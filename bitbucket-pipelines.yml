@@ -1,10 +1,18 @@
 image: bluehood/tvem
 
-pipelines:
-  default:
-    - step:
+definitions:
+  steps:
+    - step: &test
         name: test
         script:
           - conda activate tvem
           - pytest
           - pylama --options .config/pylama.ini
+
+pipelines:
+  branches:
+    master:
+      - step: *test
+  pull-requests:
+    '**':
+      - step: *test
