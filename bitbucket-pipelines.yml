@@ -1,0 +1,10 @@
+image: bluehood/tvem
+
+pipelines:
+  default:
+    - step:
+        name: test
+        script:
+          - conda activate tvem
+          - pytest
+          - pylama
