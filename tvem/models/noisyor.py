@@ -1,0 +1,149 @@
+# -*- coding: utf-8 -*-
+# Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
+# Licensed under the Academic Free License version 3.0
+
+
+from .TVEMModel import TVEMModel
+from tvem.variational import TVEMVariationalStates  # type: ignore
+from torch import Tensor
+import torch as to
+from typing import Dict, Optional
+
+
+class NoisyOR(TVEMModel):
+    """Shallow NoisyOR Model."""
+
+    eps = 1e-5
+
+    def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None,
+                 device: to.device = to.device('cpu')):
+        if W_init is not None:
+            assert W_init.shape == (D, H)
+            assert W_init.device == device
+        else:
+            W_init = to.rand(D, H, device=device)
+        if pi_init is not None:
+            assert pi_init.shape == (H,)
+            assert pi_init.device == device
+            assert (pi_init <= 1.).all() and (pi_init >= 0).all()
+        else:
+            pi_init = to.full((H,), 1./H, device=device)
+
+        self.theta = {'pi': pi_init, 'W': W_init}
+        self.new_pi = to.zeros(H, device=device)
+        self.Btilde = to.zeros(D, H, device=device)
+        self.Ctilde = to.zeros(D, H, device=device)
+
+    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
+        """Evaluate log-pseudo-joints for NoisyOR."""
+        K = states
+        Y = data
+        assert K.dtype == to.uint8 and Y.dtype == to.uint8
+        pi = self.theta['pi']
+        W = self.theta['W']
+        N, S, H = K.shape
+        D = W.shape[0]
+        dev = K.device
+        logPy = to.empty((N, S), device=dev)
+        logPriors = to.matmul(K.type_as(pi), to.log(pi/(1-pi)))
+        # the general routine for eem sometimes require evaluation of lpjs of all-zero states,
+        # which is not supported for noisy-OR.
+        # we instead manually set the lpjs of all-zero states to low values to decrease the
+        # probability they will be selected as new variational states.
+        # in case they are nevertheless selected by eem, they are discarded by noisy-OR.
+        zeroStatesInd = to.nonzero((K == 0).all(dim=2))
+        # https://discuss.pytorch.org/t/use-torch-nonzero-as-index/33218
+        zeroStatesInd = (zeroStatesInd[:, 0], zeroStatesInd[:, 1])
+        K[zeroStatesInd] = 1
+        # prods_nkd = prod{h}{1-W_dh*K_nkh}
+        prods = to.broadcast_tensors(to.empty(N, S, H, D), W.transpose(0, 1))[1].clone()
+        prod_mask = (~K).unsqueeze(-1).expand(N, S, H, D)
+        prods[prod_mask] = 0.
+        prods = to.prod(1 - prods, dim=2)
+        # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
+        f1 = to.log(1./prods - 1.)
+        indeces = Y[:, None, :].expand(N, S, D)
+        f1[~indeces] = 0.
+        logPy[:, :] = to.sum(f1, dim=-1) + to.sum(to.log(prods), dim=2)
+        K[zeroStatesInd] = 0
+        # return lpj_nk
+        lpj = logPriors + logPy
+        lpj[zeroStatesInd] = to.min(lpj) - 1
+        return lpj
+
+    def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates,
+                           mstep_factors: Dict[str, Tensor] = None) -> Optional[float]:
+        lpj = states.lpj[idx]
+        K = states.K[idx]
+        Kfloat = K.type_as(lpj)
+        deltaY = (batch.any(dim=1) == 0).type_as(lpj)
+        N = states.K.shape[0]
+
+        # pi_h = sum{n}{<K_nkh>} / N
+        self.new_pi += to.sum(self._mean_posterior(K.permute(2, 0, 1), lpj, deltaY), dim=1) / N
+
+        # Ws_dnkh = 1 - (W_dh * K_nkh)
+        Ws = 1 - self.theta['W'][:, None, None, :] * Kfloat[None, :, :, :]
+        Ws_prod = to.prod(Ws, dim=-1, keepdim=True)
+        B = Kfloat / (Ws * (1 - Ws_prod))
+        self.Btilde.add_(to.einsum('ijk,ki->ij',
+                                   self._mean_posterior(B.permute(0, 3, 1, 2), lpj, deltaY),
+                                   batch.type_as(lpj) - 1))
+        C = Ws_prod * B / Ws
+        self.Ctilde.add_(to.sum(self._mean_posterior(C.permute(0, 3, 1, 2), lpj, deltaY), dim=2))
+
+        return None
+
+    def update_param_epoch(self) -> None:
+        self.theta['pi'][:] = self.new_pi
+        to.clamp(self.theta['pi'], self.eps, 1 - self.eps, out=self.theta['pi'])
+        self.new_pi[:] = 0.
+
+        self.theta['W'][:] = 1 + self.Btilde / (self.Ctilde + self.eps)
+        to.clamp(self.theta['W'], self.eps, 1 - self.eps, out=self.theta['W'])
+        self.Btilde[:] = 0.
+        self.Ctilde[:] = 0.
+
+    def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
+        pi = self.theta['pi']
+        lpj = self.log_pseudo_joint(batch, states.K[idx])
+        N = batch.shape[0]
+        # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
+        deltaY = (batch.any(dim=1) == 0).type_as(lpj)
+        F = N * to.sum(to.log(1 - pi)) + to.sum(to.log(to.sum(to.exp(lpj), dim=1) + deltaY))
+        return F.item()
+
+    def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
+        N, H = hidden_state.shape
+        expected_H = self.theta['pi'].numel()
+        assert H == expected_H, f'input has wrong shape, expected {(N, expected_H)}, got {(N, H)}'
+        W = self.theta['W']
+        # py_nd = 1 - prod_h (1 - W_dh * s_nh)
+        py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
+        return to.rand_like(py) < py
+
+    def generate_data(self, N: int) -> Tensor:
+        print('WARN: This method override is to be removed as soon as TVEMModel implements its own')
+        pi = self.theta['pi']
+        die = to.rand(N, pi.numel(), device=pi.device)
+        return self.generate_from_hidden(die < pi)
+
+    @staticmethod
+    def _mean_posterior(g: Tensor, lpj: Tensor, deltaY: Tensor):
+        """Evaluate the mean of array g over the posterior probability distribution.
+
+        The array is assumed to have shape (...,N,K) where N is the number of
+        data-points and K is the number of configurations considered by TVEM
+        (nConfs).
+
+        The array returned has shape (...,N). Each component is the average of
+        g[...,n,k], over k, weighted by lpj[k,n].
+        """
+
+        # Evaluate constants B_n by which we can translate lpj
+        B = -to.max(lpj, dim=1, keepdim=True)[0]
+
+        # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
+        explpj = to.exp(lpj + B)
+        denominator = to.sum(explpj, dim=1) + deltaY.type_as(B)*to.exp(B[:, 0])
+        return to.einsum('...ij,ij->...i', g.type_as(lpj), explpj) / (denominator + NoisyOR.eps)
