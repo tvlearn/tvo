@@ -10,16 +10,17 @@ from itertools import combinations
 from typing import Dict, Optional, Callable
 from torch import Tensor
 
-def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
-	"""Generate matrix containing full combinatorics of an H-dimensional binary variable.
 
-	H -- length of binary vector
-	device -- default is CPU
-	"""
+def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
+    """Generate matrix containing full combinatorics of an H-dimensional binary variable.
+
+    H -- length of binary vector
+    device -- default is CPU
+    """
     sl = []
     for g in range(0,H+1):
         for s in combinations(range(H), g):
-            sl.append( to.tensor(s,dtype=to.int64) )                
+            sl.append( to.tensor(s,dtype=to.int64) )
     SM = to.zeros((len(sl), H),dtype=to.uint8,device=device)
     for i in range(len(sl)):
         s = sl[i]
@@ -28,9 +29,9 @@ def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
 
 def unique_ind(x : Tensor, dim: int = None) -> Tensor:
     """Find indices of unique elements in x along specific dimension.
-	
-	x -- torch tensor
-	dim -- dimension to apply unique
+
+    x -- torch tensor
+    dim -- dimension to apply unique
     """
     unique, inverse = to.unique(x, sorted=False, return_inverse=True, dim=dim)
     perm = to.arange(inverse.size(0), device=inverse.device)
@@ -40,11 +41,11 @@ def unique_ind(x : Tensor, dim: int = None) -> Tensor:
 def generate_unique_states(n_states: int, H: int, device: to.device = to.device('cpu')) -> Tensor:
     """Generate a torch tensor containing random and unique binary vectors.
 
-	n_states -- number of unique vectors to be generated
-	H -- size of binary vector
-	device -- default is CPU
+    n_states -- number of unique vectors to be generated
+    H -- size of binary vector
+    device -- default is CPU
 
-	Requires that n_states <= 2**H. Return has shape (n_states, H).
+    Requires that n_states <= 2**H. Return has shape (n_states, H).
     """
     assert n_states <= 2**H, "n_states must be smaller than 2**H"
     s_set = {tuple(s) for s in np.random.randint(2, size=(n_states*2, H))}
@@ -59,10 +60,10 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor, al
     """Perform substitution of old and new states (and lpj, ...) according to TVEM criterion.
 
     new_states -- set of new variational states (idx.size, newS, H)
-	new_lpj -- corresponding log-pseudo-joints (idx.size, newS)
+    new_lpj -- corresponding log-pseudo-joints (idx.size, newS)
     idx -- indeces of the datapoints that compose the batch within the dataset
     all_states -- set of all variational states (N, S, H)
-	all_lpj -- corresponding log-pseudo-joints (N, S)
+    all_lpj -- corresponding log-pseudo-joints (N, S)
 
     S is the number of variational states memorized for each of the N data-points. idx contains the ordered list of indexes for which the new_states have been evaluated (i.e. the states in new_states[0] are to be put into all_s[idx[0]]. all_s[n] is updated to contain the set of variational states with best log-pseudo-joints.
 
@@ -122,12 +123,12 @@ class TVEMVariationalStates(ABC):
     """Abstract base class for TVEM realizations."""
 
     def __init__(self, conf: Dict): 
-    	"""Construct a TVEM realization.
+        """Construct a TVEM realization.
 
-    	conf -- dictionary with hyper-parameters
-    	"""
-    	for c in ['my_N','H','S','dtype_f','device']:
-    		assert c in conf and c is not None        
+        conf -- dictionary with hyper-parameters
+        """
+        for c in ['my_N','H','S','dtype_f','device']:
+            assert c in conf and c is not None        
         self.conf   = conf
 
         self.K      = generate_unique_states(conf['S'], conf['H'], device=conf['device']).repeat(conf['my_N'], 1, 1) # (N, S, H)
@@ -135,11 +136,11 @@ class TVEMVariationalStates(ABC):
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor, lpj_fn: Callable[[Tensor, Tensor, Dict], Tensor], mstep_factors: Dict[str, Tensor]) -> int:
-    	""" Evaluate lpj of old states, generate new states and return states with highest lpj.
+        """ Evaluate lpj of old states, generate new states and return states with highest lpj.
 
-    	idx -- data point indices of batch w.r.t. K
-    	batch -- batch of data points
-    	lpj_fn -- function to evaluate lpj
-    	mstep_factors -- optional dictionary containing tensors involved in M-step
-    	"""
+        idx -- data point indices of batch w.r.t. K
+        batch -- batch of data points
+        lpj_fn -- function to evaluate lpj
+        mstep_factors -- optional dictionary containing tensors involved in M-step
+        """
         pass
