@@ -5,7 +5,7 @@
 import torch as to
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
-from tvem.variational import TVEMVariationalStates  # type: ignore
+from tvem.variational import TVEMVariationalStates
 
 
 def _make_dataloader(data: Tensor, batch_size: int = 25):
