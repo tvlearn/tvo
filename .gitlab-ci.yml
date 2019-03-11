@@ -1,4 +1,4 @@
-image: bluehood/tvem
+image: registry.gitlab.com/mloldenburg/tvem
 
 test:
   only:
