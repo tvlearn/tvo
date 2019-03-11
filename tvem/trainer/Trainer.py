@@ -5,7 +5,6 @@
 import torch as to
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
-from tvem.models import TVEMModel  # type: ignore
 from tvem.variational import TVEMVariationalStates  # type: ignore
 
 
@@ -27,8 +26,11 @@ def _make_dataloader(data: Tensor, batch_size: int = 25):
 class Trainer:
     """Train and test a given TVEMModel."""
 
-    def __init__(self, model: TVEMModel):
-        """Construct a Trainer."""
+    def __init__(self, model):
+        """Construct a Trainer.
+
+        model -- an object of a concrete type inheriting from TVEMModel
+        """
         self.model = model
 
     def train(self, epochs: int,
