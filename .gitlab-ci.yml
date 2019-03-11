@@ -1,0 +1,12 @@
+image: bluehood/tvem
+
+test:
+  only:
+    - master
+    - merge_requests
+  script:
+    - source /opt/conda/etc/profile.d/conda.sh
+    - conda activate tvem
+    - pytest
+    - pylama --options .config/pylama.ini
+    - mypy --ignore-missing-imports tvem
