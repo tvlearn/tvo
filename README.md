@@ -1,1 +1,1 @@
-# TVEM [![pipeline status](https://gitlab.com/mloldenburg/tvem/badges/master/pipeline.svg)](https://gitlab.com/mloldenburg/tvem/commits/master)
+# TVEM [![pipeline status](https://gitlab.com/mloldenburg/tvem/badges/master/pipeline.svg)](https://gitlab.com/mloldenburg/tvem/commits/master)[![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg)](https://trello.com/b/EuWTcm4w/tvem-repo)
