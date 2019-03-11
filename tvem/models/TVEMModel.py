@@ -27,6 +27,14 @@ class TVEMModel(ABC):
         """
         pass
 
+    def init_epoch(self):
+        """This method is called once at the beginning of each training epoch.
+
+        Concrete models can optionally override this method if it's convenient.
+        By default, it does nothing.
+        """
+        pass
+
     @abstractmethod
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates,
                            mstep_factors: Dict[str, Tensor] = None) -> Optional[float]:
