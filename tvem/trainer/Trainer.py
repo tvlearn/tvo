@@ -62,6 +62,7 @@ class Trainer:
             print(f'\nepoch {e}')
 
             # Training #
+            model.init_epoch()
             train_F = 0
             for idx, batch in train_dataset:
                 n_subs, mstep_factors = train_states.update(idx, batch, lpj_fn)
