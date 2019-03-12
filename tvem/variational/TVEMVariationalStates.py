@@ -10,6 +10,8 @@ from itertools import combinations
 from typing import Callable, Dict, Iterable
 from torch import Tensor
 
+from tvem.util import get
+
 
 def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
     """Generate matrix containing full combinatorics of an H-dimensional
@@ -153,15 +155,15 @@ class TVEMVariationalStates(ABC):
 
         conf -- dictionary with hyper-parameters
         """
-        for c in ['my_N', 'H', 'S', 'dtype_f', 'device']:
-            assert c in conf and c is not None
+        required_keys = ('N', 'H', 'S', 'dtype', 'device')
+        for c in required_keys:
+            assert c in conf and conf[c] is not None
         self.conf = conf
 
-        self.K = generate_unique_states(conf['S'], conf['H'],
-                                        device=conf['device']).repeat(
-            conf['my_N'], 1, 1)  # (N, S, H)
-        self.lpj = to.empty((conf['my_N'], conf['S']),
-                            dtype=conf['dtype_f'], device=conf['device'])
+        N, H, S, dtype, device = get(conf, *required_keys)
+
+        self.K = generate_unique_states(S, H, device=device).repeat(N, 1, 1)  # (N, S, H)
+        self.lpj = to.empty((N, S), dtype=dtype, device=device)
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
