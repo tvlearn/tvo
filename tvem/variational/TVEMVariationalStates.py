@@ -165,7 +165,7 @@ class TVEMVariationalStates(ABC):
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
-               lpj_fn: Callable[[Tensor, Tensor, Dict], Tensor],
+               lpj_fn: Callable[[Tensor, Tensor], Tensor],
                sort_by_lpj: Iterable[Tensor] = []) -> int:
         """ Evaluate lpj of old states, generate new states and return states
         with highest lpj.

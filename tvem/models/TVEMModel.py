@@ -5,25 +5,22 @@
 from abc import ABC, abstractmethod
 from torch import Tensor
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from typing import Dict, Optional
+from typing import Dict, Optional, Callable
 
 
 class TVEMModel(ABC):
     """Abstract base class for probabilistic generative models to be trained with TVEM."""
 
     @abstractmethod
-    def get_lpj_func(self):
+    def get_lpj_func(self) -> Callable[[Tensor, Tensor], Tensor]:
         """Return a function that evaluates log-joints (or log-pseudo-joints) for this model.
 
         The function returned should have signature
-            lpj_fn(data, states) -> lpj, mstep_factors
+            lpj_fn(data, states) -> lpj
         where:
             - data -- Tensor with shape (N,D)
             - states -- Tensor with shape (N,S,H)
             - lpj -- Tensor with shape (N,S)
-            - mstep_factors -- optional dictionary containing other Tensors with shapes (N,S,...).
-                This dictionary is passed to update_param_batch after lpj_fn has been called on
-                a given batch. The dictionary can be empty and mstep_factors can just be None.
         """
         pass
 
