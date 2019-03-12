@@ -66,7 +66,7 @@ class Trainer:
 
             # Training #
             model.init_epoch()
-            train_F = 0
+            train_F = 0.
             for idx, batch in train_dataset:
                 # TODO count avg number of subs
                 train_states.update(idx, batch, lpj_fn, model.get_mstep_factors().values())
@@ -79,7 +79,7 @@ class Trainer:
 
             # Validation #
             if val_states is not None:
-                val_F = 0
+                val_F = 0.
                 for idx, batch in val_dataset:
                     val_states.update(idx, batch, lpj_fn)
                     val_F += model.free_energy(idx, batch, val_states)
@@ -100,7 +100,7 @@ class Trainer:
 
         for e in range(epochs):
             print(f'\nepoch {e}')
-            test_F = 0
+            test_F = 0.
             for idx, batch in test_dataset:
                 test_states.update(idx, batch, lpj_fn)
                 test_F += model.free_energy(idx, batch, test_states)
