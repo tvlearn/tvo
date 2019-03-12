@@ -7,7 +7,7 @@ import torch as to
 
 from abc import ABC, abstractmethod
 from itertools import combinations
-from typing import Dict, Callable
+from typing import Callable, Dict, Iterable
 from torch import Tensor
 
 
@@ -64,7 +64,7 @@ def generate_unique_states(n_states: int, H: int, device: to.device =
 
 def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
                             all_states: Tensor, all_lpj: Tensor,
-                            mstep_factors: Dict[str, Tensor] = None) -> int:
+                            sort_by_lpj: Iterable[Tensor] = []) -> int:
     """Perform substitution of old and new states (and lpj, ...)
        according to TVEM criterion.
 
@@ -73,6 +73,8 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     idx -- indeces of the datapoints that compose the batch within the dataset
     all_states -- set of all variational states (N, S, H)
     all_lpj -- corresponding log-pseudo-joints (N, S)
+    sort_by_lpj -- optional list of tensors with shape (n,s,...) that will be
+        sorted by all_lpj, the same way all_lpj and all_states are sorted.
 
     S is the number of variational states memorized for each of the N
     data-points. idx contains the ordered list of indexes for which the
@@ -108,10 +110,8 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     all_states[idx_n, idx_s] = conc_states[idx_sc, flattened_sorted_idx]
     all_lpj[idx_n, idx_s] = conc_lpj[idx_sc, flattened_sorted_idx]
 
-    if mstep_factors is not None:
-        for key in mstep_factors:
-            mstep_factors[key][idx_n, idx_s] = mstep_factors[key]
-            [idx_n, flattened_sorted_idx]
+    for t in sort_by_lpj:
+        t[idx_n, idx_s] = t[idx_n, flattened_sorted_idx]
 
     return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
 
@@ -166,14 +166,14 @@ class TVEMVariationalStates(ABC):
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
                lpj_fn: Callable[[Tensor, Tensor, Dict], Tensor],
-               mstep_factors: Dict[str, Tensor]) -> int:
+               sort_by_lpj: Iterable[Tensor] = []) -> int:
         """ Evaluate lpj of old states, generate new states and return states
         with highest lpj.
 
         idx -- data point indices of batch w.r.t. K
         batch -- batch of data points
         lpj_fn -- function to evaluate lpj
-        mstep_factors -- optional dictionary containing tensors involved
-                         in M-step
+        sort_by_lpj -- optional list of tensors with shape (n,s,...) that will be
+            sorted by all_lpj, the same way all_lpj and all_states are sorted.
         """
         pass

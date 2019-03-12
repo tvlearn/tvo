@@ -68,8 +68,9 @@ class Trainer:
             model.init_epoch()
             train_F = 0
             for idx, batch in train_dataset:
-                n_subs, mstep_factors = train_states.update(idx, batch, lpj_fn)
-                batch_F = model.update_param_batch(idx, batch, train_states, mstep_factors)
+                # TODO count avg number of subs
+                train_states.update(idx, batch, lpj_fn, model.get_mstep_factors().values())
+                batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
                 train_F += batch_F

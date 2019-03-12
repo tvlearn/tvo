@@ -86,3 +86,7 @@ class TVEMModel(ABC):
         The returned Tensor has shape (N,D) where D is the number of observables for this model.
         """
         pass
+
+    def get_mstep_factors(self) -> Dict[str, Tensor]:
+        """Get quantities required to perform an M-step."""
+        pass
