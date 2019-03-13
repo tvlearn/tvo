@@ -5,7 +5,7 @@ test:
     - master
     - merge_requests
   script:
-    - source /opt/conda/etc/profile.d/conda.sh
+    - source $SRC_CONDA
     - conda activate tvem
     - pytest
     - pylama --options .config/pylama.ini
