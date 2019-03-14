@@ -183,7 +183,7 @@ def get_EA(parent_selection: str,
         raise RuntimeError(f'Mutation operator "{mutation}" not \
             supported. Valid options: {valid_mutations}')
 
-    return Tuple[parent_sel_dict[parent_selection], mutation_dict[mutation]]
+    return Tuple[(parent_sel_dict[parent_selection], mutation_dict[mutation])]
 
 
 def randflip(parents: Tensor, n_children: int,
