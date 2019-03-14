@@ -163,10 +163,7 @@ def get_n_new_states(mutation: str, n_parents: int, n_children: int,
         return n_parents*n_children*n_gen
 
 
-def get_EA(parent_selection: str,
-           mutation: str) -> Tuple[Callable[[Tensor, int, Tensor], Tensor],
-                                   Callable[[Tensor, int, Optional[float],
-                                             Optional[float]], Tensor]]:
+def get_EA(parent_selection: str, mutation: str) -> Tuple:
     '''Refer to the doc of `evolve_states` for the list of valid arguments'''
     parent_sel_dict = {'batch_fitparents': batch_fitparents}
     mutation_dict = {
@@ -183,7 +180,7 @@ def get_EA(parent_selection: str,
         raise RuntimeError(f'Mutation operator "{mutation}" not \
             supported. Valid options: {valid_mutations}')
 
-    return Tuple[(parent_sel_dict[parent_selection], mutation_dict[mutation])]
+    return (parent_sel_dict[parent_selection], mutation_dict[mutation])
 
 
 def randflip(parents: Tensor, n_children: int,
