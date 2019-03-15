@@ -175,7 +175,7 @@ class TVEMVariationalStates(ABC):
         idx -- data point indices of batch w.r.t. K
         batch -- batch of data points
         lpj_fn -- function to evaluate lpj
-        sort_by_lpj -- optional list of tensors with shape (n,s,...) that will be
+        sort_by_lpj -- optional list of tensors with shape (n,s,...) that will be\
             sorted by all_lpj, the same way all_lpj and all_states are sorted.
         """
         pass

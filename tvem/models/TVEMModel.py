@@ -40,7 +40,7 @@ class TVEMModel(ABC):
         idx -- indeces of the datapoints that compose the batch within the dataset
         batch -- batch of datapoints, Tensor with shape (N,D)
         states -- all variational states for this dataset
-        mstep_factors -- optional dictionary containing the Tensors that were evaluated
+        mstep_factors -- optional dictionary containing the Tensors that were evaluated\
             by the lpj_fn function returned by get_lpj_func during this batch's E-step.
 
         If the model allows it, as an optimization this method can return this batch's free energy

@@ -88,7 +88,7 @@ class Trainer:
     def test(self,  epochs: int, test_data: Tensor, test_states: TVEMVariationalStates):
         """Test model (does not run M-step).
 
-        epochs -- number of epochs to run testing for: test_states are improved at each
+        epochs -- number of epochs to run testing for: test_states are improved at each\
             iteration, therefore test results improve as the number of testing epochs increase.
         test_data -- should have shape (N,D)
         test_states -- TVEMVariationalStates with shape (N,S,H)
