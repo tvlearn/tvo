@@ -1,10 +1,25 @@
+before_script:
+    - source $SRC_CONDA
+    - conda activate tvem
+
 test:
+  stage: test
   only:
     - master
     - merge_requests
   script:
-    - source $SRC_CONDA
-    - conda activate tvem
     - pytest
     - pylama --options .config/pylama.ini
     - mypy --ignore-missing-imports tvem
+
+pages:
+  stage: deploy
+  only:
+    - master
+    - doc
+  script:
+    - conda install -q -y -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints
+    - sphinx-build docs public
+  artifacts:
+    paths:
+      - public
