@@ -4,6 +4,7 @@
 
 from typing import Dict, Any
 
+
 def get(d: Dict[Any, Any], *keys: Any):
     """Shorthand to retrieve valus at specified keys from dictionary.
 
