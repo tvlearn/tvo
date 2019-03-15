@@ -20,7 +20,7 @@ class EEMVariationalStates(TVEMVariationalStates):
     def __init__(self, conf):
         """Construct an EEM realization.
 
-        conf -- dictionary with hyper-parameters
+        :param conf: dictionary with hyper-parameters
         """
         super().__init__(conf)
         required_keys = ('parent_selection', 'mutation', 'n_parents',

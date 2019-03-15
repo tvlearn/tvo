@@ -37,10 +37,10 @@ class TVEMModel(ABC):
                            mstep_factors: Dict[str, Tensor] = None) -> Optional[float]:
         """Execute batch-wise M-step or batch-wise section of an M-step computation.
 
-        idx -- indeces of the datapoints that compose the batch within the dataset
-        batch -- batch of datapoints, Tensor with shape (N,D)
-        states -- all variational states for this dataset
-        mstep_factors -- optional dictionary containing the Tensors that were evaluated\
+        :param idx: indeces of the datapoints that compose the batch within the dataset
+        :param batch: batch of datapoints, Tensor with shape (N,D)
+        :param states: all variational states for this dataset
+        :param mstep_factors: optional dictionary containing the Tensors that were evaluated\
             by the lpj_fn function returned by get_lpj_func during this batch's E-step.
 
         If the model allows it, as an optimization this method can return this batch's free energy
@@ -62,9 +62,9 @@ class TVEMModel(ABC):
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
-        idx -- indeces of the datapoints in batch within the full dataset
-        batch -- batch of datapoints, Tensor with shape (N,D)
-        states -- all TVEMVariationalStates states for this dataset
+        :param idx: indeces of the datapoints in batch within the full dataset
+        :param batch: batch of datapoints, Tensor with shape (N,D)
+        :param states: all TVEMVariationalStates states for this dataset
         """
         pass
 
@@ -77,7 +77,7 @@ class TVEMModel(ABC):
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Generate N random datapoints from this model.
 
-        hidden_state -- Tensor with shape (N,H) where H is the number of units in the
+        :param hidden_state: Tensor with shape (N,H) where H is the number of units in the
             first latent layer.
 
         The returned Tensor has shape (N,D) where D is the number of observables for this model.

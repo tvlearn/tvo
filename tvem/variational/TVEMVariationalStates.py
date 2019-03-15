@@ -17,8 +17,8 @@ def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
     """Generate matrix containing full combinatorics of an H-dimensional
        binary variable.
 
-    H -- length of binary vector
-    device -- default is CPU
+    :param H: length of binary vector
+    :param device: default is CPU
     """
     sl = []
     for g in range(0, H+1):
@@ -34,8 +34,8 @@ def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
 def unique_ind(x: Tensor, dim: int = None) -> Tensor:
     """Find indices of unique elements in x along specific dimension.
 
-    x -- torch tensor
-    dim -- dimension to apply unique
+    :param x: torch tensor
+    :param dim: dimension to apply unique
     """
     unique, inverse = to.unique(x, sorted=False, return_inverse=True, dim=dim)
     perm = to.arange(inverse.size(0), device=inverse.device)
@@ -47,9 +47,9 @@ def generate_unique_states(n_states: int, H: int, device: to.device =
                            to.device('cpu')) -> Tensor:
     """Generate a torch tensor containing random and unique binary vectors.
 
-    n_states -- number of unique vectors to be generated
-    H -- size of binary vector
-    device -- default is CPU
+    :param n_states: number of unique vectors to be generated
+    :param H: size of binary vector
+    :param device: default is CPU
 
     Requires that n_states <= 2**H. Return has shape (n_states, H).
     """
@@ -70,12 +70,12 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     """Perform substitution of old and new states (and lpj, ...)
        according to TVEM criterion.
 
-    new_states -- set of new variational states (idx.size, newS, H)
-    new_lpj -- corresponding log-pseudo-joints (idx.size, newS)
-    idx -- indeces of the datapoints that compose the batch within the dataset
-    all_states -- set of all variational states (N, S, H)
-    all_lpj -- corresponding log-pseudo-joints (N, S)
-    sort_by_lpj -- optional list of tensors with shape (n,s,...) that will be
+    :param new_states: set of new variational states (idx.size, newS, H)
+    :param new_lpj: corresponding log-pseudo-joints (idx.size, newS)
+    :param idx: indeces of the datapoints that compose the batch within the dataset
+    :param all_states: set of all variational states (N, S, H)
+    :param all_lpj: corresponding log-pseudo-joints (N, S)
+    :param sort_by_lpj: optional list of tensors with shape (n,s,...) that will be
         sorted by all_lpj, the same way all_lpj and all_states are sorted.
 
     S is the number of variational states memorized for each of the N
@@ -123,9 +123,9 @@ def set_redundant_lpj_to_low(new_states: Tensor, new_lpj: Tensor,
     """Find redundant states in new_states w.r.t. old_states and set
        corresponding lpg to low.
 
-    new_states -- set of new variational states (batch_size, newS, H)
-    new_lpj -- corresponding log-pseudo-joints (batch_size, newS)
-    old_states -- (batch_size, S, H)
+    :param new_states: set of new variational states (batch_size, newS, H)
+    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
+    :param old_states: (batch_size, S, H)
     """
 
     N, S, H = old_states.shape
@@ -153,7 +153,7 @@ class TVEMVariationalStates(ABC):
     def __init__(self, conf: Dict):
         """Construct a TVEM realization.
 
-        conf -- dictionary with hyper-parameters
+        :param conf: dictionary with hyper-parameters
         """
         required_keys = ('N', 'H', 'S', 'dtype', 'device')
         for c in required_keys:
@@ -172,10 +172,10 @@ class TVEMVariationalStates(ABC):
         """ Evaluate lpj of old states, generate new states and return states
         with highest lpj.
 
-        idx -- data point indices of batch w.r.t. K
-        batch -- batch of data points
-        lpj_fn -- function to evaluate lpj
-        sort_by_lpj -- optional list of tensors with shape (n,s,...) that will be\
+        :param idx: data point indices of batch w.r.t. K
+        :param batch: batch of data points
+        :param lpj_fn: function to evaluate lpj
+        :param sort_by_lpj: optional list of tensors with shape (n,s,...) that will be\
             sorted by all_lpj, the same way all_lpj and all_states are sorted.
         """
         pass
