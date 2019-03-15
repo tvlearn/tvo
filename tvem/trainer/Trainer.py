@@ -12,8 +12,8 @@ from tvem.variational import TVEMVariationalStates
 def _make_dataloader(data: Tensor, batch_size: int = 25):
     """Create a pytorch DataLoader that returns datapoint indeces together with batches.
 
-    data -- should have shape (N,D)
-    batch_size -- should be an exact divisor of N
+    :param data: -- should have shape (N,D)
+    :param batch_size: -- should be an exact divisor of N
 
     Example usage of the DataLoader created here:
         for idx, batch in data_loader:
@@ -30,7 +30,7 @@ class Trainer:
     def __init__(self, model: TVEMModel):
         """Construct a Trainer.
 
-        model -- an object of a concrete type inheriting from TVEMModel
+        :param model: -- an object of a concrete type inheriting from TVEMModel
         """
         self.model = model
 
@@ -39,11 +39,11 @@ class Trainer:
               val_data: Tensor = None, val_states: TVEMVariationalStates = None):
         """Train model on given dataset for the given number of epochs.
 
-        epochs -- number of epochs to train for
-        train_data -- should have shape (N,D)
-        train_states -- TVEMVariationalStates with shape (N,S,H)
-        val_data -- should have shape (M,D) (optional)
-        val_states -- TVEMVariationalStates with shape (M,Z,H) (optional)
+        :param epochs: -- number of epochs to train for
+        :param train_data: -- should have shape (N,D)
+        :param train_states: -- TVEMVariationalStates with shape (N,S,H)
+        :param val_data: -- should have shape (M,D) (optional)
+        :param val_states: -- TVEMVariationalStates with shape (M,Z,H) (optional)
 
         Training steps on the validation dataset only perform E-steps,
         i.e. model parameters are not updated but val_states are.
@@ -88,10 +88,10 @@ class Trainer:
     def test(self,  epochs: int, test_data: Tensor, test_states: TVEMVariationalStates):
         """Test model (does not run M-step).
 
-        epochs -- number of epochs to run testing for: test_states are improved at each\
+        :param epochs: -- number of epochs to run testing for: test_states are improved at each\
             iteration, therefore test results improve as the number of testing epochs increase.
-        test_data -- should have shape (N,D)
-        test_states -- TVEMVariationalStates with shape (N,S,H)
+        :param test_data: -- should have shape (N,D)
+        :param test_states: -- TVEMVariationalStates with shape (N,S,H)
         """
         model = self.model
         test_N = test_data.shape[0]
