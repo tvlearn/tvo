@@ -16,7 +16,6 @@ pages:
   stage: deploy
   only:
     - master
-    - doc
   script:
     - conda install -q -y -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints
     - sphinx-build docs public
