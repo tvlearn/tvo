@@ -1,4 +1,4 @@
 from .TVEMVariationalStates import TVEMVariationalStates
 from .fullem import FullEM
-
-__all__ = ['TVEMVariationalStates', 'FullEM']
+from .RandomSampledVarStates import RandomSampledVarStates
+__all__ = ['TVEMVariationalStates', 'FullEM', 'RandomSampledVarStates']
