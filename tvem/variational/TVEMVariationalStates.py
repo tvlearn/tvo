@@ -153,7 +153,7 @@ class TVEMVariationalStates(ABC):
     def __init__(self, conf: Dict):
         """Construct a TVEM realization.
 
-        :param conf: dictionary with hyper-parameters
+        :param conf: dictionary with hyper-parameters. Required keys: N, H, S, dtype, device
         """
         required_keys = ('N', 'H', 'S', 'dtype', 'device')
         for c in required_keys:
@@ -169,13 +169,13 @@ class TVEMVariationalStates(ABC):
     def update(self, idx: Tensor, batch: Tensor,
                lpj_fn: Callable[[Tensor, Tensor], Tensor],
                sort_by_lpj: Iterable[Tensor] = []) -> int:
-        """ Evaluate lpj of old states, generate new states and return states
-        with highest lpj.
+        """Generate new variational states, update K and lpj with best samples and their lpj.
 
         :param idx: data point indices of batch w.r.t. K
         :param batch: batch of data points
         :param lpj_fn: function to evaluate lpj
         :param sort_by_lpj: optional list of tensors with shape (n,s,...) that will be\
             sorted by all_lpj, the same way all_lpj and all_states are sorted.
+        :returns: average number of variational state substitutions per datapoint performed
         """
         pass
