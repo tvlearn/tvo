@@ -25,10 +25,8 @@ def _make_dataloader(data: Tensor, batch_size: int = 25):
 
 
 class Trainer:
-    """Train and test a given TVEMModel."""
-
     def __init__(self, model: TVEMModel):
-        """Construct a Trainer.
+        """Train and test a given TVEMModel.
 
         :param model: an object of a concrete type inheriting from TVEMModel
         """

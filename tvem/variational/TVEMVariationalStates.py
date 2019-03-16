@@ -7,7 +7,7 @@ import torch as to
 
 from abc import ABC, abstractmethod
 from itertools import combinations
-from typing import Callable, Dict, Iterable
+from typing import Callable, Dict, Iterable, Any
 from torch import Tensor
 
 from tvem.util import get
@@ -148,10 +148,8 @@ def set_redundant_lpj_to_low(new_states: Tensor, new_lpj: Tensor,
 
 
 class TVEMVariationalStates(ABC):
-    """Abstract base class for TVEM realizations."""
-
-    def __init__(self, conf: Dict):
-        """Construct a TVEM realization.
+    def __init__(self, conf: Dict[str, Any]):
+        """Abstract base class for TVEM realizations.
 
         :param conf: dictionary with hyper-parameters. Required keys: N, H, S, dtype, device
         """

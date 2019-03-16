@@ -15,10 +15,8 @@ from tvem.variational.TVEMVariationalStates import update_states_for_batch,\
 
 
 class EEMVariationalStates(TVEMVariationalStates):
-    """Evolutionary Expectation Maximization class."""
-
     def __init__(self, conf):
-        """Construct an EEM realization.
+        """Evolutionary Expectation Maximization class.
 
         :param conf: dictionary with hyper-parameters
         """
