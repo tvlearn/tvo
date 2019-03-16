@@ -25,7 +25,7 @@ class TVEMModel(ABC):
         """
         pass
 
-    def init_epoch(self):
+    def init_epoch(self) -> None:
         """This method is called once at the beginning of each training epoch.
 
         Concrete models can optionally override this method if it's convenient.
