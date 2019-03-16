@@ -55,7 +55,7 @@ class Trainer:
         model = self.model
         train_N = train_data.shape[0]
         train_dataset = _make_dataloader(train_data)
-        lpj_fn = model.get_lpj_func()
+        lpj_fn = model.log_pseudo_joint
 
         if val_data is not None:
             val_N = val_data.shape[0]
@@ -96,7 +96,7 @@ class Trainer:
         model = self.model
         test_N = test_data.shape[0]
         test_dataset = _make_dataloader(test_data)
-        lpj_fn = model.get_lpj_func()
+        lpj_fn = model.log_pseudo_joint
 
         for e in range(epochs):
             print(f'\nepoch {e}')
