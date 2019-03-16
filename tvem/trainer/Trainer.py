@@ -67,7 +67,7 @@ class Trainer:
             train_F = 0.
             for idx, batch in train_dataset:
                 # TODO count avg number of subs
-                train_states.update(idx, batch, lpj_fn, model.get_mstep_factors().values())
+                train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
