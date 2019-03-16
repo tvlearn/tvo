@@ -5,22 +5,23 @@
 from abc import ABC, abstractmethod
 from torch import Tensor
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional
 
 
 class TVEMModel(ABC):
     """Abstract base class for probabilistic generative models to be trained with TVEM."""
 
     @abstractmethod
-    def get_lpj_func(self) -> Callable[[Tensor, Tensor], Tensor]:
-        """Return a function that evaluates log-joints (or log-pseudo-joints) for this model.
+    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
+        """Evaluate log-pseudo-joint probabilities for this model.
 
-        The function returned should have signature
-            lpj_fn(data, states) -> lpj
-        where:
-            - data -- Tensor with shape (N,D)
-            - states -- Tensor with shape (N,S,H)
-            - lpj -- Tensor with shape (N,S)
+        :param data: shape is (N,D)
+        :param states: shape is (N,S,H)
+        :returns: log-pseudo-joints for data and states - shape is (N,S)
+
+        Log-pseudo-joint probabilities are the log-joint probabilities of the model
+        for the specified set of datapoints and variational states where, potentially,
+        some factors that do not depend on the variational states have been elided.
         """
         pass
 
