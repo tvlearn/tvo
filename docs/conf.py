@@ -181,3 +181,4 @@ epub_exclude_files = ['search.html']
 
 # -- Extension configuration -------------------------------------------------
 autoclass_content = 'both'
+autodoc_default_flags = ['undoc-members']
