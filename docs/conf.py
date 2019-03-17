@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'TVEM'
-copyright = '2019, Jakob Drefs & Enrico Guiraud'
+copyright = '2019, Machine Learning Group of the University of Oldenburg'
 author = 'Jakob Drefs & Enrico Guiraud'
 
 # The short X.Y version
