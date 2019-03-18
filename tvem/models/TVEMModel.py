@@ -34,8 +34,8 @@ class TVEMModel(ABC):
         pass
 
     @abstractmethod
-    def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates,
-                           mstep_factors: Dict[str, Tensor] = None) -> Optional[float]:
+    def update_param_batch(self, idx: Tensor, batch: Tensor,
+                           states: TVEMVariationalStates) -> Optional[float]:
         """Execute batch-wise M-step or batch-wise section of an M-step computation.
 
         :param idx: indeces of the datapoints that compose the batch within the dataset
