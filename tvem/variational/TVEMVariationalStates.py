@@ -148,10 +148,11 @@ def set_redundant_lpj_to_low(new_states: Tensor, new_lpj: Tensor,
 
 
 class TVEMVariationalStates(ABC):
-    def __init__(self, conf: Dict[str, Any]):
+    def __init__(self, conf: Dict[str, Any], K_init: Tensor = None):
         """Abstract base class for TVEM realizations.
 
         :param conf: dictionary with hyper-parameters. Required keys: N, H, S, dtype, device
+        :param K_init: if specified, self.K will be initialized with this Tensor of shape (N,S,H)
         """
         required_keys = ('N', 'H', 'S', 'dtype', 'device')
         for c in required_keys:
@@ -160,7 +161,11 @@ class TVEMVariationalStates(ABC):
 
         N, H, S, dtype, device = get(conf, *required_keys)
 
-        self.K = generate_unique_states(S, H, device=device).repeat(N, 1, 1)  # (N, S, H)
+        if K_init is not None:
+            assert K_init.shape == (N, S, H)
+            self.K = K_init.clone()
+        else:
+            self.K = generate_unique_states(S, H, device=device).repeat(N, 1, 1)  # (N, S, H)
         self.lpj = to.empty((N, S), dtype=dtype, device=device)
 
     @abstractmethod
