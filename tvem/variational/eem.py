@@ -6,7 +6,7 @@ import numpy as np
 import torch as to
 
 from itertools import combinations
-from typing import Callable, Iterable, Tuple, Optional
+from typing import Callable, Dict, Tuple, Optional
 from torch import Tensor
 
 from tvem.util import get
@@ -29,7 +29,7 @@ class EEMVariationalStates(TVEMVariationalStates):
 
     def update(self, idx: Tensor, batch: Tensor,
                lpj_fn: Callable[[Tensor, Tensor], Tensor],
-               sort_by_lpj: Iterable[Tensor] = []) -> int:
+               sort_by_lpj: Dict[str, Tensor] = {}) -> int:
 
         conf = self.conf
         K = self.K

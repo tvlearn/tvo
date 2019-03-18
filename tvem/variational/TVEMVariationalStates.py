@@ -7,7 +7,7 @@ import torch as to
 
 from abc import ABC, abstractmethod
 from itertools import combinations
-from typing import Callable, Dict, Iterable, Any
+from typing import Callable, Dict, Any
 from torch import Tensor
 
 from tvem.util import get
@@ -66,7 +66,7 @@ def generate_unique_states(n_states: int, H: int, device: to.device =
 
 def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
                             all_states: Tensor, all_lpj: Tensor,
-                            sort_by_lpj: Iterable[Tensor] = []) -> int:
+                            sort_by_lpj: Dict[str, Tensor] = {}) -> int:
     """Perform substitution of old and new states (and lpj, ...)
        according to TVEM criterion.
 
@@ -112,7 +112,7 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     all_states[idx_n, idx_s] = conc_states[idx_sc, flattened_sorted_idx]
     all_lpj[idx_n, idx_s] = conc_lpj[idx_sc, flattened_sorted_idx]
 
-    for t in sort_by_lpj:
+    for t in sort_by_lpj.values():
         t[idx_n, idx_s] = t[idx_n, flattened_sorted_idx]
 
     return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
@@ -166,13 +166,13 @@ class TVEMVariationalStates(ABC):
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
                lpj_fn: Callable[[Tensor, Tensor], Tensor],
-               sort_by_lpj: Iterable[Tensor] = []) -> int:
+               sort_by_lpj: Dict[str, Tensor] = {}) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 
         :param idx: data point indices of batch w.r.t. K
         :param batch: batch of data points
         :param lpj_fn: function to evaluate lpj
-        :param sort_by_lpj: optional list of tensors with shape (n,s,...) that will be\
+        :param sort_by_lpj: optional dictionary of tensors with shape (N,S,...) that will be\
             sorted by all_lpj, the same way all_lpj and all_states are sorted.
         :returns: average number of variational state substitutions per datapoint performed
         """

@@ -5,7 +5,7 @@
 from abc import ABC, abstractmethod
 from torch import Tensor
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from typing import Dict, Optional, Iterable
+from typing import Dict, Optional
 
 
 class TVEMModel(ABC):
@@ -86,13 +86,13 @@ class TVEMModel(ABC):
         pass
 
     @property
-    def sorted_by_lpj(self) -> Iterable[Tensor]:
-        """A list of Tensors that are to be kept ordered in sync with log-pseudo-joints.
+    def sorted_by_lpj(self) -> Dict[str, Tensor]:
+        """A dictionary of Tensors that are to be kept ordered in sync with log-pseudo-joints.
 
-        The Trainer will take care that the tensors in this list are sorted the same way
+        The Trainer will take care that the tensors in this dictionary are sorted the same way
         log-pseudo-joints are during an E-step.
         Tensors must have shapes (batch_size, S, ...) where S is the number of variational
         states per datapoint used during training.
-        By default the list is empy. Concrete models can override this property if need be.
+        By default the dictionary is empy. Concrete models can override this property if need be.
         """
-        return []
+        return {}
