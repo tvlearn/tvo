@@ -1,3 +1,6 @@
+variables:
+   TVEM_USE_GPU: 1
+
 before_script:
     - source $SRC_CONDA
     - conda activate tvem
