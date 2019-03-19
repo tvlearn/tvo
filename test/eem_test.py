@@ -50,8 +50,8 @@ class TestEEM(unittest.TestCase):
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(
-                    n_parents, H, device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H,
+                                                 device=device)  # is (n_parents, H)
                 # is (n_parents*n_children, H)
                 children = eem.randflip(parents, n_children)
 
@@ -68,9 +68,8 @@ class TestEEM(unittest.TestCase):
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(
-                    n_parents, H, device)  # is (n_parents, H)
-                # is (n_parents*n_children, H)
+                parents = generate_unique_states(n_states=n_parents, H=H,
+                                                 device=device)  # is (n_parents, H)
                 children = eem.sparseflip(parents, n_children, sparsity, p_bf)
 
                 self.assertEqual(children.shape[0], n_parents*n_children)
@@ -86,8 +85,8 @@ class TestEEM(unittest.TestCase):
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(
-                    n_parents, H, device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H,
+                                                 device=device)  # is (n_parents, H)
                 children = eem.cross(parents)  # is (n_parents*n_children, H)
 
                 self.assertEqual(children.shape[0], n_parents*(n_parents-1))
@@ -103,8 +102,8 @@ class TestEEM(unittest.TestCase):
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(
-                    n_parents, H, device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H,
+                                                 device=device)  # is (n_parents, H)
 
                 to.manual_seed(seed)
                 to.cuda.manual_seed_all(seed)
@@ -130,8 +129,8 @@ class TestEEM(unittest.TestCase):
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(
-                    n_parents, H, device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H,
+                                                 device=device)  # is (n_parents, H)
 
                 to.manual_seed(seed)
                 to.cuda.manual_seed_all(seed)
@@ -158,9 +157,9 @@ class TestEEM(unittest.TestCase):
 
             for x in range(self.n_runs):
 
-                candidates = generate_unique_states(n_candidates, H, device).repeat(
-                    batch_size, 1, 1)  # is (batch_size, n_candidates, H)
-                # is (batch_size, n_candidates)
+                candidates = generate_unique_states(n_states=n_candidates, H=H,
+                                                    device=device).repeat(batch_size, 1, 1)
+                # is (batch_size, n_candidates, H)
                 lpj = lpj_dummy(candidates, None)
 
                 # is (batch_size, n_parents, H)

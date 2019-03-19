@@ -49,7 +49,8 @@ class TestTVEM(unittest.TestCase):
 
             device = to.device(key)
 
-            states = generate_unique_states(n_states, H, device)
+            states = generate_unique_states(
+                n_states=n_states, H=H, device=device)
             states_unique_ind = unique_ind(states, dim=0)
 
             self.assertEqual(states.shape[0], n_states)
