@@ -2,6 +2,8 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
+import torch as to
+
 from abc import ABC, abstractmethod
 from torch import Tensor
 from tvem.variational import TVEMVariationalStates  # type: ignore
@@ -96,3 +98,23 @@ class TVEMModel(ABC):
         By default the dictionary is empy. Concrete models can override this property if need be.
         """
         return {}
+
+
+def init_W_default(data_mean: Tensor, data_var: Tensor, H: int,
+                   dtype: to.dtype = to.float64, device: to.device = to.device('cpu')):
+
+    return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() +\
+        to.mean(to.sqrt(data_var.to(dtype=dtype, device=device))) * \
+        to.randn((data_mean.size(), H), dtype=dtype, device=device)
+
+
+def init_sigma_default(data_var: Tensor, dtype: to.dtype = to.float64,
+                       device: to.device = to.device('cpu')):
+
+    return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)))
+
+
+def init_pies_default(H: int, crowdedness: float = 2., dtype: to.dtype = to.float64,
+                      device: to.device = to.device('cpu')):
+
+    return to.full((H,), fill_value=crowdedness/H, dtype=dtype, device=device)
