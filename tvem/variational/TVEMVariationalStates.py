@@ -6,29 +6,10 @@ import numpy as np
 import torch as to
 
 from abc import ABC, abstractmethod
-from itertools import combinations
 from typing import Callable, Dict, Any
 from torch import Tensor
 
 from tvem.util import get
-
-
-def state_matrix(H: int, device: to.device = to.device('cpu')) -> Tensor:
-    """Generate matrix containing full combinatorics of an H-dimensional
-       binary variable.
-
-    :param H: length of binary vector
-    :param device: default is CPU
-    """
-    sl = []
-    for g in range(0, H+1):
-        for s in combinations(range(H), g):
-            sl.append(to.tensor(s, dtype=to.int64))
-    SM = to.zeros((len(sl), H), dtype=to.uint8, device=device)
-    for i in range(len(sl)):
-        s = sl[i]
-        SM[i, s] = 1
-    return SM
 
 
 def unique_ind(x: Tensor, dim: int = None) -> Tensor:
