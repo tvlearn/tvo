@@ -100,8 +100,17 @@ class TVEMModel(ABC):
         return {}
 
 
-def init_W_default(data_mean: Tensor, data_var: Tensor, H: int,
-                   dtype: to.dtype = to.float64, device: to.device = to.device('cpu')):
+def init_W_data_mean(data_mean: Tensor, data_var: Tensor, H: int,
+                     dtype: to.dtype = to.float64, device: to.device = to.device('cpu')):
+    """Initialize weights W based on noisy mean of the data points.
+
+    param data_mean: Mean of all data points. Length equals data dimensionality D.
+    param data_var: Variance of all data points in each dimension d=1,...D.
+    param H: Number of basis functions to be generated.
+    param dtype: Default is to.float64.
+    param device: Default is 'cpu'.
+    returns: Weight matrix W with shape (D,H).
+    """
 
     return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() +\
         to.mean(to.sqrt(data_var.to(dtype=dtype, device=device))) * \
@@ -110,11 +119,28 @@ def init_W_default(data_mean: Tensor, data_var: Tensor, H: int,
 
 def init_sigma_default(data_var: Tensor, dtype: to.dtype = to.float64,
                        device: to.device = to.device('cpu')):
+    """Initialize scalar sigma parameter based on variance of the data points.
+
+    param data_var: Variance of all data points in each dimension d=1,...D of the data.
+    param dtype: Default is to.float64.
+    param device: Default is 'cpu'.
+    returns: Scalar sigma parameter.
+
+    Returns the mean of the variance in each dimension d=1,...,D.
+    """
 
     return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)))
 
 
 def init_pies_default(H: int, crowdedness: float = 2., dtype: to.dtype = to.float64,
                       device: to.device = to.device('cpu')):
+    """Initialize pi parameter based on given crowdedness.
+
+    param H: Length of pi vector.
+    param crowdedness: Average crowdedness corresponding to sum of elements in vector pi.
+    param dtype: Default is to.float64.
+    param device: Default is 'cpu'.
+    returns: Vector pi.
+    """
 
     return to.full((H,), fill_value=crowdedness/H, dtype=dtype, device=device)
