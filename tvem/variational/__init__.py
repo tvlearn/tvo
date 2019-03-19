@@ -1,4 +1,4 @@
 from .TVEMVariationalStates import TVEMVariationalStates
-from .FullEM import FullEM
+from .fullem import FullEM
 
-__all__ = ['TVEMVariationalStates' 'FullEM']
+__all__ = ['TVEMVariationalStates', 'FullEM']
