@@ -43,21 +43,22 @@ def unique_ind(x: Tensor, dim: int = None) -> Tensor:
     return inverse.new_empty(unique.size(0)).scatter_(0, inverse, perm)
 
 
-def generate_unique_states(n_states: int, H: int, device: to.device =
-                           to.device('cpu')) -> Tensor:
+def generate_unique_states(n_states: int, H: int, crowdedness: float = 1.,
+                           device: to.device = to.device('cpu')) -> Tensor:
     """Generate a torch tensor containing random and unique binary vectors.
 
     :param n_states: number of unique vectors to be generated
     :param H: size of binary vector
+    :param crowdedness: average crowdedness per state
     :param device: default is CPU
 
     Requires that n_states <= 2**H. Return has shape (n_states, H).
     """
     assert n_states <= 2**H, "n_states must be smaller than 2**H"
-    s_set = {tuple(s) for s in np.random.randint(2, size=(n_states*2, H))}
+    s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness/H, size=(n_states//2, H))}
     while len(s_set) < n_states:
         s_set.update({tuple(s) for s in np.random.binomial(
-            1, p=1./H, size=(n_states//2, H))})
+            1, p=crowdedness/H, size=(n_states//2, H))})
     while len(s_set) > n_states:
         s_set.pop()
     return to.from_numpy(np.array(tuple(s for s in s_set), dtype=int)).to(
