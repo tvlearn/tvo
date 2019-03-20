@@ -9,6 +9,7 @@ from typing import Dict, Any
 
 import torch as to
 import torch.distributed as dist
+from torch import Tensor
 
 
 def pprint(obj: object = "", dist: to.distributed = dist, end: str = '\n'):
@@ -66,3 +67,59 @@ def init_processes(cuda: bool = False, multi_node: bool = False) -> Dict[str, An
         platform.node(), global_rank, comm['device_str'], comm_size))
 
     return comm
+
+
+def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
+                      device: to.device = to.device('cpu')):
+    """Split tensor into chunks and scatter within process group.
+
+    param data: Tensor to be scattered. Chunks are cut along dimension 0.
+    param src: Source rank to scatter from.
+    param dtype: dtype of resulting tensor.
+    param device: device of resulting tensor.
+
+    Tensor data is assumed to be None on all but the root processes.
+    """
+
+    comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
+
+    ndim = to.empty((1,), dtype=to.uint64)
+    if comm_rank == src:
+        ndim[:] = data.dim()
+    dist.broadcast(ndim, src)
+    shape = to.empty((ndim.item(),), dtype=to.int64)
+    if comm_rank == src:
+        shape[:] = to.tensor(data.shape)
+    dist.broadcast(shape, src)
+    total_length, other_length = shape[0], shape[1:]
+
+    # determine number of and eventually add dummy rows for scatter/gather compatibility
+    # no datapoints per
+    local_length_ = int(to.ceil(to.tensor([float(total_length)/comm_size])))
+    # commrank including
+    # dummy rows
+    empty_length = local_length_ * comm_size - total_length
+    local_length = local_length_
+    if comm_rank == comm_size-1:
+        local_length -= empty_length  # no datapoints per commrank excluding dummy rows actual
+        # last commrank eventually runs on smaller chunk
+
+    dist.barrier()
+
+    # split into chunks and scatter
+    chunks = []  # type: ignore
+    if comm_rank == 0:
+        chunks = list(to.chunk(to.cat((data.to(dtype=dtype, device=device), to.zeros(
+            (empty_length, other_length), dtype=dtype, device=device)), dim=0), comm_size, dim=0))
+
+    my_data = to.zeros((local_length_, other_length),
+                       dtype=dtype, device=device)
+
+    dist.scatter(my_data, src=src, scatter_list=chunks)
+
+    # remove dummy rows again before actual computation starts
+    if empty_length != 0:
+        if comm_rank == comm_size-1:
+            my_data = my_data[:local_length, :]
+
+    return my_data
