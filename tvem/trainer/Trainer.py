@@ -9,7 +9,7 @@ from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 
 
-def _make_dataloader(data: Tensor, batch_size: int = 25):
+def _make_dataloader(data: Tensor, batch_size: int):
     """Create a pytorch DataLoader that returns datapoint indeces together with batches.
 
     :param data: should have shape (N,D)
@@ -32,12 +32,14 @@ class Trainer:
         """
         self.model = model
 
-    def train(self, epochs: int,
+    def train(self, epochs: int, batch_size: int,
               train_data: Tensor, train_states: TVEMVariationalStates,
               val_data: Tensor = None, val_states: TVEMVariationalStates = None):
         """Train model on given dataset for the given number of epochs.
 
         :param epochs: number of epochs to train for
+        :param batch_size: data will be processed in batches of this size.\
+            batch_size should be an exact divisor of the number of datapoints.
         :param train_data: should have shape (N,D)
         :param train_states: TVEMVariationalStates with shape (N,S,H)
         :param val_data: should have shape (M,D) (optional)
@@ -52,12 +54,12 @@ class Trainer:
         # Setup #
         model = self.model
         train_N = train_data.shape[0]
-        train_dataset = _make_dataloader(train_data)
+        train_dataset = _make_dataloader(train_data, batch_size)
         lpj_fn = model.log_pseudo_joint
 
         if val_data is not None:
             val_N = val_data.shape[0]
-            val_dataset = _make_dataloader(val_data)
+            val_dataset = _make_dataloader(val_data, batch_size)
 
         for e in range(epochs):
             print(f'\nepoch {e}')
@@ -83,7 +85,7 @@ class Trainer:
                     val_F += model.free_energy(idx, batch, val_states)
                 print(f'\tval F/N: {val_F/val_N:.5f}')
 
-    def test(self,  epochs: int, test_data: Tensor, test_states: TVEMVariationalStates):
+    def test(self, epochs: int, test_data: Tensor, test_states: TVEMVariationalStates):
         """Test model (does not run M-step).
 
         :param epochs: number of epochs to run testing for: test_states are improved at each\
@@ -93,7 +95,7 @@ class Trainer:
         """
         model = self.model
         test_N = test_data.shape[0]
-        test_dataset = _make_dataloader(test_data)
+        test_dataset = _make_dataloader(test_data, test_N)
         lpj_fn = model.log_pseudo_joint
 
         for e in range(epochs):
