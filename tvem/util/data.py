@@ -6,7 +6,6 @@ import torch as to
 from torch.utils.data import TensorDataset, DataLoader
 
 
-class TVEMDataLoader:
-    def __init__(self, data: TensorDataset, *args, **kwargs):
-        N = data.tensors[0].shape[0]
-        return DataLoader(TensorDataset(to.arange(N), *data.tensors), *args, **kwargs)
+def TVEMDataLoader(data: TensorDataset, *args, **kwargs) -> DataLoader:
+    N = data.tensors[0].shape[0]
+    return DataLoader(TensorDataset(to.arange(N), *data.tensors), *args, **kwargs)
