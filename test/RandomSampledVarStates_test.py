@@ -2,14 +2,14 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-import os
 import pytest
 import torch as to
 from tvem.variational import RandomSampledVarStates
+import tvem
 
-test_devices = ['cpu']
-if 'TVEM_USE_GPU' in os.environ:
-    test_devices.append('cuda:0')
+test_devices = [to.device('cpu')]
+if tvem.device != test_devices[0]:
+    test_devices.append(tvem.device)
 
 
 def count_active_units(data, states):

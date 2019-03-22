@@ -4,17 +4,17 @@
 
 
 import unittest
-import os
 
 import torch as to
 
 from tvem.variational.TVEMVariationalStates import unique_ind, \
     generate_unique_states, update_states_for_batch, set_redundant_lpj_to_low
+import tvem
 
 
-test_devices = ['cpu', ]
-if 'TVEM_USE_GPU' in os.environ:
-    test_devices += ['cuda:0', ]
+test_devices = [to.device('cpu')]
+if tvem.device != to.device('cpu'):
+    test_devices.append(tvem.device)
 
 
 class TestTVEM(unittest.TestCase):
@@ -45,9 +45,7 @@ class TestTVEM(unittest.TestCase):
 
         n_states, H = 5, 8
 
-        for key in test_devices:
-
-            device = to.device(key)
+        for device in test_devices:
 
             states = generate_unique_states(
                 n_states=n_states, H=H, device=device)
@@ -82,9 +80,7 @@ class TestTVEM(unittest.TestCase):
 
         dtype_f = self.dtype_f
 
-        for key in test_devices:
-
-            device = to.device(key)
+        for device in test_devices:
 
             old_states = to.tensor([[[0, 1, 1], [1, 0, 0]], [[0, 1, 1], [
                                    1, 0, 1]]], dtype=to.uint8, device=device)

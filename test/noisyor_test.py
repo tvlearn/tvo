@@ -9,6 +9,7 @@ import pytest
 from tvem.models import NoisyOR
 from tvem.variational import TVEMVariationalStates
 import math
+import tvem
 
 test_devices = [to.device('cpu')]
 if 'TVEM_USE_GPU' in os.environ:
@@ -18,39 +19,40 @@ if 'TVEM_USE_GPU' in os.environ:
 class AllStatesExceptZero(TVEMVariationalStates):
     """All possible latent states except the all-zero one, which NoisyOR deals with separately."""
 
-    def __init__(self, N, H, device):
-        conf = {'N': N, 'H': H, 'S': 2**H - 1, 'dtype': to.float32, 'device': device}
-        super().__init__(conf, self._generate_all_states(N, H, device))
+    def __init__(self, N, H):
+        conf = {'N': N, 'H': H, 'S': 2**H - 1, 'dtype': to.float32}
+        super().__init__(conf, self._generate_all_states(N, H))
 
     def update(self, idx, batch, lpj_fn, sort_by_lpj):
         self.lpj = lpj_fn(batch, self.K[idx])
         return 0
 
-    def _generate_all_states(self, N, H, device):
+    def _generate_all_states(self, N, H):
         all_states = []
         for i in range(1, 2**H):
             i_as_binary_string = f'{i:0{H}b}'
             s = tuple(map(int, i_as_binary_string))
             all_states.append(s)
-        return to.tensor(all_states, dtype=to.uint8, device=device).unsqueeze(0).expand(N, -1, -1)
+        return to.tensor(all_states, dtype=to.uint8, device=tvem.device)\
+                 .unsqueeze(0).expand(N, -1, -1)
 
 
 @pytest.fixture(scope="module", params=test_devices)
 def setup(request):
     class Setup:
-        device = request.param
+        tvem.device = request.param
         N, D, H = 2, 1, 2
-        pi_init = to.full((H,), .5, device=device)
-        W_init = to.full((D, H), .5, device=device)
-        m = NoisyOR(H, D, W_init, pi_init, device)
-        all_s = AllStatesExceptZero(N, H, device=device)
-        data = to.tensor([[0], [1]], dtype=to.uint8, device=device)
+        pi_init = to.full((H,), .5)
+        W_init = to.full((D, H), .5)
+        m = NoisyOR(H, D, W_init, pi_init)
+        all_s = AllStatesExceptZero(N, H)
+        data = to.tensor([[0], [1]], dtype=to.uint8, device=tvem.device)
         # p(s) = 1/4 p(y=1|0,0) = 0, p(y=1|0,1) = p(y=1|1,0) = 1/2, p(y=1|1,1) = 3/4
         # free_energy = np.log((1/4)*(0 + 1/2 + 1/2 + 3/4)) + np.log((1/4)*(1 + 1/2 + 1/2 + 1/4))
         true_free_energy = -1.4020427180880297
         true_lpj = to.tensor([[np.log(1/2), np.log(1/2), np.log(1/4)],
                              [np.log(1/2), np.log(1/2), np.log(3/4)]],
-                             device=device)
+                             device=tvem.device)
     return Setup
 
 
@@ -81,7 +83,7 @@ def test_train(setup):
 
 
 def test_generate_from_hidden(setup):
-    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=setup.device)
+    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvem.device)
     assert (setup.m.generate_from_hidden(zeros) == zeros).all()
 
 

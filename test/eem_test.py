@@ -3,17 +3,17 @@
 # Licensed under the Academic Free License version 3.0
 
 import unittest
-import os
 import torch as to
 
 from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import generate_unique_states
 from tvem.variational import eem
+import tvem
 
-test_devices = ['cpu', ]
-if 'TVEM_USE_GPU' in os.environ:
-    test_devices += ['cuda:0', ]
+test_devices = [to.device('cpu')]
+if tvem.device != test_devices[0]:
+    test_devices.append(tvem.device)
 
 
 def lpj_dummy(states: Tensor, data: Tensor) -> Tensor:
@@ -45,13 +45,12 @@ class TestEEM(unittest.TestCase):
 
         H, n_parents, n_children = 5, 4, 2
 
-        for key in test_devices:
-            device = to.device(key)
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(n_states=n_parents, H=H,
-                                                 device=device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
                 # is (n_parents*n_children, H)
                 children = eem.randflip(parents, n_children)
 
@@ -63,13 +62,12 @@ class TestEEM(unittest.TestCase):
 
         H, n_parents, n_children, sparsity, p_bf = 5, 4, 2, 1./5, 0.5
 
-        for key in test_devices:
-            device = to.device(key)
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(n_states=n_parents, H=H,
-                                                 device=device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
                 children = eem.sparseflip(parents, n_children, sparsity, p_bf)
 
                 self.assertEqual(children.shape[0], n_parents*n_children)
@@ -80,13 +78,12 @@ class TestEEM(unittest.TestCase):
 
         H, n_parents = 5, 4
 
-        for key in test_devices:
-            device = to.device(key)
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(n_states=n_parents, H=H,
-                                                 device=device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
                 children = eem.cross(parents)  # is (n_parents*n_children, H)
 
                 self.assertEqual(children.shape[0], n_parents*(n_parents-1))
@@ -97,13 +94,12 @@ class TestEEM(unittest.TestCase):
         H, n_parents, n_children_ = 5, 4, 1
         seed = 7
 
-        for key in test_devices:
-            device = to.device(key)
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(n_states=n_parents, H=H,
-                                                 device=device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
                 to.manual_seed(seed)
                 to.cuda.manual_seed_all(seed)
@@ -124,13 +120,12 @@ class TestEEM(unittest.TestCase):
         H, n_parents, n_children_, sparsity, p_bf = 5, 4, 1, 1./5, 0.5
         seed = 7
 
-        for key in test_devices:
-            device = to.device(key)
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
-                parents = generate_unique_states(n_states=n_parents, H=H,
-                                                 device=device)  # is (n_parents, H)
+                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
                 to.manual_seed(seed)
                 to.cuda.manual_seed_all(seed)
@@ -152,14 +147,14 @@ class TestEEM(unittest.TestCase):
 
         batch_size, n_candidates, H, n_parents = 2, 3, 3, 2
 
-        for key in test_devices:
-            device = to.device(key)
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
-                candidates = generate_unique_states(n_states=n_candidates, H=H,
-                                                    device=device).repeat(batch_size, 1, 1)
-                # is (batch_size, n_candidates, H)
+                candidates = generate_unique_states(n_states=n_candidates, H=H)\
+                             .repeat(batch_size, 1, 1)  # is (batch_size, n_candidates, H)
+                # is (batch_size, n_candidates)
                 lpj = lpj_dummy(candidates, None)
 
                 # is (batch_size, n_parents, H)
@@ -182,9 +177,8 @@ class TestEEM(unittest.TestCase):
             'n_children': 1,
             'n_generations': 1}
 
-        for key in test_devices:
-            device = to.device(key)
-            eem_conf['device'] = device
+        for device in test_devices:
+            tvem.device = device
 
             for x in range(self.n_runs):
 
