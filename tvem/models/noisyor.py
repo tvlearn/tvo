@@ -8,6 +8,7 @@ from tvem.variational import TVEMVariationalStates  # type: ignore
 from torch import Tensor
 import torch as to
 from typing import Dict, Optional
+import tvem
 
 
 class NoisyOR(TVEMModel):
@@ -15,21 +16,19 @@ class NoisyOR(TVEMModel):
 
     eps = 1e-5
 
-    def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None,
-                 device: to.device = to.device('cpu')):
+    def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None):
+        device = tvem.device
         if W_init is not None:
             assert W_init.shape == (D, H)
-            assert W_init.device == device
         else:
             W_init = to.rand(D, H, device=device)
         if pi_init is not None:
             assert pi_init.shape == (H,)
-            assert pi_init.device == device
             assert (pi_init <= 1.).all() and (pi_init >= 0).all()
         else:
             pi_init = to.full((H,), 1./H, device=device)
 
-        self.theta = {'pi': pi_init, 'W': W_init}
+        self.theta = {'pi': pi_init.to(device=device), 'W': W_init.to(device=device)}
         self.new_pi = to.zeros(H, device=device)
         self.Btilde = to.zeros(D, H, device=device)
         self.Ctilde = to.zeros(D, H, device=device)
