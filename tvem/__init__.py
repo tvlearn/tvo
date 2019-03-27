@@ -13,3 +13,18 @@ device: _to.device = _to.device('cpu')
 """
 if 'TVEM_USE_GPU' in _os.environ and _os.environ['TVEM_USE_GPU'] != 0:
     device = _to.device('cuda:0')
+
+policy: str = 'seq'
+"""The preferred parallelization policy. Can be one of 'seq' or 'dist'.
+
+    - 'seq': the framework will not perform any parallelization other than
+    what torch tensors offer out of the box on the relevant device.
+    - 'dist': the framework will perform data parallelization for the algorithms
+    that implement it.
+
+    The default ('seq') can be overridden by exporting the TVEM_DISTRIBUTED
+    environment variable with a non-zero value. At runtime, simply assign
+    a new value to tvem.policy to change the framework's behavior.
+"""
+if 'TVEM_DISTRIBUTED' in _os.environ and _os.environ['TVEM_DISTRIBUTED'] != 0:
+    policy = 'dist'
