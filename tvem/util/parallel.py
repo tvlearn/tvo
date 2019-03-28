@@ -12,24 +12,16 @@ import torch.distributed as dist
 from torch import Tensor
 
 
-def pprint(obj: object = "", dist: to.distributed = dist, end: str = '\n'):
+def pprint(obj: object = "", end: str = '\n'):
     """Print on root process of torch.distributed process group.
 
     param obj: Message to print
-    param dist: torch.distributed module
     param end: Suffix of message. Default is linebreak.
-
-    Adapted from https://github.com/jbornschein/mpi4py-examples.
     """
     if dist.get_rank() != 0:
         return
 
-    if isinstance(obj, str):
-        sys.stdout.write(obj + end)
-    else:
-        sys.stdout.write(repr(obj))
-        sys.stdout.write(end)
-        sys.stdout.flush()
+    print(obj, end=end)
 
 
 def init_processes(cuda: bool = False, multi_node: bool = False) -> Dict[str, Any]:
