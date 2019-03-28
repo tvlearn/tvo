@@ -2,10 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-import sys
 import platform
-
-from typing import Dict, Any
 
 import torch as to
 import torch.distributed as dist
@@ -24,41 +21,38 @@ def pprint(obj: object = "", end: str = '\n'):
     print(obj, end=end)
 
 
-def init_processes(cuda: bool = False, multi_node: bool = False) -> Dict[str, Any]:
+def init_processes(cuda: bool = False, multi_node: bool = False) -> to.device:
     """Initialize MPI process group using torch.distributed module.
 
     param cuda: Deploy CUDA devices.
     param multi_node: Deploy multiple computing nodes.
-    returns: Dictionary containing the process_group, and the device information.
+    returns: Device of local process.
     """
 
-    comm = {
-        'process_group': dist.init_process_group('mpi'),
-        'device_count': int(to.cuda.device_count())
-    }
+    dist.init_process_group('mpi')
+    device_count = int(to.cuda.device_count())
 
     global_rank = dist.get_rank()
     comm_size = dist.get_world_size()
 
     if cuda:
         if multi_node:
-            node_count = int(float(comm_size) / comm['device_count'])
+            node_count = comm_size // device_count
         else:
             node_count = 1
         # 0..device_count (first_node), ..., 0..device_count (last_node)
-        local_rank = (
-            list(range(comm['device_count']))*node_count)[global_rank]
-        comm['device_str'] = 'cuda:%i' % local_rank
+        local_rank = (list(range(device_count))*node_count)[global_rank]
+        device_str = 'cuda:%i' % local_rank
     else:
-        comm['device_str'] = 'cpu'
+        device_str = 'cpu'
 
-    comm['device'] = to.device(comm['device_str'])
+    device = to.device(device_str)
 
     pprint("Initializting %i processes." % comm_size)
     print("New process on %s. Global rank %d. Device %s. Total no processes %d." % (
-        platform.node(), global_rank, comm['device_str'], comm_size))
+        platform.node(), global_rank, device_str, comm_size))
 
-    return comm
+    return device
 
 
 def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
@@ -69,6 +63,7 @@ def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
     param src: Source rank to scatter from.
     param dtype: dtype of resulting tensor.
     param device: device of resulting tensor.
+    returns: Tensor scattered to local rank.
 
     Tensor data is assumed to be None on all but the root processes.
     """
