@@ -11,9 +11,9 @@ test:
     - master
     - merge_requests
   script:
-    - pytest
     - pylama --options .config/pylama.ini
     - mypy --ignore-missing-imports tvem
+    - pytest test
 
 pages:
   stage: deploy
