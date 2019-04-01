@@ -5,80 +5,116 @@
 from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 from tvem.util.data import TVEMDataLoader
+from tvem.util.parallel import all_reduce
+from typing import Dict, Any
 
 
 class Trainer:
-    def __init__(self, model: TVEMModel):
-        """Train and test a given TVEMModel.
+    def __init__(self, model: TVEMModel,
+                 train_data: TVEMDataLoader = None, train_states: TVEMVariationalStates = None,
+                 test_data: TVEMDataLoader = None, test_states: TVEMVariationalStates = None):
+        """Train and/or test a given TVEMModel.
 
         :param model: an object of a concrete type inheriting from TVEMModel
-        """
-        self.model = model
-
-    def train(self, epochs: int, train_data: TVEMDataLoader, train_states: TVEMVariationalStates,
-              val_data: TVEMDataLoader = None, val_states: TVEMVariationalStates = None):
-        """Train model on given dataset for the given number of epochs.
-
-        :param epochs: number of epochs to train for
         :param train_data: the contained dataset should have shape (N,D)
         :param train_states: TVEMVariationalStates with shape (N,S,H)
-        :param val_data: the contained dataset should have shape (M,D) (optional)
-        :param val_states: TVEMVariationalStates with shape (M,Z,H) (optional)
+        :param test_data: validation or test dataset. The contained dataset should have shape (M,D)
+        :param test_states: TVEMVariationalStates with shape (M,Z,H)
 
-        Training steps on the validation dataset only perform E-steps,
-        i.e. model parameters are not updated but val_states are.
+        Both train_data and train_states must be provided, or neither.
+        The same holds for test_data and test_states.
+        At least one of these two pairs of arguments must be present.
+
+        Training steps on test_data only perform E-steps, i.e. model parameters are
+        not updated but test_states are. Therefore test_data can also be used for validation.
         """
-        assert (val_data is not None) == (val_states is not None),\
-            'Please provide both validation dataset and variational states, or neither'
+        for data, states in ((train_data, train_states), (test_data, test_states)):
+            assert (data is not None) == (states is not None),\
+                'Please provide both dataset and variational states, or neither'
+        self.can_train = train_data is not None and train_states is not None
+        self.can_test = test_data is not None and test_states is not None
+        if not self.can_train and not self.can_test:
+            raise RuntimeError('Please provide at least one pair of dataset and variational states')
 
-        # Setup #
+        self.model = model
+        self.train_data = train_data
+        self.train_states = train_states
+        self.test_data = test_data
+        self.test_states = test_states
+
+    @staticmethod
+    def _do_e_step(data, states, model):
+        F = 0.
+        subs = 0
+        for idx, batch in data:
+            subs += states.update(idx, batch, model.log_pseudo_joint)
+            F += model.free_energy(idx, batch, states)
+        all_reduce(F)
+        all_reduce(subs)
+        N = data.dataset.tensors[0].shape[0]
+        return F/N, subs/N
+
+    def e_step(self) -> Dict[str, Any]:
+        """Run one epoch of E-steps on training and/or test data, depending on what is available.
+
+        Only E-steps are executed.
+        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        ret = {}
         model = self.model
-        train_N = train_data.dataset.tensors[0].shape[0]
-        lpj_fn = model.log_pseudo_joint
+        train_data, train_states = self.train_data, self.train_states
+        test_data, test_states = self.test_data, self.test_states
 
-        if val_data is not None:
-            val_N = val_data.dataset.tensors[0].shape[0]
+        # Training #
+        if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
+            ret['train_F'], ret['train_subs'] = self._do_e_step(train_data, train_states, model)
 
-        for e in range(epochs):
-            print(f'\nepoch {e}')
+        # Validation/Testing #
+        if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
+            ret['test_F'], ret['test_subs'] = self._do_e_step(test_data, test_states, model)
 
-            # Training #
+        return ret
+
+    def em_step(self) -> Dict[str, Any]:
+        """Run one training and/or test epoch, depending on what data is available.
+
+        Both E-step and M-step are executed.
+        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        model = self.model
+        train_data, train_states = self.train_data, self.train_states
+        test_data, test_states = self.test_data, self.test_states
+        lpj_fn = self.model.log_pseudo_joint
+
+        ret_dict = {}
+
+        # Training #
+        if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
+            F = 0.
+            subs = 0
             model.init_epoch()
-            train_F = 0.
             for idx, batch in train_data:
-                # TODO count avg number of subs
-                train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
+                subs += train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
-                train_F += batch_F
+                F += batch_F
             model.update_param_epoch()
-            print(f'\ttrain F/N: {train_F/train_N:.5f}')
+            all_reduce(F)
+            all_reduce(subs)
+            N = train_data.dataset.tensors[0].shape[0]
+            ret_dict['train_F'] = F/N
+            ret_dict['train_subs'] = subs/N
 
-            # Validation #
-            if val_data is not None and val_states is not None:  # checking both to make mypy happy
-                val_F = 0.
-                for idx, batch in val_data:
-                    val_states.update(idx, batch, lpj_fn)
-                    val_F += model.free_energy(idx, batch, val_states)
-                print(f'\tval F/N: {val_F/val_N:.5f}')
+        # Validation/Testing #
+        if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
+            res = self._do_e_step(test_data, test_states, model)
+            ret_dict['test_F'], ret_dict['test_subs'] = res
 
-    def test(self, epochs: int, test_data: TVEMDataLoader, test_states: TVEMVariationalStates):
-        """Test model (does not run M-step).
-
-        :param epochs: number of epochs to run testing for: test_states are improved at each\
-            iteration, therefore test results improve as the number of testing epochs increase.
-        :param test_data: the contained dataset should have shape (N,D)
-        :param test_states: TVEMVariationalStates with shape (N,S,H)
-        """
-        model = self.model
-        test_N = test_data.dataset.tensors[0].shape[0]
-        lpj_fn = model.log_pseudo_joint
-
-        for e in range(epochs):
-            print(f'\nepoch {e}')
-            test_F = 0.
-            for idx, batch in test_data:
-                test_states.update(idx, batch, lpj_fn)
-                test_F += model.free_energy(idx, batch, test_states)
-            print(f'\ttest F/N: {test_F/test_N:.5f}')
+        return ret_dict
