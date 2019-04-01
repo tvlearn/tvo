@@ -14,7 +14,14 @@ device: _to.device = _to.device('cpu')
 if 'TVEM_USE_GPU' in _os.environ and _os.environ['TVEM_USE_GPU'] != 0:
     device = _to.device('cuda:0')
 
-policy: str = 'seq'
+
+class Policy:
+    def __init__(self, policy: str):
+        assert policy in ('seq', 'dist'), 'Supported policies are "seq" and "dist"'
+        self.policy = policy
+
+
+policy: Policy = Policy('seq')
 """The preferred parallelization policy. Can be one of 'seq' or 'dist'.
 
     - 'seq': the framework will not perform any parallelization other than
@@ -27,4 +34,4 @@ policy: str = 'seq'
     a new value to tvem.policy to change the framework's behavior.
 """
 if 'TVEM_DISTRIBUTED' in _os.environ and _os.environ['TVEM_DISTRIBUTED'] != 0:
-    policy = 'dist'
+    policy = Policy('dist')
