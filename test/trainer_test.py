@@ -6,9 +6,11 @@ import tvem
 from tvem.trainer import Trainer
 from tvem.models import NoisyOR
 from tvem.variational import RandomSampledVarStates
+from tvem.util.data import TVEMDataLoader
 
 import pytest
 import torch as to
+from torch.utils.data.dataset import TensorDataset
 
 test_devices = [to.device('cpu')]
 if tvem.device != test_devices[0]:
@@ -21,8 +23,10 @@ def setup(request):
         N, D, S, H = 10, 16, 8, 8
         tvem.device = request.param
         trainer = Trainer(NoisyOR(H, D))
-        data = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.device)
-        val_data = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.device)
+        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.device))
+        data = TVEMDataLoader(_td, batch_size=N)
+        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.device))
+        val_data = TVEMDataLoader(_td, batch_size=N)
         _varstates_conf = {'N': N, 'H': H, 'S': S, 'dtype': to.float32, 'device': tvem.device}
         var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
         val_var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
@@ -30,12 +34,11 @@ def setup(request):
 
 
 def test_training(setup):
-    setup.trainer.train(epochs=10, batch_size=setup.N,
-                        train_data=setup.data, train_states=setup.var_states)
+    setup.trainer.train(epochs=10, train_data=setup.data, train_states=setup.var_states)
 
 
 def test_training_with_valid(setup):
-    setup.trainer.train(epochs=10, batch_size=setup.N,
+    setup.trainer.train(epochs=10,
                         train_data=setup.data, train_states=setup.var_states,
                         val_data=setup.val_data, val_states=setup.val_var_states)
 

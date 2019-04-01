@@ -2,26 +2,9 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-import torch as to
-from torch import Tensor
-from torch.utils.data import TensorDataset, DataLoader
 from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
-
-
-def _make_dataloader(data: Tensor, batch_size: int):
-    """Create a pytorch DataLoader that returns datapoint indeces together with batches.
-
-    :param data: should have shape (N,D)
-    :param batch_size: should be an exact divisor of N
-
-    Example usage of the DataLoader created here:
-        for idx, batch in data_loader:
-            process(idx, batch)
-    """
-    N = data.shape[0]
-    assert N % batch_size == 0, 'batch_size should be an exact divisor of data.shape[0]'
-    return DataLoader(TensorDataset(to.arange(N), data), batch_size=batch_size, shuffle=True)
+from tvem.util.data import TVEMDataLoader
 
 
 class Trainer:
@@ -32,17 +15,14 @@ class Trainer:
         """
         self.model = model
 
-    def train(self, epochs: int, batch_size: int,
-              train_data: Tensor, train_states: TVEMVariationalStates,
-              val_data: Tensor = None, val_states: TVEMVariationalStates = None):
+    def train(self, epochs: int, train_data: TVEMDataLoader, train_states: TVEMVariationalStates,
+              val_data: TVEMDataLoader = None, val_states: TVEMVariationalStates = None):
         """Train model on given dataset for the given number of epochs.
 
         :param epochs: number of epochs to train for
-        :param batch_size: data will be processed in batches of this size.\
-            batch_size should be an exact divisor of the number of datapoints.
-        :param train_data: should have shape (N,D)
+        :param train_data: the contained dataset should have shape (N,D)
         :param train_states: TVEMVariationalStates with shape (N,S,H)
-        :param val_data: should have shape (M,D) (optional)
+        :param val_data: the contained dataset should have shape (M,D) (optional)
         :param val_states: TVEMVariationalStates with shape (M,Z,H) (optional)
 
         Training steps on the validation dataset only perform E-steps,
@@ -53,13 +33,11 @@ class Trainer:
 
         # Setup #
         model = self.model
-        train_N = train_data.shape[0]
-        train_dataset = _make_dataloader(train_data, batch_size)
+        train_N = train_data.dataset.tensors[0].shape[0]
         lpj_fn = model.log_pseudo_joint
 
         if val_data is not None:
-            val_N = val_data.shape[0]
-            val_dataset = _make_dataloader(val_data, batch_size)
+            val_N = val_data.dataset.tensors[0].shape[0]
 
         for e in range(epochs):
             print(f'\nepoch {e}')
@@ -67,7 +45,7 @@ class Trainer:
             # Training #
             model.init_epoch()
             train_F = 0.
-            for idx, batch in train_dataset:
+            for idx, batch in train_data:
                 # TODO count avg number of subs
                 train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
                 batch_F = model.update_param_batch(idx, batch, train_states)
@@ -78,30 +56,29 @@ class Trainer:
             print(f'\ttrain F/N: {train_F/train_N:.5f}')
 
             # Validation #
-            if val_states is not None:
+            if val_data is not None and val_states is not None:  # checking both to make mypy happy
                 val_F = 0.
-                for idx, batch in val_dataset:
+                for idx, batch in val_data:
                     val_states.update(idx, batch, lpj_fn)
                     val_F += model.free_energy(idx, batch, val_states)
                 print(f'\tval F/N: {val_F/val_N:.5f}')
 
-    def test(self, epochs: int, test_data: Tensor, test_states: TVEMVariationalStates):
+    def test(self, epochs: int, test_data: TVEMDataLoader, test_states: TVEMVariationalStates):
         """Test model (does not run M-step).
 
         :param epochs: number of epochs to run testing for: test_states are improved at each\
             iteration, therefore test results improve as the number of testing epochs increase.
-        :param test_data: should have shape (N,D)
+        :param test_data: the contained dataset should have shape (N,D)
         :param test_states: TVEMVariationalStates with shape (N,S,H)
         """
         model = self.model
-        test_N = test_data.shape[0]
-        test_dataset = _make_dataloader(test_data, test_N)
+        test_N = test_data.dataset.tensors[0].shape[0]
         lpj_fn = model.log_pseudo_joint
 
         for e in range(epochs):
             print(f'\nepoch {e}')
             test_F = 0.
-            for idx, batch in test_dataset:
+            for idx, batch in test_data:
                 test_states.update(idx, batch, lpj_fn)
                 test_F += model.free_energy(idx, batch, test_states)
             print(f'\ttest F/N: {test_F/test_N:.5f}')
