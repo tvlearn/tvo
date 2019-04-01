@@ -110,3 +110,9 @@ def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
             my_data = my_data[:local_length, :]
 
     return my_data
+
+
+def all_reduce(tensor: Tensor, op=dist.ReduceOp.SUM):
+    """Equivalent to torch.distribute.all_reduce if tvem.policy is 'dist', no-op otherwise."""
+    if tvem.policy == tvem.Policy('dist'):
+        dist.all_reduce(tensor, op)
