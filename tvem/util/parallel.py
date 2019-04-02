@@ -85,7 +85,7 @@ def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
 
     # determine number of and eventually add dummy rows for scatter/gather compatibility
     # no datapoints per
-    local_length_ = int(to.ceil(to.tensor([float(total_length)/comm_size])))
+    local_length_ = int(to.ceil(to.tensor([total_length / comm_size])))
     # commrank including
     # dummy rows
     empty_length = local_length_ * comm_size - total_length
