@@ -74,7 +74,6 @@ class TVEMModel(ABC):
         """
         pass
 
-    @abstractmethod
     def generate_data(self, N: int) -> Dict[str, Tensor]:
         """Generate N random datapoints from this model.
 
