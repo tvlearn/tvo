@@ -8,6 +8,8 @@ import torch as to
 import torch.distributed as dist
 from torch import Tensor
 
+import tvem
+
 
 def pprint(obj: object = "", end: str = '\n'):
     """Print on root process of torch.distributed process group.
@@ -21,21 +23,21 @@ def pprint(obj: object = "", end: str = '\n'):
     print(obj, end=end)
 
 
-def init_processes(cuda: bool = False, multi_node: bool = False) -> to.device:
+def init_processes(multi_node: bool = False):
     """Initialize MPI process group using torch.distributed module.
 
-    param cuda: Deploy CUDA devices.
     param multi_node: Deploy multiple computing nodes.
-    returns: Device of local process.
+
+    Eventually updates the value of tvem.device.
     """
 
     dist.init_process_group('mpi')
-    device_count = int(to.cuda.device_count())
 
     global_rank = dist.get_rank()
     comm_size = dist.get_world_size()
 
-    if cuda:
+    if tvem.device.type == 'cuda':
+        device_count = int(to.cuda.device_count())
         if multi_node:
             node_count = comm_size // device_count
         else:
@@ -46,13 +48,11 @@ def init_processes(cuda: bool = False, multi_node: bool = False) -> to.device:
     else:
         device_str = 'cpu'
 
-    device = to.device(device_str)
+    tvem.device = to.device(device_str)
 
     pprint("Initializting %i processes." % comm_size)
     print("New process on %s. Global rank %d. Device %s. Total no processes %d." % (
         platform.node(), global_rank, device_str, comm_size))
-
-    return device
 
 
 def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
