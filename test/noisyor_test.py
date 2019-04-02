@@ -12,7 +12,7 @@ import math
 import tvem
 
 test_devices = [to.device('cpu')]
-if 'TVEM_USE_GPU' in os.environ:
+if 'TVEM_GPU' in os.environ:
     test_devices.append(to.device('cuda:0'))
 
 
