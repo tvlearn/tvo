@@ -39,7 +39,7 @@ class FullEM(TVEMVariationalStates):
 
         :param conf: dictionary with hyper-parameters
         """
-        required_keys = ('N', 'H', 'device')
+        required_keys = ('N', 'H')
         for c in required_keys:
             assert c in conf and conf[c] is not None
         N, H = get(conf, *required_keys)
