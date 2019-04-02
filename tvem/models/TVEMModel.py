@@ -12,7 +12,9 @@ import tvem
 
 
 class TVEMModel(ABC):
-    """Abstract base class for probabilistic generative models to be trained with TVEM."""
+    def __init__(self):
+        """Abstract base class for probabilistic generative models to be trained with TVEM."""
+        self.theta = {}
 
     @abstractmethod
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
@@ -73,18 +75,30 @@ class TVEMModel(ABC):
         pass
 
     @abstractmethod
-    def generate_data(self, N: int) -> Tensor:
-        """Generate N random datapoints from this model."""
-        pass
+    def generate_data(self, N: int) -> Dict[str, Tensor]:
+        """Generate N random datapoints from this model.
+
+        :param N: Number of data points to be generated.
+        :returns: dictionary containing generated data.
+        """
+        theta = self.theta
+
+        pies = theta['pies']
+
+        S = to.rand((N, pies.numel()), dtype=pies.dtype,
+                    device=pies.device) <= pies
+
+        return self.generate_from_hidden(S)
 
     @abstractmethod
-    def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
+    def generate_from_hidden(self, hidden_state: Tensor) -> Dict[str, Tensor]:
         """Generate N random datapoints from this model.
 
         :param hidden_state: Tensor with shape (N,H) where H is the number of units in the
             first latent layer.
 
-        The returned Tensor has shape (N,D) where D is the number of observables for this model.
+        Data points are stored in the returned Dictionary in key 'Y' and have shape (N,D) where
+        D is the number of observables for this model.
         """
         pass
 
