@@ -28,7 +28,7 @@ class NoisyOR(TVEMModel):
         else:
             pi_init = to.full((H,), 1./H, device=device)
 
-        self.theta = {'pi': pi_init.to(device=device), 'W': W_init.to(device=device)}
+        self.theta = {'pies': pi_init.to(device=device), 'W': W_init.to(device=device)}
         self.new_pi = to.zeros(H, device=device)
         self.Btilde = to.zeros(D, H, device=device)
         self.Ctilde = to.zeros(D, H, device=device)
@@ -38,7 +38,7 @@ class NoisyOR(TVEMModel):
         K = states
         Y = data
         assert K.dtype == to.uint8 and Y.dtype == to.uint8
-        pi = self.theta['pi']
+        pi = self.theta['pies']
         W = self.theta['W']
         N, S, H = K.shape
         D = W.shape[0]
@@ -94,8 +94,8 @@ class NoisyOR(TVEMModel):
         return None
 
     def update_param_epoch(self) -> None:
-        self.theta['pi'][:] = self.new_pi
-        to.clamp(self.theta['pi'], self.eps, 1 - self.eps, out=self.theta['pi'])
+        self.theta['pies'][:] = self.new_pi
+        to.clamp(self.theta['pies'], self.eps, 1 - self.eps, out=self.theta['pies'])
         self.new_pi[:] = 0.
 
         self.theta['W'][:] = 1 + self.Btilde / (self.Ctilde + self.eps)
@@ -104,7 +104,7 @@ class NoisyOR(TVEMModel):
         self.Ctilde[:] = 0.
 
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
-        pi = self.theta['pi']
+        pi = self.theta['pies']
         lpj = self.log_pseudo_joint(batch, states.K[idx])
         N = batch.shape[0]
         # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
@@ -114,18 +114,12 @@ class NoisyOR(TVEMModel):
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         N, H = hidden_state.shape
-        expected_H = self.theta['pi'].numel()
+        expected_H = self.theta['pies'].numel()
         assert H == expected_H, f'input has wrong shape, expected {(N, expected_H)}, got {(N, H)}'
         W = self.theta['W']
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)
         py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
         return to.rand_like(py) < py
-
-    def generate_data(self, N: int) -> Tensor:
-        print('WARN: This method override is to be removed as soon as TVEMModel implements its own')
-        pi = self.theta['pi']
-        die = to.rand(N, pi.numel(), device=pi.device)
-        return self.generate_from_hidden(die < pi)
 
     @staticmethod
     def _mean_posterior(g: Tensor, lpj: Tensor, deltaY: Tensor):
