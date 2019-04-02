@@ -60,11 +60,11 @@ def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
                       device: to.device = to.device('cpu')):
     """Split tensor into chunks and scatter within process group.
 
-    param data: Tensor to be scattered. Chunks are cut along dimension 0.
-    param src: Source rank to scatter from.
-    param dtype: dtype of resulting tensor.
-    param device: device of resulting tensor.
-    returns: Tensor scattered to local rank.
+    :param data: Tensor to be scattered. Chunks are cut along dimension 0.
+    :param src: Source rank to scatter from.
+    :param dtype: dtype of resulting tensor.
+    :param device: device of resulting tensor.
+    :returns: Tensor scattered to local rank.
 
     Tensor data is assumed to be None on all but the root processes.
     """
