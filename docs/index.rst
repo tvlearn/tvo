@@ -9,7 +9,8 @@ TVEM user guide
 
    tvem
    tvem.models
-   tvem.prepost
-   tvem.trainer
-   tvem.util
    tvem.variational
+   tvem.util
+   tvem.util.parallel
+   tvem.trainer
+   tvem.prepost
