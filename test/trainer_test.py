@@ -31,15 +31,27 @@ def setup(request):
 
 def test_training(setup):
     trainer = Trainer(setup.model, setup.data, setup.var_states)
-    trainer.em_step()
+    d1 = trainer.em_step()
+    d2 = trainer.em_step()
+    assert 'train_F' in d1 and 'train_subs' in d1
+    assert 'test_F' not in d1 and 'test_subs' not in d1
+    assert d1['train_F'] < d2['train_F']
 
 
 def test_training_with_valid(setup):
     trainer = Trainer(setup.model, train_data=setup.data, train_states=setup.var_states,
                       test_data=setup.test_data, test_states=setup.test_states)
-    trainer.em_step()
+    d1 = trainer.em_step()
+    d2 = trainer.em_step()
+    assert 'train_F' in d1 and 'train_subs' in d1
+    assert 'test_F' in d1 and 'test_subs' in d1
+    assert d1['train_F'] < d2['train_F']
 
 
 def test_testing(setup):
     trainer = Trainer(setup.model, test_data=setup.test_data, test_states=setup.test_states)
-    trainer.em_step()
+    d1 = trainer.em_step()
+    d2 = trainer.em_step()
+    assert 'train_F' not in d1 and 'train_subs' not in d1
+    assert 'test_F' in d1 and 'test_subs' in d1
+    assert d1['test_F'] < d2['test_F']
