@@ -67,6 +67,8 @@ def scatter2processes(data: Tensor, src: int = 0, dtype: to.dtype = to.float64,
 
     Tensor data is assumed to be None on all but the root processes.
     """
+    if tvem.policy == tvem.Policy('seq'):
+        return data
 
     comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
 
