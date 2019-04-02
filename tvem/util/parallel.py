@@ -17,8 +17,9 @@ def pprint(obj: object = "", end: str = '\n'):
     param obj: Message to print
     param end: Suffix of message. Default is linebreak.
     """
-    if dist.get_rank() != 0:
-        return
+    if tvem.policy == tvem.Policy('dist'):
+        if dist.get_rank() != 0:
+            return
 
     print(obj, end=end)
 
