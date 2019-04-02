@@ -165,7 +165,7 @@ class BSC(TVEMModel):
             lpj + B.expand_as(lpj), dim=1) - B.flatten()).sum()
         all_reduce(lpj_shifted_sum_chunk)
 
-        return fenergy_const + lpj_shifted_sum_chunk/N
+        return fenergy_const*N + lpj_shifted_sum_chunk
 
     def update_param_batch(self, idx: Tensor, batch: Tensor,
                            states: TVEMVariationalStates) -> float:
@@ -219,7 +219,7 @@ class BSC(TVEMModel):
             pjc[:batch_size, :], dim=1) - B).sum()
         all_reduce(lpj_shifted_sum_chunk)
 
-        return fenergy_const + lpj_shifted_sum_chunk/N
+        return fenergy_const*N + lpj_shifted_sum_chunk
 
     def update_param_epoch(self) -> None:
 

@@ -58,7 +58,7 @@ def test_lpj(setup):
 def test_free_energy(setup):
     setup.m.init_epoch()
     f = setup.m.free_energy(idx=to.arange(
-        setup.N), batch=setup.data, states=setup.all_s)
+        setup.N), batch=setup.data, states=setup.all_s) / setup.N
     assert math.isclose(f, setup.true_free_energy, rel_tol=1e-6)
 
 
