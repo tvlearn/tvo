@@ -17,7 +17,7 @@ class NoisyOR(TVEMModel):
     eps = 1e-5
 
     def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None):
-        device = tvem.device
+        device = tvem.get_device()
         if W_init is not None:
             assert W_init.shape == (D, H)
         else:

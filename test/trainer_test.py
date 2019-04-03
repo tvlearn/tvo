@@ -13,21 +13,21 @@ import torch as to
 from torch.utils.data.dataset import TensorDataset
 
 test_devices = [to.device('cpu')]
-if tvem.device != test_devices[0]:
-    test_devices.append(tvem.device)
+if tvem.get_device() != test_devices[0]:
+    test_devices.append(tvem.get_device())
 
 
 @pytest.fixture(scope='function', params=test_devices)
 def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
-        tvem.device = request.param
+        tvem.set_device(request.param)
         trainer = Trainer(NoisyOR(H, D))
-        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.device))
+        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
         data = TVEMDataLoader(_td, batch_size=N)
-        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.device))
+        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
         val_data = TVEMDataLoader(_td, batch_size=N)
-        _varstates_conf = {'N': N, 'H': H, 'S': S, 'dtype': to.float32, 'device': tvem.device}
+        _varstates_conf = {'N': N, 'H': H, 'S': S, 'dtype': to.float32, 'device': tvem.get_device()}
         var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
         val_var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
     return Setup

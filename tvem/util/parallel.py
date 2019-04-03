@@ -18,7 +18,7 @@ def pprint(obj: object = "", end: str = '\n'):
     param obj: Message to print
     param end: Suffix of message. Default is linebreak.
     """
-    if tvem.policy == tvem.Policy('dist'):
+    if tvem.get_run_policy() == 'dist':
         if dist.get_rank() != 0:
             return
 
@@ -38,7 +38,7 @@ def init_processes(multi_node: bool = False):
     global_rank = dist.get_rank()
     comm_size = dist.get_world_size()
 
-    if tvem.device.type == 'cuda':
+    if tvem.get_device().type == 'cuda':
         device_count = int(to.cuda.device_count())
         if multi_node:
             node_count = comm_size // device_count
@@ -50,7 +50,7 @@ def init_processes(multi_node: bool = False):
     else:
         device_str = 'cpu'
 
-    tvem.device = to.device(device_str)
+    tvem.set_device(device_str)
 
     pprint("Initializting %i processes." % comm_size)
     print("New process on %s. Global rank %d. Device %s. Total no processes %d." % (
@@ -69,7 +69,7 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
 
     Tensor data is assumed to be None on all but the root processes.
     """
-    if tvem.policy == tvem.Policy('seq'):
+    if tvem.get_run_policy() == 'seq':
         return tensors
 
     comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
@@ -122,6 +122,6 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
 
 
 def all_reduce(tensor: Tensor, op=dist.ReduceOp.SUM):
-    """Equivalent to torch.distribute.all_reduce if tvem.policy is 'dist', no-op otherwise."""
-    if tvem.policy == tvem.Policy('dist'):
+    """Equivalent to torch's all_reduce if tvem.get_run_policy() is 'dist', no-op otherwise."""
+    if tvem.get_run_policy() == 'dist':
         dist.all_reduce(tensor, op)

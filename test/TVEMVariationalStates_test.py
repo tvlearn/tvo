@@ -13,8 +13,8 @@ import tvem
 
 
 test_devices = [to.device('cpu')]
-if tvem.device != to.device('cpu'):
-    test_devices.append(tvem.device)
+if tvem.get_device() != to.device('cpu'):
+    test_devices.append(tvem.get_device())
 
 
 class TestTVEM(unittest.TestCase):

@@ -20,7 +20,7 @@ class BSC(TVEMModel):
 
     def __init__(self, conf, W_init: Tensor = None, sigma_init: Tensor = None,
                  pies_init: Tensor = None):
-        device = tvem.device
+        device = tvem.get_device()
 
         required_keys = ('N', 'D', 'H', 'S', 'Snew', 'batch_size', 'dtype')
         for c in required_keys:

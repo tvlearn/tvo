@@ -20,12 +20,13 @@ if 'TVEM_GPU' in os.environ:
 @pytest.fixture(scope="module", params=test_devices)
 def setup(request):
     class Setup:
-        tvem.device = request.param
+        tvem.set_device(request.param)
+        _device = tvem.get_device()
         N, D, H = 2, 1, 2
         dtype = to.float32
-        pi_init = to.full((H,), .5, dtype=dtype, device=tvem.device)
-        W_init = to.full((D, H), 1., dtype=dtype, device=tvem.device)
-        sigma_init = to.tensor([1., ], dtype=dtype, device=tvem.device)
+        pi_init = to.full((H,), .5, dtype=dtype, device=_device)
+        W_init = to.full((D, H), 1., dtype=dtype, device=_device)
+        sigma_init = to.tensor([1., ], dtype=dtype, device=_device)
 
         conf = {'N': N, 'D': D, 'H': H, 'S': 2**H,
                 'Snew': 0, 'batch_size': N, 'dtype': dtype}
@@ -33,7 +34,7 @@ def setup(request):
         conf = {'N': N, 'H': H, 'S': 2**H, 'dtype': dtype}
         all_s = FullEM(conf)
         all_s.lpj = to.zeros_like(all_s.lpj)
-        data = to.tensor([[0], [1]], dtype=dtype, device=tvem.device)
+        data = to.tensor([[0], [1]], dtype=dtype, device=_device)
         # lpj = \sum_h s_h \log( \pi_h/(1-\pi_h) )
         #        - 1/(2\sigma^2) ( \vec{y}-W\vec{s})^T (\vec{y}-W\vec{s}) )
         # const = \sum_h \log(1-\pi_h) - (D/2) \log(2\pi\sigma^2)
@@ -41,7 +42,7 @@ def setup(request):
         true_lpj = to.tensor([[0., np.log(1.)-(1./2), np.log(1.)-(1./2),
                                2.*np.log(1.)-(1./2)*2.**2],
                               [-(1./2), np.log(1.), np.log(1.), 2.*np.log(1.)-(1./2)]],
-                             device=tvem.device)
+                             device=_device)
         true_const = 2*np.log(0.5) - 0.5 * np.log(2*math.pi)
         # per datap.
         true_free_energy = to.log(

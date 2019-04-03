@@ -8,8 +8,8 @@ from tvem.variational import RandomSampledVarStates
 import tvem
 
 test_devices = [to.device('cpu')]
-if tvem.device != test_devices[0]:
-    test_devices.append(tvem.device)
+if tvem.get_device() != test_devices[0]:
+    test_devices.append(tvem.get_device())
 
 
 def count_active_units(data, states):

@@ -17,11 +17,11 @@ def state_matrix(H: int, device: to.device = None):
     """Get full combinatorics of H-dimensional binary vecor.
 
     :param H: vector length
-    :device: torch.device of output Tensor. Defaults to tvem.device.
+    :device: torch.device of output Tensor. Defaults to tvem.get_device().
     :returns: tensor containing full combinatorics, shape (2**H,H)
     """
     if device is None:
-        device = tvem.device
+        device = tvem.get_device()
     sl = []
     for g in range(0, H+1):
         for s in combinations(range(H), g):

@@ -32,12 +32,12 @@ def generate_unique_states(n_states: int, H: int, crowdedness: float = 1.,
     :param n_states: number of unique vectors to be generated
     :param H: size of binary vector
     :param crowdedness: average crowdedness per state
-    :param device: torch.device of output Tensor. Defaults to tvem.device
+    :param device: torch.device of output Tensor. Defaults to tvem.get_device()
 
     Requires that n_states <= 2**H. Return has shape (n_states, H).
     """
     if device is None:
-        device = tvem.device
+        device = tvem.get_device()
     assert n_states <= 2**H, "n_states must be smaller than 2**H"
     s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness/H, size=(n_states//2, H))}
     while len(s_set) < n_states:
@@ -151,7 +151,7 @@ class TVEMVariationalStates(ABC):
             self.K = K_init.clone()
         else:
             self.K = generate_unique_states(S, H).repeat(N, 1, 1)  # (N, S, H)
-        self.lpj = to.empty((N, S), dtype=dtype, device=tvem.device)
+        self.lpj = to.empty((N, S), dtype=dtype, device=tvem.get_device())
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
