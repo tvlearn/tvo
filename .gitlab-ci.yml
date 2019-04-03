@@ -2,7 +2,7 @@ variables:
    TVEM_GPU: 0
 
 before_script:
-    - source $SRC_CONDA
+    - source /home/gitlab-runner/anaconda3/etc/profile.d/conda.sh
     - conda activate tvem
 
 test:
