@@ -4,8 +4,9 @@ import torch as to
 
 def _default_device() -> to.device:
     dev = to.device('cpu')
-    if 'TVEM_GPU' in os.environ and os.environ['TVEM_GPU'] != 0:
-        dev = to.device('cuda:0')
+    if 'TVEM_GPU' in os.environ:
+        gpu_n = int(os.environ['TVEM_GPU'])
+        dev = to.device(f'cuda:{gpu_n}')
     return dev
 
 
@@ -31,7 +32,8 @@ def set_device(device: to.device):
     Note that certain operations might run on CPU independently of the value of tvem.device.
 
     The default ('cpu') can also be overridden by setting the TVEM_GPU environment variable
-    to a non-zero value.
+    to the number of the desired CUDA device. For example, in bash, `export TVEM_GPU=0`
+    will make the framework default to device 'cuda:0'.
     """
     _GlobalDevice.set_device(device)
 

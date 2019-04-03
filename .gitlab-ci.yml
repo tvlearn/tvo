@@ -1,5 +1,5 @@
 variables:
-   TVEM_GPU: 1
+   TVEM_GPU: 0
 
 before_script:
     - source $SRC_CONDA
