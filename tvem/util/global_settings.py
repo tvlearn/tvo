@@ -71,9 +71,10 @@ class _GlobalPolicy:
 def set_run_policy(policy: str):
     """Set the preferred parallelization policy. Can be one of 'seq' or 'dist'.
 
-    * 'seq': the framework will not perform any parallelization other than what torch tensors
-             offer out of the box on the relevant device.
-    * 'dist': the framework will perform data parallelization for the algorithms that implement it.
+    * `'seq'`: the framework will not perform any parallelization other than what torch tensors
+      offer out of the box on the relevant device.
+    * `'dist'`: the framework will perform data parallelization for the algorithms that
+      implement it.
 
     The default is 'seq' unless the framework detects that the program is running within `mpirun`,
     in which case the default is 'dist'.
