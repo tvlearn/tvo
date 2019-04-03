@@ -1,5 +1,8 @@
-variables:
-   TVEM_GPU: 0
+# Configuration to run TVEM CI on our workstations
+# It assumes conda is installed, in path, and the tvem environment has been created from our repo's env.yml file.
+# The special environment python/3.6.4-ompi (pytorch+CUDA+MPI) is loaded to run parallelization tests.
+# Documentation generation with sphinx additionally requires
+# `conda install -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints`
 
 before_script:
     - source /home/gitlab-runner/anaconda3/etc/profile.d/conda.sh
@@ -8,19 +11,25 @@ before_script:
 test:
   stage: test
   only:
-    - master
-    - merge_requests
+     - master
+     - merge_requests
   script:
+    # static checkers
     - pylama --options .config/pylama.ini
     - mypy --ignore-missing-imports tvem test
-    - pytest test
+    # CPU tests
+    - pytest -v test
+    # GPU tests
+    - env TVEM_GPU=0 pytest -v -m gpu test
+    # parallel tests
+    - module load python/3.6.4-ompi
+    - mpirun -n 4 bash .ci_scripts/run_parallel_tests.sh
 
 pages:
   stage: deploy
   only:
     - master
   script:
-    - conda install -q -y -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints
     - sphinx-build docs public
   artifacts:
     paths:
