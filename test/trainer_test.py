@@ -12,16 +12,12 @@ import pytest
 import torch as to
 from torch.utils.data.dataset import TensorDataset
 
-test_devices = [to.device('cpu')]
-if tvem.get_device() != test_devices[0]:
-    test_devices.append(tvem.get_device())
 
-
-@pytest.fixture(scope='function', params=test_devices)
+@pytest.fixture(scope='function',
+                params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)])
 def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
-        tvem._set_device(request.param)
         trainer = Trainer(NoisyOR(H, D))
         _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
         data = TVEMDataLoader(_td, batch_size=N)

@@ -10,10 +10,7 @@ from torch import Tensor
 from tvem.variational.TVEMVariationalStates import generate_unique_states
 from tvem.variational import eem
 import tvem
-
-test_devices = [to.device('cpu')]
-if tvem.get_device() != test_devices[0]:
-    test_devices.append(tvem.get_device())
+import pytest
 
 
 def lpj_dummy(states: Tensor, data: Tensor) -> Tensor:
@@ -28,6 +25,7 @@ def lpj_dummy(states: Tensor, data: Tensor) -> Tensor:
                   s_ids[None, None, :].expand(N, S, -1)).sum(dim=2).to(dtype=to.float64)
 
 
+@pytest.mark.gpu
 class TestEEM(unittest.TestCase):
     """Define unittests for tvem.variational.TVEMVariationalStates module.
 
@@ -45,124 +43,106 @@ class TestEEM(unittest.TestCase):
 
         H, n_parents, n_children = 5, 4, 2
 
-        for device in test_devices:
-            tvem._set_device(device)
+        for x in range(self.n_runs):
 
-            for x in range(self.n_runs):
+            parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
+            # is (n_parents*n_children, H)
+            children = eem.randflip(parents, n_children)
 
-                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-                # is (n_parents*n_children, H)
-                children = eem.randflip(parents, n_children)
-
-                self.assertEqual(children.shape[0], n_parents*n_children)
-                self.assertEqual(((parents.repeat(1, n_children).view(-1, H) ==
-                                   children).sum(dim=1).sum()/(n_parents*n_children)).item(), H-1)
+            self.assertEqual(children.shape[0], n_parents*n_children)
+            self.assertEqual(((parents.repeat(1, n_children).view(-1, H) ==
+                               children).sum(dim=1).sum()/(n_parents*n_children)).item(), H-1)
 
     def test_sparseflip(self):
 
         H, n_parents, n_children, sparsity, p_bf = 5, 4, 2, 1./5, 0.5
 
-        for device in test_devices:
-            tvem._set_device(device)
+        for x in range(self.n_runs):
 
-            for x in range(self.n_runs):
+            parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
+            children = eem.sparseflip(parents, n_children, sparsity, p_bf)
 
-                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-                children = eem.sparseflip(parents, n_children, sparsity, p_bf)
-
-                self.assertEqual(children.shape[0], n_parents*n_children)
-                self.assertTrue(((parents.repeat(1, n_children).view(-1, H) == children).sum(
-                    dim=1).sum()/(n_parents*n_children)).item() > 0)  # TODO Find better test
+            self.assertEqual(children.shape[0], n_parents*n_children)
+            self.assertTrue(((parents.repeat(1, n_children).view(-1, H) == children).sum(
+                dim=1).sum()/(n_parents*n_children)).item() > 0)  # TODO Find better test
 
     def test_cross(self):
 
         H, n_parents = 5, 4
 
-        for device in test_devices:
-            tvem._set_device(device)
+        for x in range(self.n_runs):
 
-            for x in range(self.n_runs):
+            parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
+            children = eem.cross(parents)  # is (n_parents*n_children, H)
 
-                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-                children = eem.cross(parents)  # is (n_parents*n_children, H)
-
-                self.assertEqual(children.shape[0], n_parents*(n_parents-1))
-                # TODO Find more tests
+            self.assertEqual(children.shape[0], n_parents*(n_parents-1))
+            # TODO Find more tests
 
     def test_cross_randflip(self):
 
         H, n_parents, n_children_ = 5, 4, 1
         seed = 7
 
-        for device in test_devices:
-            tvem._set_device(device)
+        for x in range(self.n_runs):
 
-            for x in range(self.n_runs):
+            parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
-                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
+            to.manual_seed(seed)
+            to.cuda.manual_seed_all(seed)
+            children_wth_flip = eem.cross(parents)
 
-                to.manual_seed(seed)
-                to.cuda.manual_seed_all(seed)
-                children_wth_flip = eem.cross(parents)
+            to.manual_seed(seed)
+            to.cuda.manual_seed_all(seed)
+            children_w_flip = eem.cross_randflip(
+                parents, n_children_)  # is (n_parents*n_children, H)
 
-                to.manual_seed(seed)
-                to.cuda.manual_seed_all(seed)
-                children_w_flip = eem.cross_randflip(
-                    parents, n_children_)  # is (n_parents*n_children, H)
-
-                self.assertEqual(
-                    children_w_flip.shape[0], n_parents*(n_parents-1)*n_children_)
-                self.assertEqual(((children_wth_flip == children_w_flip).sum(
-                    dim=1).sum()/(n_parents*(n_parents-1)*n_children_)).item(), H-1)
+            self.assertEqual(
+                children_w_flip.shape[0], n_parents*(n_parents-1)*n_children_)
+            self.assertEqual(((children_wth_flip == children_w_flip).sum(
+                dim=1).sum()/(n_parents*(n_parents-1)*n_children_)).item(), H-1)
 
     def test_cross_sparseflip(self):
 
         H, n_parents, n_children_, sparsity, p_bf = 5, 4, 1, 1./5, 0.5
         seed = 7
 
-        for device in test_devices:
-            tvem._set_device(device)
+        for x in range(self.n_runs):
 
-            for x in range(self.n_runs):
+            parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
-                parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
+            to.manual_seed(seed)
+            to.cuda.manual_seed_all(seed)
+            children_wth_flip = eem.cross(parents)
 
-                to.manual_seed(seed)
-                to.cuda.manual_seed_all(seed)
-                children_wth_flip = eem.cross(parents)
+            to.manual_seed(seed)
+            to.cuda.manual_seed_all(seed)
+            children_w_flip = eem.cross_sparseflip(
+                parents, n_children_, sparsity, p_bf)  # is (n_parents*n_children, H)
 
-                to.manual_seed(seed)
-                to.cuda.manual_seed_all(seed)
-                children_w_flip = eem.cross_sparseflip(
-                    parents, n_children_, sparsity, p_bf)  # is (n_parents*n_children, H)
-
-                self.assertEqual(
-                    children_w_flip.shape[0], n_parents*(n_parents-1)*n_children_)
-                self.assertTrue(((children_wth_flip == children_w_flip).sum(dim=1).sum(
-                )/(n_parents*(n_parents-1)*n_children_)).item() > 0)  # TODO Find better test
-                self.assertTrue(((children_wth_flip == children_w_flip).sum(dim=1).sum(
-                )/(n_parents*(n_parents-1)*n_children_)).item() <= H)  # TODO Find better test
+            self.assertEqual(
+                children_w_flip.shape[0], n_parents*(n_parents-1)*n_children_)
+            self.assertTrue(((children_wth_flip == children_w_flip).sum(dim=1).sum(
+            )/(n_parents*(n_parents-1)*n_children_)).item() > 0)  # TODO Find better test
+            self.assertTrue(((children_wth_flip == children_w_flip).sum(dim=1).sum(
+            )/(n_parents*(n_parents-1)*n_children_)).item() <= H)  # TODO Find better test
 
     def test_batch_fitparents(self):
 
         batch_size, n_candidates, H, n_parents = 2, 3, 3, 2
 
-        for device in test_devices:
-            tvem._set_device(device)
+        for x in range(self.n_runs):
 
-            for x in range(self.n_runs):
+            candidates = generate_unique_states(n_states=n_candidates, H=H)\
+                         .repeat(batch_size, 1, 1)  # is (batch_size, n_candidates, H)
+            # is (batch_size, n_candidates)
+            lpj = lpj_dummy(candidates, None)
 
-                candidates = generate_unique_states(n_states=n_candidates, H=H)\
-                             .repeat(batch_size, 1, 1)  # is (batch_size, n_candidates, H)
-                # is (batch_size, n_candidates)
-                lpj = lpj_dummy(candidates, None)
+            # is (batch_size, n_parents, H)
+            parents = eem.batch_fitparents(candidates, n_parents, lpj)
 
-                # is (batch_size, n_parents, H)
-                parents = eem.batch_fitparents(candidates, n_parents, lpj)
-
-                self.assertTrue(
-                    (list(parents.shape) == [batch_size, n_parents, H]))
-                # TODO Find more tests
+            self.assertTrue(
+                (list(parents.shape) == [batch_size, n_parents, H]))
+            # TODO Find more tests
 
     def test_update(self):
 
@@ -177,33 +157,32 @@ class TestEEM(unittest.TestCase):
             'n_children': 1,
             'n_generations': 1}
 
-        for device in test_devices:
-            tvem._set_device(device)
+        device = tvem.get_device()
 
-            for x in range(self.n_runs):
+        for x in range(self.n_runs):
 
-                idx = to.arange(eem_conf['N'], device=device)
-                data_dummy = to.empty((1,), device=device)
+            idx = to.arange(eem_conf['N'], device=device)
+            data_dummy = to.empty((1,), device=device)
 
-                var_states = eem.EEMVariationalStates(conf=eem_conf)
+            var_states = eem.EEMVariationalStates(conf=eem_conf)
 
-                # is (batch_size, n_candidates)
-                var_states.lpj[:] = lpj_dummy(
-                    states=var_states.K[idx], data=data_dummy)
+            # is (batch_size, n_candidates)
+            var_states.lpj[:] = lpj_dummy(
+                states=var_states.K[idx], data=data_dummy)
 
-                old_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
+            old_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
 
-                nsubs = var_states.update(
-                    idx=idx, batch=data_dummy, lpj_fn=lpj_dummy)
+            nsubs = var_states.update(
+                idx=idx, batch=data_dummy, lpj_fn=lpj_dummy)
 
-                new_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
-                no_datapoints_without_lpj_increase = (
-                    new_sum_lpj_over_n == old_sum_lpj_over_n).sum()
-                no_datapoints_with_lpj_decrease = (
-                    (new_sum_lpj_over_n-old_sum_lpj_over_n) < (-1e-10)).sum()
+            new_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
+            no_datapoints_without_lpj_increase = (
+                new_sum_lpj_over_n == old_sum_lpj_over_n).sum()
+            no_datapoints_with_lpj_decrease = (
+                (new_sum_lpj_over_n-old_sum_lpj_over_n) < (-1e-10)).sum()
 
-                self.assertTrue(nsubs >= 0)
-                self.assertEqual(no_datapoints_with_lpj_decrease, 0)
-                if no_datapoints_without_lpj_increase > 0:
-                    self.assertTrue(nsubs < (eem_conf['N']*eem_conf['S']))
-                # TODO Find more tests
+            self.assertTrue(nsubs >= 0)
+            self.assertEqual(no_datapoints_with_lpj_decrease, 0)
+            if no_datapoints_without_lpj_increase > 0:
+                self.assertTrue(nsubs < (eem_conf['N']*eem_conf['S']))
+            # TODO Find more tests

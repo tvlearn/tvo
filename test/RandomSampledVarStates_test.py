@@ -7,17 +7,14 @@ import torch as to
 from tvem.variational import RandomSampledVarStates
 import tvem
 
-test_devices = [to.device('cpu')]
-if tvem.get_device() != test_devices[0]:
-    test_devices.append(tvem.get_device())
-
 
 def count_active_units(data, states):
     return states.sum(dim=2, dtype=to.float32)
 
 
-@pytest.mark.parametrize('device', test_devices)
-def test_update(device):
+@pytest.mark.gpu
+def test_update():
+    device = tvem.get_device()
     conf = {'N': 10, 'H': 8, 'S': 4, 'dtype': to.float32, 'device': device}
     var_states = RandomSampledVarStates(10, conf)
     data = to.rand(conf['N'], 1, device=device)

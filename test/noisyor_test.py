@@ -2,7 +2,6 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-import os
 import numpy as np
 import torch as to
 import pytest
@@ -10,10 +9,6 @@ from tvem.models import NoisyOR
 from tvem.variational import TVEMVariationalStates
 import math
 import tvem
-
-test_devices = [to.device('cpu')]
-if 'TVEM_GPU' in os.environ:
-    test_devices.append(to.device('cuda:0'))
 
 
 class AllStatesExceptZero(TVEMVariationalStates):
@@ -37,10 +32,10 @@ class AllStatesExceptZero(TVEMVariationalStates):
                  .unsqueeze(0).expand(N, -1, -1)
 
 
-@pytest.fixture(scope="module", params=test_devices)
+@pytest.fixture(scope="module",
+                params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)])
 def setup(request):
     class Setup:
-        tvem._set_device(request.param)
         _device = tvem.get_device()
         N, D, H = 2, 1, 2
         pi_init = to.full((H,), .5)
