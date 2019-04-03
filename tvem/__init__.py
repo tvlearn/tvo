@@ -1,3 +1,3 @@
-from tvem.util.global_settings import set_device, get_device, set_run_policy, get_run_policy
+from tvem.util.global_settings import get_device, get_run_policy, _set_device
 
-__all__ = ['set_device', 'get_device', 'set_run_policy', 'get_run_policy']
+__all__ = ['get_device', '_set_device', 'get_run_policy']

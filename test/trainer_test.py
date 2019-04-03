@@ -21,7 +21,7 @@ if tvem.get_device() != test_devices[0]:
 def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
-        tvem.set_device(request.param)
+        tvem._set_device(request.param)
         trainer = Trainer(NoisyOR(H, D))
         _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
         data = TVEMDataLoader(_td, batch_size=N)

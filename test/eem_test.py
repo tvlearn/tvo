@@ -46,7 +46,7 @@ class TestEEM(unittest.TestCase):
         H, n_parents, n_children = 5, 4, 2
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 
@@ -63,7 +63,7 @@ class TestEEM(unittest.TestCase):
         H, n_parents, n_children, sparsity, p_bf = 5, 4, 2, 1./5, 0.5
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 
@@ -79,7 +79,7 @@ class TestEEM(unittest.TestCase):
         H, n_parents = 5, 4
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 
@@ -95,7 +95,7 @@ class TestEEM(unittest.TestCase):
         seed = 7
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 
@@ -121,7 +121,7 @@ class TestEEM(unittest.TestCase):
         seed = 7
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 
@@ -148,7 +148,7 @@ class TestEEM(unittest.TestCase):
         batch_size, n_candidates, H, n_parents = 2, 3, 3, 2
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 
@@ -178,7 +178,7 @@ class TestEEM(unittest.TestCase):
             'n_generations': 1}
 
         for device in test_devices:
-            tvem.set_device(device)
+            tvem._set_device(device)
 
             for x in range(self.n_runs):
 

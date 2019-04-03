@@ -2,7 +2,7 @@ import os
 import torch as to
 
 
-def _default_device() -> to.device:
+def _choose_device() -> to.device:
     dev = to.device('cpu')
     if 'TVEM_GPU' in os.environ:
         gpu_n = int(os.environ['TVEM_GPU'])
@@ -15,35 +15,34 @@ class _GlobalDevice:
 
     Set and get the corresponding to.device with `{set,get}_device()`.
     """
-    _device: to.device = _default_device()
-
-    @classmethod
-    def set_device(cls, dev: to.device):
-        cls._device = dev
+    _device: to.device = _choose_device()
 
     @classmethod
     def get_device(cls) -> to.device:
         return cls._device
 
-
-def set_device(device: to.device):
-    """Set the torch.device that all objects in the package will use by default.
-
-    Note that certain operations might run on CPU independently of the value of tvem.device.
-
-    The default ('cpu') can also be overridden by setting the TVEM_GPU environment variable
-    to the number of the desired CUDA device. For example, in bash, `export TVEM_GPU=0`
-    will make the framework default to device 'cuda:0'.
-    """
-    _GlobalDevice.set_device(device)
+    @classmethod
+    def set_device(cls, dev: to.device):
+        cls._device = dev
 
 
 def get_device() -> to.device:
-    """Get the torch.device that all objects in the package will use by default."""
+    """Get the torch.device that all objects in the package will use by default.
+
+    The default ('cpu') can be changed by setting the `TVEM_GPU` environment variable
+    to the number of the desired CUDA device. For example, in bash, `export TVEM_GPU=0`
+    will make the framework default to device 'cuda:0'. Note that some computations might
+    still be performed on CPU for performance reasons.
+    """
     return _GlobalDevice.get_device()
 
 
-def _default_run_policy() -> str:
+def _set_device(dev: to.device):
+    """Private method to change the TVEM device settings. USE WITH CARE."""
+    _GlobalDevice.set_device(dev)
+
+
+def _choose_run_policy() -> str:
     policy = 'seq'
     if ('TVEM_DISTRIBUTED' in os.environ and os.environ['TVEM_DISTRIBUTED'] != 0)\
        or 'OMPI_COMM_WORLD_SIZE' in os.environ:
@@ -56,36 +55,24 @@ class _GlobalPolicy:
 
     Set and get the policy with `{set,get}_run_policy()`.
     """
-    _policy: str = _default_run_policy()
-
-    @classmethod
-    def set_policy(cls, p: str):
-        assert p in ('seq', 'dist'), "Supported policies are 'seq' and 'dist'"
-        cls._policy = p
+    _policy: str = _choose_run_policy()
 
     @classmethod
     def get_policy(cls) -> str:
         return cls._policy
 
 
-def set_run_policy(policy: str):
-    """Set the preferred parallelization policy. Can be one of 'seq' or 'dist'.
+def get_run_policy() -> str:
+    """Get the current parallelization policy.
 
     * `'seq'`: the framework will not perform any parallelization other than what torch tensors
       offer out of the box on the relevant device.
     * `'dist'`: the framework will perform data parallelization for the algorithms that
       implement it.
 
-    The default is 'seq' unless the framework detects that the program is running within `mpirun`,
-    in which case the default is 'dist'.
-    The default can be overridden by setting the TVEM_DISTRIBUTED environment variable to a
-    non-zero value, e.g. in bash with `export TVEM_DISTRIBUTED=1`.
+    The policy is 'seq' unless the framework detects that the program is running within `mpirun`,
+    in which case the policy is 'dist'. The default can also be overridden by setting the
+    `TVEM_DISTRIBUTED` environment variable to a non-zero value, e.g. in bash with
+    `export TVEM_DISTRIBUTED=1`.
     """
-    _GlobalPolicy.set_policy(policy)
-
-
-def get_run_policy() -> str:
-    """Get the preferred parallelization policy for the framework.
-
-    Returned string can be one of 'seq' and 'dist'."""
     return _GlobalPolicy.get_policy()

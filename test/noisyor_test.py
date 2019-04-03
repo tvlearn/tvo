@@ -40,7 +40,7 @@ class AllStatesExceptZero(TVEMVariationalStates):
 @pytest.fixture(scope="module", params=test_devices)
 def setup(request):
     class Setup:
-        tvem.set_device(request.param)
+        tvem._set_device(request.param)
         _device = tvem.get_device()
         N, D, H = 2, 1, 2
         pi_init = to.full((H,), .5)
