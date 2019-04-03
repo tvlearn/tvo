@@ -45,7 +45,8 @@ def get_device() -> to.device:
 
 def _default_run_policy() -> str:
     policy = 'seq'
-    if 'TVEM_DISTRIBUTED' in os.environ and os.environ['TVEM_DISTRIBUTED'] != 0:
+    if ('TVEM_DISTRIBUTED' in os.environ and os.environ['TVEM_DISTRIBUTED'] != 0)\
+       or 'OMPI_COMM_WORLD_SIZE' in os.environ:
         policy = 'dist'
     return policy
 
@@ -74,8 +75,10 @@ def set_run_policy(policy: str):
              offer out of the box on the relevant device.
     * 'dist': the framework will perform data parallelization for the algorithms that implement it.
 
-    The default ('seq') can also be overridden by setting the TVEM_DISTRIBUTED environment
-    variable to a non-zero value.
+    The default is 'seq' unless the framework detects that the program is running within `mpirun`,
+    in which case the default is 'dist'.
+    The default can be overridden by setting the TVEM_DISTRIBUTED environment variable to a
+    non-zero value, e.g. in bash with `export TVEM_DISTRIBUTED=1`.
     """
     _GlobalPolicy.set_policy(policy)
 
