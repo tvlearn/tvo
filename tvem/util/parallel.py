@@ -70,13 +70,16 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
     Tensor data is assumed to be None on all but the root processes.
     """
     if tvem.get_run_policy() == 'seq':
-        return tensors
+        if len(tensors) == 1:
+            return tensors[0].to(dtype=dtype, device=device)
+        else:
+            return map(to.Tensor.to(dtype=dtype, device=device), tensors)
 
     comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
 
     my_tensors = []
     for data in tensors:
-        ndim = to.empty((1,), dtype=to.uint64)
+        ndim = to.empty((1,), dtype=to.int64)
         if comm_rank == src:
             ndim[:] = data.dim()
         dist.broadcast(ndim, src)
@@ -87,7 +90,7 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
         total_length, other_length = shape[0], shape[1:]
 
         # no datapoints per commrank including dummy rows
-        local_length_ = int(to.ceil(to.tensor([total_length / comm_size])))
+        local_length_ = int(to.ceil(to.tensor([float(total_length) / comm_size])))
         # determine number of and eventually add dummy rows for scatter/gather compatibility
         empty_length = local_length_ * comm_size - total_length
         local_length = local_length_
@@ -118,7 +121,7 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
 
         my_tensors.append(my_data)
 
-    return my_tensors
+    return my_tensors[0] if len(my_tensors) == 1 else my_tensors
 
 
 def all_reduce(tensor: Tensor, op=dist.ReduceOp.SUM):
