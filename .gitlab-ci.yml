@@ -12,7 +12,7 @@ test:
     - merge_requests
   script:
     - pylama --options .config/pylama.ini
-    - mypy --ignore-missing-imports tvem
+    - mypy --ignore-missing-imports tvem test
     - pytest test
 
 pages:
