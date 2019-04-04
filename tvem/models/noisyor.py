@@ -113,6 +113,12 @@ class NoisyOR(TVEMModel):
         return F.item()
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
+        """Use hidden states to sample datapoints according to the NoisyOR generative model.
+
+        :param hidden_state: a tensor with shape (N, H) where H is the number of hidden units.
+        :returns: the datapoints, as a tensor with shape (N, D) where D is
+                  the number of observables.
+        """
         N, H = hidden_state.shape
         expected_H = self.theta['pies'].numel()
         assert H == expected_H, f'input has wrong shape, expected {(N, expected_H)}, got {(N, H)}'

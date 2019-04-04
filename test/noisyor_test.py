@@ -85,4 +85,5 @@ def test_generate_from_hidden(setup):
 
 def test_generate_data(setup):
     N = 3
-    assert setup.m.generate_data(N).shape == (N, setup.D)
+    assert setup.m.generate_data(N)['data'].shape == (N, setup.D)
+    assert setup.m.generate_data(N)['hidden_state'].shape == (N, setup.H)

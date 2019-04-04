@@ -68,8 +68,13 @@ class BSC(TVEMModel):
 
         return {'batch_Wbar': tmp['batch_Wbar']}
 
-    def generate_from_hidden(self, hidden_state: Tensor) -> Dict[str, Tensor]:
-        """Use hidden states to draw data points according to the noise model of BSC."""
+    def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
+        """Use hidden states to sample datapoints according to the noise model of BSC.
+
+        :param hidden_state: a tensor with shape (N, H) where H is the number of hidden units.
+        :returns: the datapoints, as a tensor with shape (N, D) where D is
+                  the number of observables.
+        """
 
         theta = self.theta
 
@@ -88,7 +93,7 @@ class BSC(TVEMModel):
         Y = Wbar + theta['sigma'] * \
             to.randn((no_datapoints, D), dtype=dtype_f, device=device)
 
-        return {'Y': Y, 'S': hidden_state, 'Wbar': Wbar}
+        return Y
 
     def init_epoch(self):
         """Allocate and/or initialize tensors used during EM-step."""

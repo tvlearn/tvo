@@ -75,19 +75,22 @@ class TVEMModel(ABC):
         pass  # pragma: no cover
 
     def generate_data(self, N: int) -> Dict[str, Tensor]:
-        """Generate N random datapoints from this model.
+        """Sample N datapoints from this model.
 
-        :param N: Number of data points to be generated.
-        :returns: dictionary containing generated data.
+        :param N: number of data points to be generated.
+        :returns: dictionary with keys
+                  - `data`: a tensor with shape (N, D) where D is the number of
+                    observables for this model.
+                  - `hidden_state`: a tensor with shape (N, H) where H is the number of
+                    hidden variables for this model
         """
         theta = self.theta
 
         pies = theta['pies']
 
-        S = to.rand((N, pies.numel()), dtype=pies.dtype,
-                    device=pies.device) <= pies
+        S = to.rand((N, pies.numel()), dtype=pies.dtype, device=pies.device) <= pies
 
-        return self.generate_from_hidden(S)
+        return {'data': self.generate_from_hidden(S), 'hidden_state': S}
 
     @abstractmethod
     def generate_from_hidden(self, hidden_state: Tensor) -> Dict[str, Tensor]:
