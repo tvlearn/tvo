@@ -44,9 +44,9 @@ def _set_device(dev: to.device):
 
 def _choose_run_policy() -> str:
     policy = 'seq'
-    if ('TVEM_DISTRIBUTED' in os.environ and os.environ['TVEM_DISTRIBUTED'] != 0)\
+    if ('TVEM_MPI' in os.environ and os.environ['TVEM_MPI'] != 0)\
        or 'OMPI_COMM_WORLD_SIZE' in os.environ:
-        policy = 'dist'
+        policy = 'mpi'
     return policy
 
 
@@ -67,12 +67,12 @@ def get_run_policy() -> str:
 
     * `'seq'`: the framework will not perform any parallelization other than what torch tensors
       offer out of the box on the relevant device.
-    * `'dist'`: the framework will perform data parallelization for the algorithms that
+    * `'mpi'`: the framework will perform data parallelization for the algorithms that
       implement it.
 
     The policy is 'seq' unless the framework detects that the program is running within `mpirun`,
-    in which case the policy is 'dist'. The default can also be overridden by setting the
-    `TVEM_DISTRIBUTED` environment variable to a non-zero value, e.g. in bash with
-    `export TVEM_DISTRIBUTED=1`.
+    in which case the policy is 'mpi'. The default can also be overridden by setting the
+    `TVEM_MPI` environment variable to a non-zero value, e.g. in bash with
+    `export TVEM_MPI=1`.
     """
     return _GlobalPolicy.get_policy()

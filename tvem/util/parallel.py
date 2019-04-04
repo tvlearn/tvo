@@ -18,9 +18,8 @@ def pprint(obj: object = "", end: str = '\n'):
     param obj: Message to print
     param end: Suffix of message. Default is linebreak.
     """
-    if tvem.get_run_policy() == 'dist':
-        if dist.get_rank() != 0:
-            return
+    if tvem.get_run_policy() == 'mpi' and dist.get_rank() != 0:
+        return
 
     print(obj, end=end)
 
@@ -125,6 +124,6 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
 
 
 def all_reduce(tensor: Tensor, op=dist.ReduceOp.SUM):
-    """Equivalent to torch's all_reduce if tvem.get_run_policy() is 'dist', no-op otherwise."""
-    if tvem.get_run_policy() == 'dist':
+    """Equivalent to torch's all_reduce if tvem.get_run_policy() is 'mpi', no-op otherwise."""
+    if tvem.get_run_policy() == 'mpi':
         dist.all_reduce(tensor, op)

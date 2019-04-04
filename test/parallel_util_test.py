@@ -15,7 +15,7 @@ def setup(request):
     if tvem.get_run_policy() == 'seq':
         rank, n_procs = 0, 1
     else:
-        assert tvem.get_run_policy() == 'dist'
+        assert tvem.get_run_policy() == 'mpi'
         init_processes()
         rank = to.distributed.get_rank()
         n_procs = to.distributed.get_world_size()
