@@ -12,9 +12,9 @@ import tvem
 
 
 class TVEMModel(ABC):
-    def __init__(self):
+    def __init__(self, theta: Dict[str, Tensor]):
         """Abstract base class for probabilistic generative models to be trained with TVEM."""
-        self.theta = {}
+        self.theta = theta
 
     @abstractmethod
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:

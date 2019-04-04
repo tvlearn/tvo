@@ -55,10 +55,11 @@ class BSC(TVEMModel):
         assert sigma_init is None or sigma_init.shape == (
             1,) and sigma_init.device == device
 
-        self.theta = {
+        theta = {
             'pies': pies_init if pies_init is not None else to.full((H,), 1./H, device=device),
             'W': W_init if W_init is not None else to.rand(D, H, device=device),
             'sigma': sigma_init if sigma_init is not None else to.tensor([1., ], device=device)}
+        super().__init__(theta=theta)
 
     @property
     def sorted_by_lpj(self) -> Dict[str, Tensor]:

@@ -28,7 +28,7 @@ class NoisyOR(TVEMModel):
         else:
             pi_init = to.full((H,), 1./H, device=device)
 
-        self.theta = {'pies': pi_init.to(device=device), 'W': W_init.to(device=device)}
+        super().__init__(theta={'pies': pi_init.to(device=device), 'W': W_init.to(device=device)})
         self.new_pi = to.zeros(H, device=device)
         self.Btilde = to.zeros(D, H, device=device)
         self.Ctilde = to.zeros(D, H, device=device)
