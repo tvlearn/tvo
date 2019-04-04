@@ -166,4 +166,4 @@ class TVEMVariationalStates(ABC):
             sorted by all_lpj, the same way all_lpj and all_states are sorted.
         :returns: average number of variational state substitutions per datapoint performed
         """
-        pass
+        pass  # pragma: no cover

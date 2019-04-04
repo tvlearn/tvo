@@ -28,7 +28,7 @@ class TVEMModel(ABC):
         for the specified set of datapoints and variational states where, potentially,
         some factors that do not depend on the variational states have been elided.
         """
-        pass
+        pass  # pragma: no cover
 
     def init_epoch(self) -> None:
         """This method is called once at the beginning of each training epoch.
@@ -36,7 +36,7 @@ class TVEMModel(ABC):
         Concrete models can optionally override this method if it's convenient.
         By default, it does nothing.
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def update_param_batch(self, idx: Tensor, batch: Tensor,
@@ -53,7 +53,7 @@ class TVEMModel(ABC):
         evaluated _before_ the model parameter update. If the batch's free energy is returned here,
         Trainers will skip a direct per-batch call to the free_energy method.
         """
-        pass
+        pass  # pragma: no cover
 
     def update_param_epoch(self) -> None:
         """Execute epoch-wise M-step or epoch-wise section of an M-step computation.
@@ -62,7 +62,7 @@ class TVEMModel(ABC):
         Implementing this method is optional: models can leave the body empty (just a `pass`)
         or even not implement it at all.
         """
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
@@ -72,7 +72,7 @@ class TVEMModel(ABC):
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all TVEMVariationalStates states for this dataset
         """
-        pass
+        pass  # pragma: no cover
 
     def generate_data(self, N: int) -> Dict[str, Tensor]:
         """Generate N random datapoints from this model.
@@ -99,7 +99,7 @@ class TVEMModel(ABC):
         Data points are stored in the returned Dictionary in key 'Y' and have shape (N,D) where
         D is the number of observables for this model.
         """
-        pass
+        pass  # pragma: no cover
 
     @property
     def sorted_by_lpj(self) -> Dict[str, Tensor]:
