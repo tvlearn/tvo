@@ -79,8 +79,11 @@ def test_train(setup):
 
 
 def test_generate_from_hidden(setup):
-    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvem.get_device())
-    assert (setup.m.generate_from_hidden(zeros) == zeros).all()
+    N = 1
+    S = to.zeros(N, setup.H, dtype=to.uint8, device=tvem.get_device())
+    data = setup.m.generate_from_hidden(S)
+    assert data.shape == (N, setup.D)
+    assert (data == to.zeros(N, setup.D).to(S)).all()
 
 
 def test_generate_data(setup):
