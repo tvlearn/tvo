@@ -72,9 +72,13 @@ def test_train(setup):
     assert new_F > first_F
 
 
-"""
-TESTS TO DO:
+def test_generate_from_hidden(setup):
+    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvem.get_device())
+    assert setup.m.generate_from_hidden(zeros).shape == (1, setup.D)
 
-- calls to generate_data and generate_from_hidden must return tensors with the correct shape
-- a call to generate_from_hidden with all-zero latents must return an all-zero datapoint
-"""
+
+def test_generate_data(setup):
+    N = 3
+    d = setup.m.generate_data(N)
+    assert d['data'].shape == (N, setup.D)
+    assert d['hidden_state'].shape == (N, setup.H)
