@@ -11,7 +11,7 @@ if [[ ! -v OMPI_COMM_WORLD_RANK ]]; then
 fi
 
 if [[ $OMPI_COMM_WORLD_RANK -eq 0 ]]; then
-   pytest -v -m parallel test
+   pytest --cov=tvem --cov-append -v -m parallel test
 else
    pytest -m parallel test > /dev/null
 fi
