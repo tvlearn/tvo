@@ -55,4 +55,6 @@ class FullEM(TVEMVariationalStates):
 
         lpj[idx] = lpj_fn(batch, K[idx])
 
+        self.lpj2pjc(idx)
+
         return 0
