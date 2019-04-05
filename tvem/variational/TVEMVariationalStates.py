@@ -39,7 +39,8 @@ def generate_unique_states(n_states: int, H: int, crowdedness: float = 1.,
     if device is None:
         device = tvem.get_device()
     assert n_states <= 2**H, "n_states must be smaller than 2**H"
-    s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness/H, size=(n_states//2, H))}
+    s_set = {tuple(s) for s in np.random.binomial(
+        1, p=crowdedness/H, size=(n_states//2, H))}
     while len(s_set) < n_states:
         s_set.update({tuple(s) for s in np.random.binomial(
             1, p=crowdedness/H, size=(n_states//2, H))})
@@ -153,6 +154,8 @@ class TVEMVariationalStates(ABC):
         else:
             self.K = generate_unique_states(S, H).repeat(N, 1, 1)  # (N, S, H)
         self.lpj = to.empty((N, S), dtype=dtype, device=tvem.get_device())
+        self.pjc = to.empty_like(self.lpj)
+        self.up_lpg_bound = 0.
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
@@ -168,3 +171,16 @@ class TVEMVariationalStates(ABC):
         :returns: average number of variational state substitutions per datapoint performed
         """
         pass  # pragma: no cover
+
+    def lpj2pjc(self, idx: Tensor):
+        """Shift log-pseudo-joint and convert log- to actual probability
+
+        :param idx: data point indices of batch w.r.t. K
+        """
+        all_lpj = self.lpj
+        all_pjc = self.pjc
+        up_lpg_bound = self.up_lpg_bound
+
+        shft = up_lpg_bound - all_lpj[idx].max(dim=1)[0]
+        tmp = to.exp(all_lpj[idx] + shft[:, None])
+        all_pjc[idx] = tmp / tmp.sum(dim=1)[:, None]
