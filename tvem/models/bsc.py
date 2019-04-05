@@ -6,7 +6,7 @@ import math
 import torch as to
 
 from torch import Tensor
-from typing import Dict
+from typing import Dict, Tuple
 
 import tvem
 from tvem.util import get
@@ -261,3 +261,7 @@ class BSC(TVEMModel):
 
         for key in theta:
             theta[key] = theta_new[key]
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        return self.theta['W'].shape

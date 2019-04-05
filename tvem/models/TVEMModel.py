@@ -7,7 +7,7 @@ import torch as to
 from abc import ABC, abstractmethod
 from torch import Tensor
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import tvem
 
 
@@ -115,6 +115,15 @@ class TVEMModel(ABC):
         By default the dictionary is empy. Concrete models can override this property if need be.
         """
         return {}
+
+    @property
+    @abstractmethod
+    def shape(self) -> Tuple[int, ...]:
+        """The model shape.
+
+        :returns: the model shape, observable layer followed by the hidden layers: (D, H1, H2, ...)
+        """
+        pass  # pragma: no cover
 
 
 def init_W_data_mean(data_mean: Tensor, data_var: Tensor, H: int, dtype: to.dtype = to.float64,

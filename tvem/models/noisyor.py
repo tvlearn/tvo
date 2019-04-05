@@ -8,7 +8,7 @@ from tvem.variational import TVEMVariationalStates  # type: ignore
 from tvem.util.parallel import all_reduce
 from torch import Tensor
 import torch as to
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import tvem
 
 
@@ -150,3 +150,7 @@ class NoisyOR(TVEMModel):
         explpj = to.exp(lpj + B)
         denominator = to.sum(explpj, dim=1) + deltaY.type_as(B)*to.exp(B[:, 0])
         return to.einsum('...ij,ij->...i', g.type_as(lpj), explpj) / (denominator + NoisyOR.eps)
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        return self.theta['W'].shape
