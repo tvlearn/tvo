@@ -42,7 +42,7 @@ class NoisyOR(TVEMModel):
         W = self.theta['W']
         N, S, H = K.shape
         D = W.shape[0]
-        dev = K.device
+        dev = pi.device
         logPy = to.empty((N, S), device=dev)
         logPriors = to.matmul(K.type_as(pi), to.log(pi/(1-pi)))
         # the general routine for eem sometimes require evaluation of lpjs of all-zero states,
