@@ -39,10 +39,10 @@ class EEMVariationalStates(TVEMVariationalStates):
         parent_selection, mutation, n_parents, n_children,\
             n_generations = get(conf, *required_keys)
 
-        lpj[idx] = lpj_fn(K[idx], batch)
+        lpj[idx] = lpj_fn(batch, K[idx])
 
         def lpj_fn_(states):
-            return lpj_fn(states, batch.to(device='cpu'))
+            return lpj_fn(batch.to(device='cpu'), states)
 
         new_states, new_lpj = evolve_states(
             lpj=lpj[idx].to(device='cpu'),

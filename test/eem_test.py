@@ -13,7 +13,7 @@ import tvem
 import pytest
 
 
-def lpj_dummy(states: Tensor, data: Tensor) -> Tensor:
+def lpj_dummy(data: Tensor, states: Tensor) -> Tensor:
     """Dummy log-pseudo-joint. """
     N, S, H = states.shape
 
@@ -135,7 +135,7 @@ class TestEEM(unittest.TestCase):
             candidates = generate_unique_states(n_states=n_candidates, H=H)\
                          .repeat(batch_size, 1, 1)  # is (batch_size, n_candidates, H)
             # is (batch_size, n_candidates)
-            lpj = lpj_dummy(candidates, None)
+            lpj = lpj_dummy(None, candidates)
 
             # is (batch_size, n_parents, H)
             parents = eem.batch_fitparents(candidates, n_parents, lpj)
@@ -167,8 +167,7 @@ class TestEEM(unittest.TestCase):
             var_states = eem.EEMVariationalStates(conf=eem_conf)
 
             # is (batch_size, n_candidates)
-            var_states.lpj[:] = lpj_dummy(
-                states=var_states.K[idx], data=data_dummy)
+            var_states.lpj[:] = lpj_dummy(data=data_dummy, states=var_states.K[idx])
 
             old_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
 
