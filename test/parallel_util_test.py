@@ -23,7 +23,7 @@ def setup(request):
     return Setup(rank, n_procs)
 
 
-@pytest.mark.parallel
+@pytest.mark.mpi
 def test_scatter2processes(setup):
     t = to.arange(setup.n_procs*2).reshape(setup.n_procs, 2)
     my_t = scatter2processes(t)
@@ -31,7 +31,7 @@ def test_scatter2processes(setup):
     assert to.allclose(my_t, to.arange(2, dtype=to.double) + setup.rank*2)
 
 
-@pytest.mark.parallel
+@pytest.mark.mpi
 def test_all_reduce(setup):
     t = to.ones(1)
     all_reduce(t)
