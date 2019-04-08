@@ -154,8 +154,9 @@ class BSC(TVEMModel):
         tmp['indS_fill_upto'] += statesfloat.shape[1]
 
         # is (batch_size,S)
-        return to.mul(to.sum(to.pow(batch_Wbar-data[:, None, :], 2), dim=2), pre1) +\
+        lpj = to.mul(to.sum(to.pow(batch_Wbar-data[:, None, :], 2), dim=2), pre1) +\
             to.einsum('ijk,k->ij', statesfloat, pil_bar)
+        return lpj.to(device=states.device)
 
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
 

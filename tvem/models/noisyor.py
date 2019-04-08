@@ -69,7 +69,7 @@ class NoisyOR(TVEMModel):
         # return lpj_nk
         lpj = logPriors + logPy
         lpj[zeroStatesInd] = to.min(lpj) - 1
-        return lpj
+        return lpj.to(device=states.device)
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates,
                            mstep_factors: Dict[str, Tensor] = None) -> Optional[float]:
