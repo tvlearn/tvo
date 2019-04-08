@@ -54,6 +54,7 @@ def setup(request):
 
 def test_lpj(setup):
     lpj = setup.m.log_pseudo_joint(setup.data, setup.all_s.K)
+    assert lpj.device == setup.all_s.K.device
     assert to.allclose(lpj, setup.true_lpj)
 
 
