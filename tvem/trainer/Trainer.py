@@ -53,14 +53,14 @@ class Trainer:
 
     @staticmethod
     def _do_e_step(data, states, model, N):
-        F = 0.
-        subs = 0
+        F = to.tensor(0.)
+        subs = to.tensor(0)
         for idx, batch in data:
             subs += states.update(idx, batch, model.log_pseudo_joint)
             F += model.free_energy(idx, batch, states)
         all_reduce(F)
         all_reduce(subs)
-        return F/N, subs/N
+        return F.item()/N, subs.item()/N
 
     def e_step(self) -> Dict[str, Any]:
         """Run one epoch of E-steps on training and/or test data, depending on what is available.
@@ -105,8 +105,8 @@ class Trainer:
         # Training #
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
-            F = 0.
-            subs = 0
+            F = to.tensor(0.)
+            subs = to.tensor(0)
             model.init_epoch()
             for idx, batch in train_data:
                 subs += train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
@@ -117,8 +117,8 @@ class Trainer:
             model.update_param_epoch()
             all_reduce(F)
             all_reduce(subs)
-            ret_dict['train_F'] = F/self.N_train
-            ret_dict['train_subs'] = subs/self.N_train
+            ret_dict['train_F'] = F.item()/self.N_train
+            ret_dict['train_subs'] = subs.item()/self.N_train
 
         # Validation/Testing #
         if self.can_test:
