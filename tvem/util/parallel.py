@@ -31,6 +31,8 @@ def init_processes(multi_node: bool = False):
 
     Eventually updates the value of tvem.device.
     """
+    if to.distributed.is_initialized():
+        return
 
     dist.init_process_group('mpi')
 
