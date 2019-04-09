@@ -58,28 +58,34 @@ def init_processes(multi_node: bool = False):
         platform.node(), global_rank, device_str, comm_size))
 
 
-def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float64,
-                      device: to.device = to.device('cpu')) -> Iterable[Tensor]:
+def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = None,
+                      device: to.device = None) -> Iterable[Tensor]:
     """Split tensors into chunks and scatter within process group.
 
     :param data: Tensor to be scattered. Chunks are cut along dimension 0.
     :param src: Source rank to scatter from.
-    :param dtype: dtype of resulting tensor.
-    :param device: device of resulting tensor.
+    :param dtype: dtype of resulting tensor. Defaults to the dtype of the corresponding
+                  input tensor if not specified.
+    :param device: device of resulting tensor. Defaults to the device of the corresponding
+                   input tensor if not specified.
     :returns: Tensor scattered to local rank.
 
     Tensor data is assumed to be None on all but the root processes.
     """
+    my_tensors = []
+
     if tvem.get_run_policy() == 'seq':
-        if len(tensors) == 1:
-            return tensors[0].to(dtype=dtype, device=device)
-        else:
-            return map(to.Tensor.to(dtype=dtype, device=device), tensors)
+        for data in tensors:
+            this_dtype = data.dtype if dtype is None else dtype
+            this_device = data.device if device is None else device
+            my_tensors.append(data.to(dtype=this_dtype, device=this_device))
+    return my_tensors[0] if len(my_tensors) == 1 else my_tensors
 
     comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
 
-    my_tensors = []
     for data in tensors:
+        this_dtype = data.dtype if dtype is None else dtype
+        this_device = data.device if device is None else device
         ndim = to.empty((1,), dtype=to.int64)
         if comm_rank == src:
             ndim[:] = data.dim()
@@ -104,14 +110,13 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = to.float
         # split into chunks and scatter
         chunks = []  # type: ignore
         if comm_rank == 0:
-            chunks = list(to.chunk(to.cat((data.to(dtype=dtype, device=device),
+            chunks = list(to.chunk(to.cat((data.to(dtype=this_dtype, device=this_device),
                                            to.zeros((empty_length, other_length),
-                                                    dtype=dtype, device=device)),
+                                                    dtype=this_dtype, device=this_device)),
                                           dim=0),
                                    comm_size, dim=0))
 
-        my_data = to.zeros((local_length_, other_length),
-                           dtype=dtype, device=device)
+        my_data = to.zeros((local_length_, other_length), dtype=this_dtype, device=this_device)
 
         dist.scatter(my_data, src=src, scatter_list=chunks)
 

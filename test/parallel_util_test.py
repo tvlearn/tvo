@@ -28,7 +28,7 @@ def test_scatter2processes(setup):
     t = to.arange(setup.n_procs*2).reshape(setup.n_procs, 2)
     my_t = scatter2processes(t)
     assert my_t.shape == (1, 2)
-    assert to.allclose(my_t, to.arange(2, dtype=to.double) + setup.rank*2)
+    assert to.allclose(my_t, to.arange(2) + setup.rank*2)
 
 
 @pytest.mark.mpi
