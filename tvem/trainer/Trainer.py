@@ -7,6 +7,7 @@ from tvem.variational import TVEMVariationalStates
 from tvem.util.data import TVEMDataLoader
 from tvem.util.parallel import all_reduce
 from typing import Dict, Any
+import torch as to
 
 
 class Trainer:
@@ -41,9 +42,17 @@ class Trainer:
         self.train_states = train_states
         self.test_data = test_data
         self.test_states = test_states
+        if train_data is not None:
+            self.N_train = to.tensor(train_data.dataset.tensors[0].shape[0])
+            all_reduce(self.N_train)
+            self.N_train = self.N_train.item()
+        if test_data is not None:
+            self.N_test = to.tensor(test_data.dataset.tensors[0].shape[0])
+            all_reduce(self.N_test)
+            self.N_test = self.N_test.item()
 
     @staticmethod
-    def _do_e_step(data, states, model):
+    def _do_e_step(data, states, model, N):
         F = 0.
         subs = 0
         for idx, batch in data:
@@ -51,7 +60,6 @@ class Trainer:
             F += model.free_energy(idx, batch, states)
         all_reduce(F)
         all_reduce(subs)
-        N = data.dataset.tensors[0].shape[0]
         return F/N, subs/N
 
     def e_step(self) -> Dict[str, Any]:
@@ -69,12 +77,14 @@ class Trainer:
         # Training #
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
-            ret['train_F'], ret['train_subs'] = self._do_e_step(train_data, train_states, model)
+            ret['train_F'], ret['train_subs'] = self._do_e_step(train_data, train_states, model,
+                                                                self.N_train)
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            ret['test_F'], ret['test_subs'] = self._do_e_step(test_data, test_states, model)
+            ret['test_F'], ret['test_subs'] = self._do_e_step(test_data, test_states, model,
+                                                              self.N_test)
 
         return ret
 
@@ -107,14 +117,13 @@ class Trainer:
             model.update_param_epoch()
             all_reduce(F)
             all_reduce(subs)
-            N = train_data.dataset.tensors[0].shape[0]
-            ret_dict['train_F'] = F/N
-            ret_dict['train_subs'] = subs/N
+            ret_dict['train_F'] = F/self.N_train
+            ret_dict['train_subs'] = subs/self.N_train
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            res = self._do_e_step(test_data, test_states, model)
+            res = self._do_e_step(test_data, test_states, model, self.N_test)
             ret_dict['test_F'], ret_dict['test_subs'] = res
 
         return ret_dict
