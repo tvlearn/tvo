@@ -14,7 +14,7 @@ import tvem
 class NoisyOR(TVEMModel):
     """Shallow NoisyOR Model."""
 
-    eps = 1e-5
+    eps = 1e-10
 
     def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None):
         device = tvem.get_device()
@@ -60,7 +60,7 @@ class NoisyOR(TVEMModel):
         prods[prod_mask] = 0.
         prods = to.prod(1 - prods, dim=2)
         # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
-        f1 = to.log(1./prods - 1.)
+        f1 = to.log(1./(prods + self.eps) - 1.)
         indeces = Y[:, None, :].expand(N, S, D)
         f1[~indeces] = 0.
         logPy[:, :] = to.sum(f1, dim=-1) + to.sum(to.log(prods), dim=2)
