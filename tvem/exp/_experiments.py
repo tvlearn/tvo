@@ -8,8 +8,10 @@ from tvem.util.data import TVEMDataLoader
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
 from tvem.util.parallel import pprint, init_processes, scatter2processes
+from tvem.util import get
 import tvem
 
+import math
 import h5py
 from typing import Tuple, Dict, Any
 import torch as to
@@ -62,10 +64,14 @@ class _TrainingAndOrValidation(Experiment):
             pprint(f'epoch {e}')
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
             if self.train_data is not None:
-                pprint(f'\ttrain F/N: {d["train_F"]:<10.5f} avg subs: {d["train_subs"]:<6.2f}')
+                F, subs = get(d, 'train_F', 'train_subs')
+                assert not (math.isnan(F) or math.isinf(F)), 'training free energy is nan!'
+                pprint(f'\ttrain F/N: {F:<10.5f} avg subs: {subs:<6.2f}')
             if self.test_data is not None:
-                prompt = 'valid.' if self.train_data is not None else 'test'
-                pprint(f'\t{prompt} F/N: {d["test_F"]:<10.5f} avg subs: {d["test_subs"]:<6.2f}')
+                F, subs = get(d, 'test_F', 'test_subs')
+                test_or_valid = 'valid.' if self.train_data is not None else 'test'
+                assert not (math.isnan(F) or math.isinf(F)), f'{test_or_valid} free energy is nan!'
+                pprint(f'\t{test_or_valid} F/N: {F:<10.5f} avg subs: {subs:<6.2f}')
 
 
 def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:
