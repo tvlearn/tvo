@@ -5,6 +5,7 @@
 
 from .TVEMModel import TVEMModel
 from tvem.variational import TVEMVariationalStates  # type: ignore
+from tvem.util.parallel import all_reduce
 from torch import Tensor
 import torch as to
 from typing import Dict, Optional
@@ -94,10 +95,13 @@ class NoisyOR(TVEMModel):
         return None
 
     def update_param_epoch(self) -> None:
+        all_reduce(self.new_pi)
         self.theta['pies'][:] = self.new_pi
         to.clamp(self.theta['pies'], self.eps, 1 - self.eps, out=self.theta['pies'])
         self.new_pi[:] = 0.
 
+        all_reduce(self.Btilde)
+        all_reduce(self.Ctilde)
         self.theta['W'][:] = 1 + self.Btilde / (self.Ctilde + self.eps)
         to.clamp(self.theta['W'], self.eps, 1 - self.eps, out=self.theta['W'])
         self.Btilde[:] = 0.
