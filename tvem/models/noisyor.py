@@ -15,7 +15,7 @@ import tvem
 class NoisyOR(TVEMModel):
     """Shallow NoisyOR Model."""
 
-    eps = 1e-10
+    eps = 1e-7
 
     def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None):
         device = tvem.get_device()
@@ -68,7 +68,8 @@ class NoisyOR(TVEMModel):
         K[zeroStatesInd] = 0
         # return lpj_nk
         lpj = logPriors + logPy
-        lpj[zeroStatesInd] = to.min(lpj) - 1
+        lpj[zeroStatesInd] = -1e30  # arbitrary very low value
+        assert (~to.isnan(lpj)).all(), 'some NoisyOR lpj values are nan!'
         return lpj.to(device=states.device)
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates,
@@ -81,16 +82,19 @@ class NoisyOR(TVEMModel):
 
         # pi_h = sum{n}{<K_nkh>} / N
         self.new_pi += to.sum(self._mean_posterior(K.permute(2, 0, 1), lpj, deltaY), dim=1) / N
+        assert (~to.isnan(self.new_pi)).all()
 
         # Ws_dnkh = 1 - (W_dh * K_nkh)
         Ws = 1 - self.theta['W'][:, None, None, :] * Kfloat[None, :, :, :]
         Ws_prod = to.prod(Ws, dim=-1, keepdim=True)
-        B = Kfloat / (Ws * (1 - Ws_prod))
+        B = Kfloat / ((Ws * (1 - Ws_prod)) + self.eps)
         self.Btilde.add_(to.einsum('ijk,ki->ij',
                                    self._mean_posterior(B.permute(0, 3, 1, 2), lpj, deltaY),
                                    batch.type_as(lpj) - 1))
         C = Ws_prod * B / Ws
         self.Ctilde.add_(to.sum(self._mean_posterior(C.permute(0, 3, 1, 2), lpj, deltaY), dim=2))
+        assert (~to.isnan(self.Ctilde)).all()
+        assert (~to.isnan(self.Btilde)).all()
 
         return None
 
@@ -113,7 +117,8 @@ class NoisyOR(TVEMModel):
         N = batch.shape[0]
         # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
         deltaY = (batch.any(dim=1) == 0).type_as(lpj)
-        F = N * to.sum(to.log(1 - pi)) + to.sum(to.log(to.sum(to.exp(lpj), dim=1) + deltaY))
+        F = N * to.sum(to.log(1 - pi)) + to.sum(to.log(to.sum(to.exp(lpj) + self.eps, dim=1) + deltaY))
+        assert not (to.isnan(F) or to.isinf(F)), 'free energy is nan!'
         return F.item()
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
@@ -145,11 +150,14 @@ class NoisyOR(TVEMModel):
 
         # Evaluate constants B_n by which we can translate lpj
         B = -to.max(lpj, dim=1, keepdim=True)[0]
+        to.clamp(B, 0, 80, out=B)
 
         # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
         explpj = to.exp(lpj + B)
         denominator = to.sum(explpj, dim=1) + deltaY.type_as(B)*to.exp(B[:, 0])
-        return to.einsum('...ij,ij->...i', g.type_as(lpj), explpj) / (denominator + NoisyOR.eps)
+        means = to.einsum('...ij,ij->...i', g.type_as(lpj), explpj) / (denominator + NoisyOR.eps)
+        assert (~to.isnan(means)).all()
+        return means
 
     @property
     def shape(self) -> Tuple[int, ...]:
