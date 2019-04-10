@@ -117,7 +117,8 @@ class NoisyOR(TVEMModel):
         N = batch.shape[0]
         # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
         deltaY = (batch.any(dim=1) == 0).type_as(lpj)
-        F = N * to.sum(to.log(1 - pi)) + to.sum(to.log(to.sum(to.exp(lpj) + self.eps, dim=1) + deltaY))
+        F = N * to.sum(to.log(1 - pi))\
+            + to.sum(to.log(to.sum(to.exp(lpj) + self.eps, dim=1) + deltaY))
         assert not (to.isnan(F) or to.isinf(F)), 'free energy is nan!'
         return F.item()
 
