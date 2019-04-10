@@ -151,7 +151,7 @@ class NoisyOR(TVEMModel):
 
         # Evaluate constants B_n by which we can translate lpj
         B = -to.max(lpj, dim=1, keepdim=True)[0]
-        to.clamp(B, 0, 80, out=B)
+        to.clamp(B, -80, 80, out=B)
 
         # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
         explpj = to.exp(lpj + B)
