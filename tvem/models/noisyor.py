@@ -69,7 +69,7 @@ class NoisyOR(TVEMModel):
         # return lpj_nk
         lpj = logPriors + logPy
         lpj[zeroStatesInd] = -1e30  # arbitrary very low value
-        assert (~to.isnan(lpj)).all(), 'some NoisyOR lpj values are nan!'
+        assert not to.isnan(lpj).any(), 'some NoisyOR lpj values are nan!'
         return lpj.to(device=states.device)
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates,
@@ -82,7 +82,7 @@ class NoisyOR(TVEMModel):
 
         # pi_h = sum{n}{<K_nkh>} / N
         self.new_pi += to.sum(self._mean_posterior(K.permute(2, 0, 1), lpj, deltaY), dim=1) / N
-        assert (~to.isnan(self.new_pi)).all()
+        assert not to.isnan(self.new_pi).any()
 
         # Ws_dnkh = 1 - (W_dh * K_nkh)
         Ws = 1 - self.theta['W'][:, None, None, :] * Kfloat[None, :, :, :]
@@ -93,8 +93,8 @@ class NoisyOR(TVEMModel):
                                    batch.type_as(lpj) - 1))
         C = Ws_prod * B / Ws
         self.Ctilde.add_(to.sum(self._mean_posterior(C.permute(0, 3, 1, 2), lpj, deltaY), dim=2))
-        assert (~to.isnan(self.Ctilde)).all()
-        assert (~to.isnan(self.Btilde)).all()
+        assert not to.isnan(self.Ctilde).any()
+        assert not to.isnan(self.Btilde).any()
 
         return None
 
@@ -157,7 +157,7 @@ class NoisyOR(TVEMModel):
         explpj = to.exp(lpj + B)
         denominator = to.sum(explpj, dim=1) + deltaY.type_as(B)*to.exp(B[:, 0])
         means = to.einsum('...ij,ij->...i', g.type_as(lpj), explpj) / (denominator + NoisyOR.eps)
-        assert (~to.isnan(means)).all()
+        assert not (to.isnan(means).any() or to.isinf(means).any())
         return means
 
     @property
