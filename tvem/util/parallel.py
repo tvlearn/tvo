@@ -4,12 +4,15 @@
 
 import platform
 
-import torch as to
+import torch
 import torch.distributed as dist
 from torch import Tensor
 from typing import Iterable
 
 import tvem
+
+dtypes = [torch.float32, torch.float64, torch.float16, torch.uint8,
+          torch.int8, torch.int16, torch.int32, torch.int64]
 
 
 def pprint(obj: object = "", end: str = '\n'):
@@ -40,7 +43,7 @@ def init_processes(multi_node: bool = False):
     comm_size = dist.get_world_size()
 
     if tvem.get_device().type == 'cuda':
-        device_count = int(to.cuda.device_count())
+        device_count = int(torch.cuda.device_count())
         if multi_node:
             node_count = comm_size // device_count
         else:
@@ -58,8 +61,8 @@ def init_processes(multi_node: bool = False):
         platform.node(), global_rank, device_str, comm_size))
 
 
-def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = None,
-                      device: to.device = None) -> Iterable[Tensor]:
+def scatter2processes(*tensors: Tensor, src: int = 0, dtype: torch.dtype = None,
+                      device: torch.device = None) -> Iterable[Tensor]:
     """Split tensors into chunks and scatter within process group.
 
     :param data: Tensor to be scattered. Chunks are cut along dimension 0.
@@ -84,20 +87,30 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = None,
     comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
 
     for data in tensors:
-        this_dtype = data.dtype if dtype is None else dtype
-        this_device = data.device if device is None else device
-        ndim = to.empty((1,), dtype=to.int64)
+        if dtype is None:
+            ind_dtype = torch.empty((1,), dtype=torch.uint8)
+            if comm_rank == src:
+                dtype = data.dtype
+                ind_dtype[:] = [*map(str, dtypes)].index(str(dtype))
+            dist.broadcast(ind_dtype, 0)
+            this_dtype = dtypes[ind_dtype.item()]
+        else:
+            this_dtype = dtype
+        this_device = data.device if device is None else tvem.get_device()
+
+        ndim = torch.empty((1,), dtype=torch.int64)
         if comm_rank == src:
             ndim[:] = data.dim()
         dist.broadcast(ndim, src)
-        shape = to.empty((ndim.item(),), dtype=to.int64)
+        shape = torch.empty((ndim.item(),), dtype=torch.int64)
         if comm_rank == src:
-            shape[:] = to.tensor(data.shape)
+            shape[:] = torch.tensor(data.shape)
         dist.broadcast(shape, src)
         total_length, other_length = shape[0], shape[1:]
 
         # no datapoints per commrank including dummy rows
-        local_length_ = int(to.ceil(to.tensor([float(total_length) / comm_size])))
+        local_length_ = int(
+            torch.ceil(torch.tensor([float(total_length) / comm_size])))
         # determine number of and eventually add dummy rows for scatter/gather compatibility
         empty_length = local_length_ * comm_size - total_length
         local_length = local_length_
@@ -110,13 +123,14 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: to.dtype = None,
         # split into chunks and scatter
         chunks = []  # type: ignore
         if comm_rank == 0:
-            chunks = list(to.chunk(to.cat((data.to(dtype=this_dtype, device=this_device),
-                                           to.zeros((empty_length, other_length),
-                                                    dtype=this_dtype, device=this_device)),
-                                          dim=0),
-                                   comm_size, dim=0))
+            chunks = list(torch.chunk(torch.cat((data.to(dtype=this_dtype, device=this_device),
+                                                 torch.zeros((empty_length, other_length),
+                                                             dtype=this_dtype, device=this_device)),
+                                                dim=0),
+                                      comm_size, dim=0))
 
-        my_data = to.zeros((local_length_, other_length), dtype=this_dtype, device=this_device)
+        my_data = torch.zeros((local_length_, other_length),
+                              dtype=this_dtype, device=this_device)
 
         dist.scatter(my_data, src=src, scatter_list=chunks)
 
