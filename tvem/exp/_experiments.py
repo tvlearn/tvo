@@ -35,10 +35,11 @@ class _TrainingAndOrValidation(Experiment):
         It performs training and/or validation/testings depending on what input is provided.
         """
         S = conf['n_states']
+        dtype = conf['dtype']
         H = sum(model.shape[1:])
         self.model = model
         eem_conf = {'parent_selection': 'batch_fitparents', 'mutation': 'randflip', 'n_parents': 3,
-                    'n_children': 2, 'n_generations': 1, 'S': S, 'H': H, 'dtype': to.float}
+                    'n_children': 2, 'n_generations': 1, 'S': S, 'H': H, 'dtype': dtype}
 
         self.train_data = None
         self.train_states = None
@@ -91,7 +92,6 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
         data = None
         # convert h5py dtype to torch dtype passing through numpy
         dtype = to.from_numpy(np.empty(0, dtype=f[dataset].dtype)).dtype
-
     return scatter2processes(data, dtype=dtype, device=tvem.get_device())
 
 
