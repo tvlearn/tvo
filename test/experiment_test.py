@@ -2,7 +2,8 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.exp import Training, Testing as _Testing  # otherwise Testing is picked up as a test class
+# otherwise Testing is picked up as a test class
+from tvem.exp import Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC
 from tvem.util.parallel import init_processes
 from tvem.util import get
@@ -56,7 +57,7 @@ def input_files(hyperparams):
         f.close()
 
         f = h5py.File(continuous_fname, mode='w')
-        data = f.create_dataset('data', (N, D), dtype=np.float)
+        data = f.create_dataset('data', (N, D), dtype=np.float32)
         data[:] = np.random.rand(N, D)
         f.close()
 
@@ -81,24 +82,27 @@ def model_and_data(request, hyperparams, input_files):
     if request.param == 'NoisyOR':
         return NoisyOR(H=H, D=D), input_files.binary_data
     elif request.param == 'BSC':
-        conf = {'N': N, 'D': D, 'H': H, 'S': 2**H, 'Snew': 0, 'batch_size': N, 'dtype': to.float}
+        conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': 6,
+                'batch_size': 1, 'dtype': to.float32}
         return BSC(conf), input_files.continuous_data
 
 
 def test_training(model_and_data, hyperparams):
     model, input_file = model_and_data
-    exp = Training({'n_states': hyperparams.S}, model=model, train_data_file=input_file)
+    exp = Training({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
+                   train_data_file=input_file)
     exp.run(10)
 
 
 def test_training_and_validation(model_and_data, hyperparams):
     model, input_file = model_and_data
-    exp = Training({'n_states': hyperparams.S}, model=model, train_data_file=input_file,
-                   val_data_file=input_file)
+    exp = Training({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
+                   train_data_file=input_file, val_data_file=input_file)
     exp.run(10)
 
 
 def test_testing(model_and_data, hyperparams):
     model, input_file = model_and_data
-    exp = _Testing({'n_states': hyperparams.S}, model=model, data_file=input_file)
+    exp = _Testing({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
+                   data_file=input_file)
     exp.run(10)
