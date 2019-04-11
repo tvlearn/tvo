@@ -56,9 +56,12 @@ class BSC(TVEMModel):
             1,) and sigma_init.device == device
 
         theta = {
-            'pies': pies_init if pies_init is not None else to.full((H,), 1./H, device=device),
-            'W': W_init if W_init is not None else to.rand(D, H, device=device),
-            'sigma': sigma_init if sigma_init is not None else to.tensor([1., ], device=device)}
+            'pies': pies_init if pies_init is not None
+            else to.full((H,), 1./H, dtype=dtype, device=device),
+            'W': W_init if W_init is not None
+            else to.rand((D, H), dtype=dtype, device=device),
+            'sigma': sigma_init if sigma_init is not None
+            else to.tensor([1., ], dtype=dtype, device=device)}
         super().__init__(theta=theta)
 
     @property
@@ -141,18 +144,18 @@ class BSC(TVEMModel):
         pil_bar = tmp['pil_bar_%s' % device_type]
         WT = tmp['WT_%s' % device_type]
         pre1 = tmp['pre1']
+        indS_fill_upto = tmp["indS_fill_upto"]
 
         # TODO Find solution to avoid byte->float casting
         statesfloat = states.to(dtype=theta['W'].dtype)
 
         # TODO Store batch_Wbar in storage allocated at beginning of EM-step, e.g.
         # to.matmul(tensor1=states, tensor2=tmp['WT'], out=tmp["batch_Wbar"])
-        sorted_by_lpj['batch_Wbar'][:batch_size,
-                                    tmp["indS_fill_upto"]:S, :] = to.matmul(statesfloat, WT)
-        batch_Wbar = sorted_by_lpj['batch_Wbar'][:batch_size,
-                                                 tmp["indS_fill_upto"]:S, :]
-        tmp['indS_fill_upto'] += statesfloat.shape[1]
-
+        sorted_by_lpj['batch_Wbar'][:batch_size, indS_fill_upto:(
+            indS_fill_upto+S), :] = to.matmul(statesfloat, WT)
+        batch_Wbar = sorted_by_lpj['batch_Wbar'][:batch_size, indS_fill_upto:(
+            indS_fill_upto+S), :]
+        tmp['indS_fill_upto'] += S
         # is (batch_size,S)
         lpj = to.mul(to.sum(to.pow(batch_Wbar-data[:, None, :], 2), dim=2), pre1) +\
             to.einsum('ijk,k->ij', statesfloat, pil_bar)
@@ -172,7 +175,7 @@ class BSC(TVEMModel):
             lpj + B.expand_as(lpj), dim=1) - B.flatten()).sum()
         all_reduce(lpj_shifted_sum_chunk)
 
-        return fenergy_const*N + lpj_shifted_sum_chunk
+        return (fenergy_const*N + lpj_shifted_sum_chunk).item()
 
     def update_param_batch(self, idx: Tensor, batch: Tensor,
                            states: TVEMVariationalStates) -> float:
@@ -226,7 +229,7 @@ class BSC(TVEMModel):
             pjc[:batch_size, :], dim=1) - B).sum()
         all_reduce(lpj_shifted_sum_chunk)
 
-        return fenergy_const*N + lpj_shifted_sum_chunk
+        return (fenergy_const*N + lpj_shifted_sum_chunk).item()
 
     def update_param_epoch(self) -> None:
 
@@ -246,19 +249,33 @@ class BSC(TVEMModel):
         all_reduce(my_sigma)
 
         # Calculate updated W
-        # to.gels assumes full-commrank matrices
-        theta_new['W'] = to.gels(my_Wp.t(), my_Wq)[0].t()
-        if to.isnan(theta_new['W']).any() or to.isinf(theta_new['W']).any():
+        try:
+            # to.gels assumes full-commrank matrices
+            theta_new['W'] = to.gels(my_Wp.t(), my_Wq)[0].t()
+            if to.isnan(theta_new['W']).any() or to.isinf(theta_new['W']).any():
+                pprint("Infinite Wnew. Will not update W but add some noise instead.")
+                W_old = theta['W']
+                theta_new['W'] = W_old + to.randn(
+                    W_old.shape, dtype=W_old.dtype, device=W_old.device)
+        except:
             pprint("Infinite Wnew. Will not update W but add some noise instead.")
             W_old = theta['W']
-            theta_new['W'] = W_old + to.randn(
-                W_old.shape, dtype=W_old.dtype, device=W_old.device)
+            theta_new['W'] = W_old + \
+                to.randn(W_old.shape, dtype=W_old.dtype, device=W_old.device)
 
         # Calculate updated pi
         theta_new['pies'] = my_pies / N
+        if to.isnan(theta_new['pies']).any() or to.isinf(theta_new['pies']).any():
+            pprint("Infinite pies. Will not update pies.")
+            theta_new['pies'] = theta['pies']
+        eps = 1.e-5
+        theta_new['pies'][theta_new['pies'] <= eps] = eps
 
         # Calculate updated sigma
         theta_new['sigma'] = to.sqrt(my_sigma / N / ((H / 2)**2))
+        if to.isnan(theta_new['sigma']).any() or to.isinf(theta_new['sigma']).any():
+            pprint("Infinite sigma. Will not update sigma.")
+            theta_new['sigma'] = theta['sigma']
 
         for key in theta:
             theta[key] = theta_new[key]
