@@ -3,56 +3,102 @@
 # Licensed under the Academic Free License version 3.0
 
 from tvem.exp import Training, Testing as _Testing  # otherwise Testing is picked up as a test class
-from tvem.models import NoisyOR
+from tvem.models import NoisyOR, BSC
 from tvem.util.parallel import init_processes
+from tvem.util import get
 import tvem
 import os
 import numpy as np
 import h5py
 import pytest
+import torch as to
 import torch.distributed as dist
-
-device_name = tvem.get_device().type
-gpu_and_mpi_marks = (pytest.mark.gpu, pytest.mark.mpi)
+from collections import namedtuple
 
 
-@pytest.fixture(scope='module', params=[pytest.param(device_name, marks=gpu_and_mpi_marks)])
-def setup(request):
-    class Setup:
-        N, D = 10, 8
-        S, H = 4, 10
-        data_fname = 'experiment_test_data.h5'
-        model = NoisyOR(H, D)
+gpu_and_mpi_marks = pytest.param(tvem.get_device().type,
+                                 marks=(pytest.mark.gpu, pytest.mark.mpi))
 
+
+@pytest.fixture(scope='module', params=(gpu_and_mpi_marks,))
+def add_gpu_and_mpi_marks():
+    """No-op fixture, use it to add the 'gpu' and 'mpi' marks to a test or fixture."""
+    pass
+
+
+@pytest.fixture(scope='module')
+def hyperparams():
+    """Return an object containing hyperparametrs N,D,S,H as data members."""
+    class HyperParams:
+        N = 10
+        D = 8
+        S = 4
+        H = 10
+    return HyperParams
+
+
+@pytest.fixture(scope='module')
+def input_files(hyperparams):
+    """Create hd5 input files for tests, remove them before exiting the module."""
     if tvem.get_run_policy() == 'mpi':
         init_processes()
     rank = dist.get_rank() if dist.is_initialized() else 0
 
+    binary_fname = 'experiment_test_data_binary.h5'
+    continuous_fname = 'experiment_test_data_continous.h5'
+
     if rank == 0:
-        f = h5py.File(Setup.data_fname, mode='w')
-        data = f.create_dataset('data', (Setup.N, Setup.D), dtype=np.uint8)
-        data[:] = np.random.randint(2, size=(Setup.N, Setup.D), dtype=np.uint8)
+        N, D = hyperparams.N, hyperparams.D
+
+        f = h5py.File(binary_fname, mode='w')
+        data = f.create_dataset('data', (N, D), dtype=np.uint8)
+        data[:] = np.random.randint(2, size=(N, D), dtype=np.uint8)
         f.close()
+
+        f = h5py.File(continuous_fname, mode='w')
+        data = f.create_dataset('data', (N, D), dtype=np.float)
+        data[:] = np.random.rand(N, D)
+        f.close()
+
     if tvem.get_run_policy() == 'mpi':
         dist.barrier()
 
-    yield Setup
+    FileNames = namedtuple('FileNames', 'binary_data, continuous_data')
+    yield FileNames(binary_data=binary_fname, continuous_data=continuous_fname)
 
     if rank == 0:
-        os.remove(Setup.data_fname)
+        os.remove(binary_fname)
+        os.remove(continuous_fname)
 
 
-def test_training(setup):
-    exp = Training({'n_states': setup.S}, model=setup.model, train_data_file=setup.data_fname)
+@pytest.fixture(scope='function', params=('NoisyOR', 'BSC'))
+def model_and_data(request, hyperparams, input_files):
+    """Return a tuple of a TVEMModel and a filename (dataset for the model).
+
+    Parametrized fixture, use it to test on several models.
+    """
+    N, S, D, H = get(hyperparams.__dict__, 'N', 'S', 'D', 'H')
+    if request.param == 'NoisyOR':
+        return NoisyOR(H=H, D=D), input_files.binary_data
+    elif request.param == 'BSC':
+        conf = {'N': N, 'D': D, 'H': H, 'S': 2**H, 'Snew': 0, 'batch_size': N, 'dtype': to.float}
+        return BSC(conf), input_files.continuous_data
+
+
+def test_training(model_and_data, hyperparams):
+    model, input_file = model_and_data
+    exp = Training({'n_states': hyperparams.S}, model=model, train_data_file=input_file)
     exp.run(10)
 
 
-def test_training_and_validation(setup):
-    exp = Training({'n_states': setup.S}, model=setup.model, train_data_file=setup.data_fname,
-                   val_data_file=setup.data_fname)
+def test_training_and_validation(model_and_data, hyperparams):
+    model, input_file = model_and_data
+    exp = Training({'n_states': hyperparams.S}, model=model, train_data_file=input_file,
+                   val_data_file=input_file)
     exp.run(10)
 
 
-def test_testing(setup):
-    exp = _Testing({'n_states': setup.S}, model=setup.model, data_file=setup.data_fname)
+def test_testing(model_and_data, hyperparams):
+    model, input_file = model_and_data
+    exp = _Testing({'n_states': hyperparams.S}, model=model, data_file=input_file)
     exp.run(10)
