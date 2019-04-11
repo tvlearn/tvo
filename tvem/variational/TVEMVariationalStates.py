@@ -98,7 +98,8 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     all_lpj[idx_n, idx_s] = conc_lpj[idx_sc, flattened_sorted_idx]
 
     for t in sort_by_lpj.values():
-        t[idx_n, idx_s] = t[idx_n, flattened_sorted_idx]
+        idx_n_ = to.arange(t.shape[0]).repeat(S, 1).t().flatten()
+        t[idx_n_, idx_s] = t[idx_n_, flattened_sorted_idx]
 
     return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
 
