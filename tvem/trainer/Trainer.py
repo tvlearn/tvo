@@ -8,6 +8,7 @@ from tvem.util.data import TVEMDataLoader
 from tvem.util.parallel import all_reduce
 from typing import Dict, Any
 import torch as to
+import math
 
 
 class Trainer:
@@ -35,7 +36,8 @@ class Trainer:
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:
-            raise RuntimeError('Please provide at least one pair of dataset and variational states')
+            raise RuntimeError(
+                'Please provide at least one pair of dataset and variational states')
 
         self.model = model
         self.train_data = train_data
@@ -57,7 +59,15 @@ class Trainer:
         subs = to.tensor(0)
         for idx, batch in data:
             subs += states.update(idx, batch, model.log_pseudo_joint)
+            # begin temporary solution
+            if model.__class__.__name__ == "BSC":
+                model.tmp["indS_fill_upto"] = 0
+            # end temporary solution
             F += model.free_energy(idx, batch, states)
+            # begin temporary solution
+            if model.__class__.__name__ == "BSC":
+                model.tmp["indS_fill_upto"] = 0
+            # end temporary solution
         all_reduce(F)
         all_reduce(subs)
         return F.item()/N, subs.item()/N
@@ -109,10 +119,19 @@ class Trainer:
             subs = to.tensor(0)
             model.init_epoch()
             for idx, batch in train_data:
-                subs += train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
+                subs += train_states.update(idx, batch,
+                                            lpj_fn, sort_by_lpj=model.sorted_by_lpj)
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
+                else:
+                    if math.isnan(batch_F):
+                        from pdb import set_trace as BP
+                        BP()
+                # begin temporary solution
+                if model.__class__.__name__ == "BSC":
+                    model.tmp["indS_fill_upto"] = 0
+                # end temporary solution
                 F += batch_F
             model.update_param_epoch()
             all_reduce(F)
@@ -123,6 +142,7 @@ class Trainer:
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
+            model.init_epoch()
             res = self._do_e_step(test_data, test_states, model, self.N_test)
             ret_dict['test_F'], ret_dict['test_subs'] = res
 
