@@ -56,12 +56,12 @@ class BSC(TVEMModel):
             1,) and sigma_init.device == device
 
         theta = {
-            'pies': pies_init if pies_init is not None
-            else to.full((H,), 1./H, dtype=dtype, device=device),
-            'W': W_init if W_init is not None
-            else to.rand((D, H), dtype=dtype, device=device),
-            'sigma': sigma_init if sigma_init is not None
-            else to.tensor([1., ], dtype=dtype, device=device)}
+            'pies': pies_init if pies_init is not None else to.full((H,), 1./H,
+                                                                    dtype=dtype, device=device),
+            'W': W_init if W_init is not None else to.rand((D, H), dtype=dtype, device=device),
+            'sigma': sigma_init if sigma_init is not None else to.tensor([1., ],
+                                                                         dtype=dtype,
+                                                                         device=device)}
         super().__init__(theta=theta)
 
     @property
