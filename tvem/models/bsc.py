@@ -257,7 +257,7 @@ class BSC(TVEMModel):
                 W_old = theta['W']
                 theta_new['W'] = W_old + to.randn(
                     W_old.shape, dtype=W_old.dtype, device=W_old.device)
-        except:
+        except RuntimeError:
             pprint("Infinite Wnew. Will not update W but add some noise instead.")
             W_old = theta['W']
             theta_new['W'] = W_old + \
