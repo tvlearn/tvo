@@ -46,6 +46,7 @@ class BSC(TVEMModel):
             "batch_Wp": to.empty((batch_size, D, H), dtype=dtype, device=device),
             "batch_Wq": to.empty((batch_size, H, H), dtype=dtype, device=device),
             "batch_sigma": to.empty((batch_size,), dtype=dtype, device=device),
+            "indS_filled": 0,
         }
 
         assert W_init is None or W_init.shape == (
@@ -69,7 +70,7 @@ class BSC(TVEMModel):
 
         tmp = self.tmp
 
-        return {'batch_Wbar': tmp['batch_Wbar']}
+        return {'batch_Wbar': tmp['batch_Wbar'], 'indS_filled': tmp['indS_filled']}
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Use hidden states to sample datapoints according to the noise model of BSC.
@@ -129,8 +130,6 @@ class BSC(TVEMModel):
         tmp["infty"] = to.tensor(
             [float('inf')], dtype=theta["pies"].dtype, device=theta["pies"].device)
 
-        tmp["indS_fill_upto"] = 0
-
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for BSC."""
 
@@ -144,18 +143,18 @@ class BSC(TVEMModel):
         pil_bar = tmp['pil_bar_%s' % device_type]
         WT = tmp['WT_%s' % device_type]
         pre1 = tmp['pre1']
-        indS_fill_upto = tmp["indS_fill_upto"]
+        indS_filled = sorted_by_lpj["indS_filled"]
 
         # TODO Find solution to avoid byte->float casting
         statesfloat = states.to(dtype=theta['W'].dtype)
 
         # TODO Store batch_Wbar in storage allocated at beginning of EM-step, e.g.
         # to.matmul(tensor1=states, tensor2=tmp['WT'], out=tmp["batch_Wbar"])
-        sorted_by_lpj['batch_Wbar'][:batch_size, indS_fill_upto:(
-            indS_fill_upto+S), :] = to.matmul(statesfloat, WT)
-        batch_Wbar = sorted_by_lpj['batch_Wbar'][:batch_size, indS_fill_upto:(
-            indS_fill_upto+S), :]
-        tmp['indS_fill_upto'] += S
+        sorted_by_lpj['batch_Wbar'][:batch_size, indS_filled:(
+            indS_filled+S), :] = to.matmul(statesfloat, WT)
+        batch_Wbar = sorted_by_lpj['batch_Wbar'][:batch_size, indS_filled:(
+            indS_filled+S), :]
+        sorted_by_lpj['indS_filled'] += S
         # is (batch_size,S)
         lpj = to.mul(to.sum(to.pow(batch_Wbar-data[:, None, :], 2), dim=2), pre1) +\
             to.einsum('ijk,k->ij', statesfloat, pil_bar)
@@ -194,10 +193,10 @@ class BSC(TVEMModel):
 
         N = conf['N']
         pjc, pjc_sum, batch_s_pjc, batch_Wp, batch_Wq, batch_sigma, my_pies, my_Wp, my_Wq,\
-            my_sigma, indS_fill_upto,\
+            my_sigma,\
             fenergy_const = get(tmp, *('pjc', 'pjc_sum', 'batch_s_pjc', 'batch_Wp', 'batch_Wq',
                                        'batch_sigma', 'my_pies', 'my_Wp', 'my_Wq', 'my_sigma',
-                                       'indS_fill_upto', 'fenergy_const'))
+                                       'fenergy_const'))
         batch_Wbar = sorted_by_lpj['batch_Wbar']
 
         B = 0. - to.max(lpj, dim=1, keepdim=True)[0]

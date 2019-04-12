@@ -116,6 +116,15 @@ class TVEMModel(ABC):
         """
         return {}
 
+    def init_sorted_by_lpj(self):
+        """Reset counter for how many states tensors in sorted_by_lpj have been evaluated.
+
+        Only relevant if model makes use of the sorted_by_lpj dictionary.
+        """
+        sorted_by_lpj = self.sorted_by_lpj
+        if bool(sorted_by_lpj):
+            sorted_by_lpj['indS_filled'] = 0
+
     @property
     @abstractmethod
     def shape(self) -> Tuple[int, ...]:
