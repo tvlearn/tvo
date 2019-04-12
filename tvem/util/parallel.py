@@ -11,9 +11,6 @@ from typing import Iterable
 
 import tvem
 
-dtypes = [torch.float32, torch.float64, torch.float16, torch.uint8,
-          torch.int8, torch.int16, torch.int32, torch.int64]
-
 
 def pprint(obj: object = "", end: str = '\n'):
     """Print on root process of torch.distributed process group.
@@ -34,7 +31,7 @@ def init_processes(multi_node: bool = False):
 
     Eventually updates the value of tvem.device.
     """
-    if to.distributed.is_initialized():
+    if torch.distributed.is_initialized():
         return
 
     dist.init_process_group('mpi')
@@ -70,6 +67,9 @@ def bcast_dtype(data: Tensor, src: int = 0) -> torch.dtype:
     """
     comm_rank = dist.get_rank()
 
+    dtypes = [torch.float32, torch.float64, torch.float16, torch.uint8,
+              torch.int8, torch.int16, torch.int32, torch.int64]
+
     ind_dtype = torch.empty((1,), dtype=torch.uint8)
     if comm_rank == src:
         dtype = data.dtype
@@ -83,7 +83,7 @@ def bcast_shape(data: Tensor, src: int) -> Tensor:
 
     :param data: Tensor on src rank
     :param src: Source rank
-    :returns: TEnsor with shape on each rank
+    :returns: Tensor with shape on each rank
     """
     comm_rank = dist.get_rank()
 
@@ -140,8 +140,6 @@ def scatter2processes(*tensors: Tensor, src: int = 0, dtype: torch.dtype = None,
             if comm_rank == comm_size-1:
                 local_length -= empty_length  # no datapoints per commrank excluding dummy
                 # rows actual; last commrank eventually runs on smaller chunk
-
-            dist.barrier()
 
             # split into chunks and scatter
             chunks = []  # type: ignore
