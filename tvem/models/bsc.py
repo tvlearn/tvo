@@ -70,7 +70,7 @@ class BSC(TVEMModel):
 
         tmp = self.tmp
 
-        return {'batch_Wbar': tmp['batch_Wbar'], 'indS_filled': tmp['indS_filled']}
+        return {'batch_Wbar': tmp['batch_Wbar']}
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Use hidden states to sample datapoints according to the noise model of BSC.
@@ -135,8 +135,8 @@ class BSC(TVEMModel):
 
         Only relevant if model makes use of the sorted_by_lpj dictionary.
         """
-        sorted_by_lpj = self.sorted_by_lpj
-        sorted_by_lpj['indS_filled'] = 0
+        tmp = self.tmp
+        tmp['indS_filled'] = 0
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for BSC."""
@@ -151,7 +151,7 @@ class BSC(TVEMModel):
         pil_bar = tmp['pil_bar_%s' % device_type]
         WT = tmp['WT_%s' % device_type]
         pre1 = tmp['pre1']
-        indS_filled = sorted_by_lpj["indS_filled"]
+        indS_filled = tmp["indS_filled"]
 
         # TODO Find solution to avoid byte->float casting
         statesfloat = states.to(dtype=theta['W'].dtype)
@@ -162,7 +162,7 @@ class BSC(TVEMModel):
             indS_filled+S), :] = to.matmul(statesfloat, WT)
         batch_Wbar = sorted_by_lpj['batch_Wbar'][:batch_size, indS_filled:(
             indS_filled+S), :]
-        sorted_by_lpj['indS_filled'] += S
+        tmp['indS_filled'] += S
         # is (batch_size,S)
         lpj = to.mul(to.sum(to.pow(batch_Wbar-data[:, None, :], 2), dim=2), pre1) +\
             to.einsum('ijk,k->ij', statesfloat, pil_bar)
