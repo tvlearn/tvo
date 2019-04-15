@@ -55,6 +55,7 @@ def test_lpj(setup):
 def test_free_energy(setup):
     batch, states, m = setup.data, setup.all_s, setup.m
     m.init_epoch()
+    m.init_batch()
     states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
     f = m.free_energy(idx=to.arange(setup.N), batch=batch, states=states) / setup.N
     assert math.isclose(f, setup.true_free_energy, rel_tol=1e-6)
@@ -65,11 +66,13 @@ def test_train(setup):
     N = setup.N
     batch, states = setup.data, setup.all_s
     m.init_epoch()
+    m.init_batch()
     states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
     first_F = m.free_energy(idx=to.arange(N), batch=batch, states=states)
     m.update_param_batch(idx=to.arange(N), batch=batch, states=states)
     m.update_param_epoch()
     m.init_epoch()
+    m.init_batch()
     states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
     new_F = m.free_energy(idx=to.arange(N), batch=batch, states=states)
 
