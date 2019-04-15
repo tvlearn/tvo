@@ -203,8 +203,8 @@ class BSC(TVEMModel):
         pjc, pjc_sum, batch_s_pjc, batch_Wp, batch_Wq, batch_sigma, my_pies, my_Wp, my_Wq,\
             my_sigma,\
             fenergy_const = get(tmp, 'pjc', 'pjc_sum', 'batch_s_pjc', 'batch_Wp', 'batch_Wq',
-                                       'batch_sigma', 'my_pies', 'my_Wp', 'my_Wq', 'my_sigma',
-                                       'fenergy_const')
+                                     'batch_sigma', 'my_pies', 'my_Wp', 'my_Wq', 'my_sigma',
+                                     'fenergy_const')
         batch_Wbar = sorted_by_lpj['batch_Wbar']
 
         B = 0. - to.max(lpj, dim=1, keepdim=True)[0]
