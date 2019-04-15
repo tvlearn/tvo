@@ -57,9 +57,9 @@ class Trainer:
         F = to.tensor(0.)
         subs = to.tensor(0)
         for idx, batch in data:
-            model.init_sorted_by_lpj()
+            model.init_batch()
             subs += states.update(idx, batch, model.log_pseudo_joint)
-            model.init_sorted_by_lpj()  # can be removed once lpj is not evaluated anymore
+            model.init_batch()  # can be removed once lpj is not evaluated anymore
             # in model.free_energy
             F += model.free_energy(idx, batch, states)
         all_reduce(F)
@@ -113,12 +113,12 @@ class Trainer:
             subs = to.tensor(0)
             model.init_epoch()
             for idx, batch in train_data:
-                model.init_sorted_by_lpj()
+                model.init_batch()
                 subs += train_states.update(idx, batch,
                                             lpj_fn, sort_by_lpj=model.sorted_by_lpj)
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
-                    model.init_sorted_by_lpj()  # can be removed once lpj is not evaluated
+                    model.init_batch()  # can be removed once lpj is not evaluated
                     # anymore in model.free_energy
                     batch_F = model.free_energy(idx, batch, train_states)
                 F += batch_F
