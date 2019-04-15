@@ -50,4 +50,9 @@ class FullEM(TVEMVariationalStates):
                lpj_fn: Callable[[Tensor, Tensor], Tensor],
                sort_by_lpj: Dict[str, Tensor] = {}) -> int:
 
+        K = self.K
+        lpj = self.lpj
+
+        lpj[idx] = lpj_fn(batch, K[idx])
+
         return 0
