@@ -171,13 +171,13 @@ class TVEMVariationalStates(ABC):
         pass  # pragma: no cover
 
 
-def _lpj2pjc(lpj: Tensor, up_lpg_bound: float = 0.):
+def _lpj2pjc(lpj: Tensor):
     """Shift log-pseudo-joint and convert log- to actual probability
 
     :param lpj: log-pseudo-joint tensor
-    :param up_lpg_bound: upper bound for lpj values after shift
     :returns: probability tensor
     """
+    up_lpg_bound = 0.
     shft = up_lpg_bound - lpj.max(dim=1)[0]
     tmp = to.exp(lpj + shft[:, None])
     return tmp / tmp.sum(dim=1)[:, None]
