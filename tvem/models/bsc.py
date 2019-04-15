@@ -11,7 +11,7 @@ from typing import Dict, Tuple
 import tvem
 from tvem.util import get
 from tvem.util.parallel import pprint, all_reduce
-from tvem.variational import TVEMVariationalStates
+from tvem.variational.TVEMVariationalStates import TVEMVariationalStates, mean_posterior
 from tvem.models.TVEMModel import TVEMModel
 
 
@@ -39,8 +39,6 @@ class BSC(TVEMModel):
             "pil_bar_cpu": to.empty(H, dtype=dtype, device=to.device('cpu')),
             "WT_cuda": to.empty((H, D), dtype=dtype, device=device),
             "WT_cpu": to.empty((H, D), dtype=dtype, device=to.device('cpu')),
-            "pjc": to.empty((batch_size, S), dtype=dtype, device=device),
-            "pjc_sum": to.empty(batch_size, dtype=dtype, device=device),
             "batch_Wbar": to.empty((batch_size, S+Snew, D), dtype=dtype, device=device),
             "batch_s_pjc": to.empty((batch_size, H), dtype=dtype, device=device),
             "batch_Wp": to.empty((batch_size, D, H), dtype=dtype, device=device),
@@ -186,9 +184,8 @@ class BSC(TVEMModel):
         return (fenergy_const*N + lpj_shifted_sum_chunk).item()
 
     def update_param_batch(self, idx: Tensor, batch: Tensor,
-                           states: TVEMVariationalStates) -> float:
+                           states: TVEMVariationalStates) -> None:
 
-        conf = self.conf
         tmp = self.tmp
         sorted_by_lpj = self.sorted_by_lpj
 
@@ -199,45 +196,29 @@ class BSC(TVEMModel):
         # TODO Find solution to avoid byte->float casting
         Kfloat = K.to(dtype=lpj.dtype)
 
-        N = conf['N']
-        pjc, pjc_sum, batch_s_pjc, batch_Wp, batch_Wq, batch_sigma, my_pies, my_Wp, my_Wq,\
-            my_sigma,\
-            fenergy_const = get(tmp, 'pjc', 'pjc_sum', 'batch_s_pjc', 'batch_Wp', 'batch_Wq',
+        batch_s_pjc, batch_Wp, batch_Wq, batch_sigma, my_pies, my_Wp, my_Wq,\
+            my_sigma, indS_fill_upto,\
+            fenergy_const = get(tmp, 'batch_s_pjc', 'batch_Wp', 'batch_Wq',
                                      'batch_sigma', 'my_pies', 'my_Wp', 'my_Wq', 'my_sigma',
-                                     'fenergy_const')
+                                     'indS_fill_upto', 'fenergy_const')
         batch_Wbar = sorted_by_lpj['batch_Wbar']
 
-        B = 0. - to.max(lpj, dim=1, keepdim=True)[0]
-        to.exp(lpj + B, out=pjc[:batch_size, :])
-
-        pjc_sum[:batch_size] = to.sum(
-            pjc[:batch_size, :], dim=1)  # is (batch_size,)
-
-        batch_s_pjc[:batch_size, :] = to.einsum(
-            'ij,ijl->il', (pjc[:batch_size, :], Kfloat))  # is (batch_size,H)
+        batch_s_pjc[:batch_size, :] = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
         batch_Wp[:batch_size, :, :] = to.einsum(
             'nd,nh->ndh', (batch, batch_s_pjc[:batch_size, :]))  # is (batch_size,D,H)
-        batch_Wq[:batch_size, :, :] = to.einsum(
-            'ij,ijkl->ikl', (pjc[:batch_size, :], to.einsum('ijk,ijl->ijkl', (Kfloat, Kfloat))))
+        batch_Wq[:batch_size, :, :] = mean_posterior(to.einsum('ijk,ijl->ijkl',
+                                                               (Kfloat, Kfloat)), lpj)
         # is (batch_size,H,H)
-        batch_sigma[:batch_size] = to.einsum('ij,ij->i', (pjc[:batch_size, :], to.sum(
-            (batch[:, None, :]-batch_Wbar[:batch_size, :S, :])**2, dim=2)))
+        batch_sigma[:batch_size] = mean_posterior(to.sum(
+            (batch[:, None, :]-batch_Wbar[:batch_size, :S, :])**2, dim=2), lpj)
         # is (batch_size,)
 
-        my_pies.add_(
-            to.sum(batch_s_pjc[:batch_size, :] / pjc_sum[:batch_size, None], dim=0))
-        my_Wp.add_(to.sum(batch_Wp[:batch_size, :, :] /
-                          pjc_sum[:batch_size, None, None], dim=0))
-        my_Wq.add_(to.sum(batch_Wq[:batch_size, :, :] /
-                          pjc_sum[:batch_size, None, None], dim=0))
-        my_sigma.add_(to.sum(batch_sigma[:batch_size] / pjc_sum[:batch_size]))
+        my_pies.add_(to.sum(batch_s_pjc[:batch_size, :], dim=0))
+        my_Wp.add_(to.sum(batch_Wp[:batch_size, :, :], dim=0))
+        my_Wq.add_(to.sum(batch_Wq[:batch_size, :, :], dim=0))
+        my_sigma.add_(to.sum(batch_sigma[:batch_size]))
 
-        # batch free energy
-        lpj_shifted_sum_chunk = (to.logsumexp(
-            pjc[:batch_size, :], dim=1) - B).sum()
-        all_reduce(lpj_shifted_sum_chunk)
-
-        return (fenergy_const*N + lpj_shifted_sum_chunk).item()
+        return None
 
     def update_param_epoch(self) -> None:
 
