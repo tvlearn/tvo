@@ -55,3 +55,10 @@ def test_testing(setup):
     assert 'train_F' not in d1 and 'train_subs' not in d1
     assert 'test_F' in d1 and 'test_subs' in d1
     assert d1['test_F'] < d2['test_F']
+
+
+def test_estep(setup):
+    trainer = Trainer(setup.model, test_data=setup.test_data, test_states=setup.test_states)
+    d1 = trainer.e_step()
+    d2 = trainer.e_step()
+    assert d1['test_F'] < d2['test_F']
