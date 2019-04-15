@@ -58,7 +58,7 @@ class Trainer:
         subs = to.tensor(0)
         for idx, batch in data:
             model.init_batch()
-            subs += states.update(idx, batch, model.log_pseudo_joint)            
+            subs += states.update(idx, batch, model.log_pseudo_joint)
             F += model.free_energy(idx, batch, states)
         all_reduce(F)
         all_reduce(subs)
