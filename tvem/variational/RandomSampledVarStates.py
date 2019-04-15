@@ -34,9 +34,5 @@ class RandomSampledVarStates(TVEMVariationalStates):
         new_K = to.rand(batch_size, self.n_new_states, H, device=K.device) < self.sparsity
         new_lpj = lpj_fn(batch, new_K)
 
-        nsubs = update_states_for_batch(new_K, new_lpj, idx,
-                                        self.K, self.lpj, sort_by_lpj=sort_by_lpj)
-
-        self.lpj2pjc(idx)
-
-        return nsubs
+        return update_states_for_batch(new_K, new_lpj, idx, self.K, self.lpj,
+                                       sort_by_lpj=sort_by_lpj)

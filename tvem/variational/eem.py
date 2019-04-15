@@ -54,13 +54,9 @@ class EEMVariationalStates(TVEMVariationalStates):
             parent_selection=parent_selection,
             mutation=mutation)
 
-        nsubs = update_states_for_batch(new_states.to(device=K.device),
-                                        new_lpj.to(device=lpj.device),
-                                        idx, K, lpj, sort_by_lpj)
-
-        self.lpj2pjc(idx)
-
-        return nsubs
+        return update_states_for_batch(new_states.to(device=K.device),
+                                       new_lpj.to(device=lpj.device),
+                                       idx, K, lpj, sort_by_lpj)
 
 
 def evolve_states(lpj: Tensor, states: Tensor,
