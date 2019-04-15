@@ -154,8 +154,6 @@ class TVEMVariationalStates(ABC):
         else:
             self.K = generate_unique_states(S, H).repeat(N, 1, 1)  # (N, S, H)
         self.lpj = to.empty((N, S), dtype=dtype, device=tvem.get_device())
-        self.pjc = to.empty_like(self.lpj)
-        self.up_lpg_bound = 0.
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
@@ -172,15 +170,24 @@ class TVEMVariationalStates(ABC):
         """
         pass  # pragma: no cover
 
-    def lpj2pjc(self, idx: Tensor):
-        """Shift log-pseudo-joint and convert log- to actual probability
 
-        :param idx: data point indices of batch w.r.t. K
-        """
-        all_lpj = self.lpj
-        all_pjc = self.pjc
-        up_lpg_bound = self.up_lpg_bound
+def _lpj2pjc(lpj: Tensor, up_lpg_bound: float = 0.):
+    """Shift log-pseudo-joint and convert log- to actual probability
 
-        shft = up_lpg_bound - all_lpj[idx].max(dim=1)[0]
-        tmp = to.exp(all_lpj[idx] + shft[:, None])
-        all_pjc[idx] = tmp / tmp.sum(dim=1)[:, None]
+    :param lpj: log-pseudo-joint tensor
+    :param up_lpg_bound: upper bound for lpj values after shift
+    :returns: probability tensor
+    """
+    shft = up_lpg_bound - lpj.max(dim=1)[0]
+    tmp = to.exp(lpj + shft[:, None])
+    return tmp / tmp.sum(dim=1)[:, None]
+
+
+def mean_posterior(g: Tensor, lpj: Tensor, equation: str = 'ij...,ij->i...'):
+    """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
+
+    :param g: Values of g(s)
+    :param lpj: Log-pseudo-joint to compute q(s)
+    :param equation: Einsum equation according to shapes of g, lpj.
+    """
+    return to.einsum(equation, (g, _lpj2pjc(lpj)))
