@@ -34,7 +34,7 @@ class Trainer:
                 'Please provide both dataset and variational states, or neither'
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
-        if not self.can_train and not self.can_test:
+        if not self.can_train and not self.can_test:  # pragma: no cover
             raise RuntimeError(
                 'Please provide at least one pair of dataset and variational states')
 

@@ -24,7 +24,7 @@ class Experiment(ABC):
     """Abstract base class for all experiments."""
     @abstractmethod
     def run(self, epochs: int):
-        pass
+        pass  # pragma: no cover
 
 
 class _TrainingAndOrValidation(Experiment):
@@ -83,7 +83,7 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
     for dataset in possible_keys:
         if dataset in f.keys():
             break
-    else:
+    else:  # pragma: no cover
         raise RuntimeError(f'File "{fname}" does not contain any of keys {possible_keys}')
     if rank == 0:
         data = to.tensor(f[dataset], device=tvem.get_device())
