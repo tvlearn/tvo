@@ -183,11 +183,11 @@ def _lpj2pjc(lpj: Tensor):
     return tmp / tmp.sum(dim=1)[:, None]
 
 
-def mean_posterior(g: Tensor, lpj: Tensor, equation: str = 'ij...,ij->i...'):
+def mean_posterior(g: Tensor, lpj: Tensor, equation: str = 'ns...,ns->n...'):
     """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
 
-    :param g: Values of g(s)
-    :param lpj: Log-pseudo-joint to compute q(s)
+    :param g: Values of g(s) with shape (N,S,...). For other shapes equation must be specified.
+    :param lpj: Log-pseudo-joint with shape (N,S). For other shapes equation must be specified.
     :param equation: Einsum equation according to shapes of g, lpj.
     """
     return to.einsum(equation, (g, _lpj2pjc(lpj)))
