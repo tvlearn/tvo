@@ -168,9 +168,10 @@ class BSC(TVEMModel):
 
         N, D, H = get(conf, *('N', 'D', 'H'))
         fenergy_const = tmp['fenergy_const']
+        lpj = states.lpj[idx]
 
-        lpj = self.log_pseudo_joint(batch, states.K[idx])
-        B = 0. - to.max(lpj, dim=1, keepdim=True)[0]
+        up_lpg_bound = 0.
+        B = up_lpg_bound - to.max(lpj, dim=1, keepdim=True)[0]
         lpj_shifted_sum_chunk = (to.logsumexp(
             lpj + B.expand_as(lpj), dim=1) - B.flatten()).sum()
         all_reduce(lpj_shifted_sum_chunk)
