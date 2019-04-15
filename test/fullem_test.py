@@ -35,4 +35,4 @@ def test_update(setup):
     lpj = count_active_units(data=None, states=var_states.K)
     n_subs = var_states.update(idx, data, lpj_fn=count_active_units)
     assert n_subs == 0
-    assert (var_states.lpj == lpj).all
+    assert (var_states.lpj == lpj).all()
