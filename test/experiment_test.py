@@ -87,21 +87,21 @@ def model_and_data(request, hyperparams, input_files):
         return BSC(conf), input_files.continuous_data
 
 
-def test_training(model_and_data, hyperparams):
+def test_training(model_and_data, hyperparams, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = Training({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
                    train_data_file=input_file)
     exp.run(10)
 
 
-def test_training_and_validation(model_and_data, hyperparams):
+def test_training_and_validation(model_and_data, hyperparams, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = Training({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
                    train_data_file=input_file, val_data_file=input_file)
     exp.run(10)
 
 
-def test_testing(model_and_data, hyperparams):
+def test_testing(model_and_data, hyperparams, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = _Testing({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
                    data_file=input_file)
