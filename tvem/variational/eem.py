@@ -9,6 +9,7 @@ from itertools import combinations
 from typing import Callable, Dict, Tuple, Optional
 from torch import Tensor
 
+import tvem
 from tvem.util import get
 from tvem.variational.TVEMVariationalStates import update_states_for_batch,\
     set_redundant_lpj_to_low, TVEMVariationalStates
@@ -42,7 +43,7 @@ class EEMVariationalStates(TVEMVariationalStates):
         lpj[idx] = lpj_fn(batch, K[idx])
 
         def lpj_fn_(states):
-            return lpj_fn(batch.to(device='cpu'), states)
+            return lpj_fn(batch, states)
 
         new_states, new_lpj = evolve_states(
             lpj=lpj[idx].to(device='cpu'),
@@ -130,7 +131,7 @@ def evolve_states(lpj: Tensor, states: Tensor,
 
     for g in range(n_generations):
         # parent selection
-        gen_idx = to.arange(g*new_states_per_gen, (g+1) *
+        gen_idx = to.arange(g * new_states_per_gen, (g + 1) *
                             new_states_per_gen, device=device)
         if g == 0:
             parents[:] = select(states, n_parents, lpj)
@@ -145,7 +146,9 @@ def evolve_states(lpj: Tensor, states: Tensor,
                 parents[n], n_children, sparseness, p_bf)
 
         # children fitness evaluation
-        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
+        # new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
+        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx].to(
+            device=tvem.get_device())).to(device='cpu')
 
     # TODO check that new_lpj contains very low numbers
     set_redundant_lpj_to_low(new_states, new_lpj, states)
@@ -156,9 +159,9 @@ def evolve_states(lpj: Tensor, states: Tensor,
 def get_n_new_states(mutation: str, n_parents: int, n_children: int,
                      n_gen: int) -> int:
     if mutation[:5] == 'cross':
-        return n_parents*(n_parents-1)*n_children*n_gen
+        return n_parents * (n_parents - 1) * n_children * n_gen
     else:
-        return n_parents*n_children*n_gen
+        return n_parents * n_children * n_gen
 
 
 def get_EA(parent_selection: str, mutation: str) -> Tuple:
@@ -202,7 +205,7 @@ def randflip(parents: Tensor, n_children: int,
 
     # for each new state (0 to n_children*n_parents-1), flip bit at the
     # position indicated by ind_flip_flat
-    ind_slice_flat = to.arange(n_children*n_parents, device=parents.device)
+    ind_slice_flat = to.arange(n_children * n_parents, device=parents.device)
 
     children[ind_slice_flat, ind_flip_flat] = ~(children[ind_slice_flat,
                                                          ind_flip_flat])
@@ -230,7 +233,7 @@ def sparseflip(parents: Tensor, n_children: int, sparsity: Optional[float],
     s_abs = parents.sum(dim=1)  # is (n_parents)
     children = parents.repeat(1, n_children).view(-1, H)
     eps = 1e-100
-    crowdedness = sparsity*H
+    crowdedness = sparsity * H
 
     H = float(H)
     s_abs = s_abs.to(dtype=dtype_f)
@@ -241,10 +244,10 @@ def sparseflip(parents: Tensor, n_children: int, sparsity: Optional[float],
 
     # Probability to flip a 1 to a 0 and vice versa
     # (modification of Joerg's idea)
-    alpha = (H - s_abs) * ((H*p_bf) - (crowdedness - s_abs)) /\
-        ((crowdedness - s_abs + H*p_bf) * s_abs + eps)  # is (n_parents)
-    p_0 = ((H * p_bf) / (H + (alpha-1.) * s_abs) + eps)  # is (n_parents,)
-    p_1 = (alpha*p_0)[:, None].expand(-1, int(H)).repeat(1, n_children)\
+    alpha = (H - s_abs) * ((H * p_bf) - (crowdedness - s_abs)) /\
+        ((crowdedness - s_abs + H * p_bf) * s_abs + eps)  # is (n_parents)
+    p_0 = ((H * p_bf) / (H + (alpha - 1.) * s_abs) + eps)  # is (n_parents,)
+    p_1 = (alpha * p_0)[:, None].expand(-1, int(H)).repeat(1, n_children)\
         .view(-1, int(H))  # is (n_parents*n_children, H)
     p_0 = p_0[:, None].expand(-1, int(H)).repeat(1,
                                                  n_children).view(-1, int(H))
@@ -254,7 +257,7 @@ def sparseflip(parents: Tensor, n_children: int, sparsity: Optional[float],
     p[~children] = p_0[~children]
 
     # Determine bits to be flipped and do the bitflip
-    flips = to.rand((n_parents*n_children, int(H)),
+    flips = to.rand((n_parents * n_children, int(H)),
                     dtype=dtype_f, device=device) < p
     children[flips] = ~children[flips]
 
@@ -271,7 +274,7 @@ def cross(parents: Tensor) -> Tensor:
     ind_children = to.arange(2, device=device)
 
     # All combinations of parents lead to n_parents*(n_parents-1) new children
-    children = to.empty((n_parents*(n_parents-1), H),
+    children = to.empty((n_parents * (n_parents - 1), H),
                         dtype=to.uint8, device=device)
     for p in combinations(range(n_parents), 2):
         # Cross tails
