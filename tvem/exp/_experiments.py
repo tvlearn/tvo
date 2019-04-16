@@ -47,7 +47,6 @@ class _TrainingAndOrValidation(Experiment):
             self.train_data = TVEMDataLoader(
                 TensorDataset(
                     train_dataset.to(
-                        dtype=dtype,
                         device=tvem.get_device())))
             eem_conf['N'] = train_dataset.shape[0]
             self.train_states = EEMVariationalStates(eem_conf)
@@ -57,7 +56,6 @@ class _TrainingAndOrValidation(Experiment):
             self.test_data = TVEMDataLoader(
                 TensorDataset(
                     test_dataset.to(
-                        dtype=dtype,
                         device=tvem.get_device())))
             eem_conf['N'] = test_dataset.shape[0]
             self.test_states = EEMVariationalStates(eem_conf)
