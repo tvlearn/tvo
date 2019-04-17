@@ -171,9 +171,10 @@ class BSC(TVEMModel):
         conf = self.conf
         tmp = self.tmp
 
-        N, D, H = get(conf, *('N', 'D', 'H'))
+        D, H = get(conf, *('D', 'H'))
         fenergy_const = tmp['fenergy_const']
         lpj = states.lpj[idx]
+        batch_size = lpj.shape[0]
 
         up_lpg_bound = 0.
         B = up_lpg_bound - to.max(lpj, dim=1, keepdim=True)[0]
@@ -181,7 +182,7 @@ class BSC(TVEMModel):
             lpj + B.expand_as(lpj), dim=1) - B.flatten()).sum()
         all_reduce(lpj_shifted_sum_chunk)
 
-        return (fenergy_const*N + lpj_shifted_sum_chunk).item()
+        return (fenergy_const*batch_size + lpj_shifted_sum_chunk).item()
 
     def update_param_batch(self, idx: Tensor, batch: Tensor,
                            states: TVEMVariationalStates) -> None:
