@@ -11,7 +11,7 @@ assert len(sys.argv) == 2, f'Usage: {sys.argv[0]} <output filename>'
 def pick_color(coverage):
     colors = ((95, 'brightgreen'), (90, 'green'), (70, 'yellow'), (40, 'orange'), (0, 'red'))
     for perc, color in colors:
-        if coverage > perc:
+        if coverage >= perc:
             return color
 
 
