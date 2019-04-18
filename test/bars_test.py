@@ -23,7 +23,7 @@ def generate_bars(H: int, bar_amp: float = 1., neg_amp: bool = False,
     """ Generate a ground-truth dictionary W suitable for a std. bars test
 
     Creates H bases vectors with horizontal and vertival bars on a R*R pixel grid,
-    (wth R = H // 2).  
+    (wth R = H // 2).
 
     :param H: Number of latent variables
     :param bar_amp: Amplitude of each bar
@@ -35,7 +35,7 @@ def generate_bars(H: int, bar_amp: float = 1., neg_amp: bool = False,
     """
     R = H // 2
     D = R ** 2
-    
+
     W = bg_amp * to.ones((R, R, H), dtype=dtype, device=tvem.get_device())
     for i in range(R):
         W[i, :, i] = bar_amp
