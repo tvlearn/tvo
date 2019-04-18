@@ -39,6 +39,7 @@ def test_all_reduce(setup):
     assert t == setup.n_procs
 
 
+@pytest.mark.gpu
 @pytest.mark.mpi
 def test_device(setup):
     if 'TVEM_GPU' in os.environ:
