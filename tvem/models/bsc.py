@@ -180,9 +180,11 @@ class BSC(TVEMModel):
         B = up_lpg_bound - to.max(lpj, dim=1, keepdim=True)[0]
         lpj_shifted_sum_chunk = (to.logsumexp(
             lpj + B.expand_as(lpj), dim=1) - B.flatten()).sum()
+        const = fenergy_const*batch_size
         all_reduce(lpj_shifted_sum_chunk)
+        all_reduce(const)
 
-        return (fenergy_const*batch_size + lpj_shifted_sum_chunk).item()
+        return (const + lpj_shifted_sum_chunk).item()
 
     def update_param_batch(self, idx: Tensor, batch: Tensor,
                            states: TVEMVariationalStates) -> None:
