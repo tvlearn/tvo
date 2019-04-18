@@ -5,6 +5,7 @@
 from tvem.util.parallel import init_processes, scatter2processes, all_reduce
 import tvem
 
+import os
 import torch as to
 import pytest
 from collections import namedtuple
@@ -36,3 +37,11 @@ def test_all_reduce(setup):
     t = to.ones(1)
     all_reduce(t)
     assert t == setup.n_procs
+
+
+@pytest.mark.mpi
+def test_device(setup):
+    if 'TVEM_GPU' in os.environ:
+        assert tvem.get_device().type == 'cuda'
+    else:
+        assert tvem.get_device() == to.device('cpu')
