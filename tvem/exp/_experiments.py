@@ -63,7 +63,7 @@ class _TrainingAndOrValidation(Experiment):
     def run(self, epochs: int):
         """Run training and/or testing.
 
-        :param epochs: number of epochs to train for
+        :param epochs: Number of epochs to train for
         """
         trainer = Trainer(self.model, self.train_data, self.train_states,
                           self.test_data, self.test_states)
@@ -108,14 +108,14 @@ class Training(_TrainingAndOrValidation):
 
         :param conf: TODO: document required keys etc.
         :param model: TVEMModel to train
-        :param train_data_file: path to an HDF5 file containing the training dataset.
+        :param train_data_file: Path to an HDF5 file containing the training dataset.
                                 Datasets with name "train_data" and "data" will be
                                 searched in the file, in this order.
-        :param n_train_states: number of TVEM variational states to use for training.
-        :param val_data_file: path to an HDF5 file containing the training dataset.
+        :param n_train_states: Number of TVEM variational states to use for training.
+        :param val_data_file: Path to an HDF5 file containing the training dataset.
                               Datasets with name "val_data" and "data" will be searched in the file,
                               in this order.
-        :param n_val_states: number of TVEM variational states to use for validation.
+        :param n_val_states: Number of TVEM variational states to use for validation.
 
         On the validation dataset, Training only performs E-steps without updating
         the model parameters.
@@ -136,9 +136,9 @@ class Testing(_TrainingAndOrValidation):
 
         :param conf: TODO: document required keys etc.
         :param model: TVEMModel to test
-        :param data_file: path to an HDF5 file containing the training dataset. Datasets with name
+        :param data_file: Path to an HDF5 file containing the training dataset. Datasets with name
                           "test_data" and "data" will be searched in the file, in this order.
-        :param n_states: number of TVEM variational states to use for testing.
+        :param n_states: Number of TVEM variational states to use for testing.
 
         Only E-steps are run. Model parameters are not updated.
         """
