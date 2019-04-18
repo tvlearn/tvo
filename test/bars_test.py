@@ -28,9 +28,9 @@ def generate_bars(H: int, bar_amp: float = 1., neg_amp: bool = False,
     :param H: Number of latent variables
     :param bar_amp: Amplitude of each bar
     :param neg_amp: Set probability of amplitudes taking negative values to 50 percent
-    :bg_amp: Background amplitude
-    :add_unit: If not None an additional unit with amplitude add_unit will be inserted
-    :dtype: torch.dtype of the returned tensor
+    :param bg_amp: Background amplitude
+    :param add_unit: If not None an additional unit with amplitude add_unit will be inserted
+    :param dtype: torch.dtype of the returned tensor
     :returns: tensor containing the bars dictionary
     """
     R = H // 2
