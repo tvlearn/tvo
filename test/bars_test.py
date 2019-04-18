@@ -18,38 +18,39 @@ gpu_and_mpi_marks = pytest.param(tvem.get_device().type,
                                  marks=(pytest.mark.gpu, pytest.mark.mpi))
 
 
-def generate_bars(H, amp=1., neg_amp=False, background=None, dtype=to.float64):
+def generate_bars(H: int, bar_amp: float = 1., neg_amp: bool = False,
+                  bg_amp: float = 0., add_unit: float = None, dtype: to.dtype = to.float64):
     """ Generate a ground-truth dictionary W suitable for a std. bars test
 
     Creates H bases vectors with horizontal and vertival bars on a R*R pixel grid,
-    (wth R = H // 2).  The function thus returns a matrix storing H dictionaries of
-    size D=R*R.
+    (wth R = H // 2).  
 
     :param H: Number of latent variables
-    :type  H: int
-    :param neg_amp: Set probability of amplitudes taking negative values to 50 percent.
-    :type  neg_amp: bool
-    :rtype: ndarray (D x H)
+    :param bar_amp: Amplitude of each bar
+    :param neg_amp: Set probability of amplitudes taking negative values to 50 percent
+    :bg_amp: Background amplitude
+    :add_unit: If not None an additional unit with amplitude add_unit will be inserted
+    :dtype: torch.dtype of the returned tensor
+    :returns: tensor containing the bars dictionary
     """
     R = H // 2
     D = R ** 2
-    W = to.zeros((R, R, H), dtype=dtype, device=tvem.get_device())
+    
+    W = bg_amp * to.ones((R, R, H), dtype=dtype, device=tvem.get_device())
     for i in range(R):
-        W[i, :, i] = amp
-        W[:, i, R + i] = amp
+        W[i, :, i] = bar_amp
+        W[:, i, R + i] = bar_amp
 
     if neg_amp:
         sign = 1 - 2 * to.randint(high=2, size=(H), device=tvem.get_device())
         W = sign[None, None, :] * W
-    return W.view((D, H))
 
-    D = W.shape[0]
-    if background:
-        background_field = background * to.ones((D, 1), device=tvem.get_device())
-        W = to.cat((W, background_field), dim=1)
+    if add_unit is not None:
+        add_unit = add_unit * to.ones((D, 1), device=tvem.get_device())
+        W = to.cat((W, add_unit), dim=1)
         H += 1
 
-    return W
+    return W.view((D, H))
 
 
 @pytest.fixture(scope='module', params=(gpu_and_mpi_marks,))
@@ -65,7 +66,7 @@ def hyperparams():
         dtype = to.float32
         N = 500
         H = 10
-        D = int((H / 2)**2)
+        D = (H // 2)**2
         S = 60
         W_gt = generate_bars(H, amp=10., dtype=dtype)
         sigma_gt = to.ones((1,), dtype=dtype, device=tvem.get_device())
