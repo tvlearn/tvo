@@ -23,7 +23,8 @@ test:
     - env TVEM_GPU=0 pytest --cov=tvem --cov-append -v -m gpu test
     # mpi tests
     - module load python/3.6.4-ompi
-    - mpirun -n 4 bash .ci_scripts/run_mpi_tests.sh
+    - mpirun -n 4 bash .ci_scripts/run_mpi_tests.sh 0 # coverage of rank 0
+    - mpirun -n 4 bash .ci_scripts/run_mpi_tests.sh 1 # coverage of rank 1
   artifacts:
     paths:
       - .coverage
