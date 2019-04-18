@@ -68,7 +68,7 @@ def hyperparams():
         H = 10
         D = (H // 2)**2
         S = 60
-        W_gt = generate_bars(H, amp=10., dtype=dtype)
+        W_gt = generate_bars(H, bar_amp=10., dtype=dtype)
         sigma_gt = to.ones((1,), dtype=dtype, device=tvem.get_device())
         pies_gt = to.full((H,), 2./H, dtype=dtype, device=tvem.get_device())
         batch_size = 1
