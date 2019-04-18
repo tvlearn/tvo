@@ -51,7 +51,7 @@ def init_processes(multi_node: bool = False):
     else:
         device_str = 'cpu'
 
-    tvem._set_device(device_str)
+    tvem._set_device(torch.device(device_str))
 
     pprint("Initializting %i processes." % comm_size)
     print("New process on %s. Global rank %d. Device %s. Total no processes %d." % (
