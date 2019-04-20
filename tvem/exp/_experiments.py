@@ -9,6 +9,7 @@ from tvem.models import TVEMModel
 from tvem.trainer import Trainer
 from tvem.util.parallel import pprint, init_processes, scatter2processes
 from tvem.util import get
+from tvem.exp._EStepConfig import EEMConfig, EStepConfig
 import tvem
 
 import math
@@ -19,6 +20,25 @@ import torch.distributed as dist
 import numpy as np
 
 
+def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMVariationalStates:
+    if isinstance(conf, EEMConfig):
+        return _make_EEM_var_states(conf, N, H, dtype)
+    else:
+        raise RuntimeError('Unimplemented')
+
+
+def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
+    selection = {'fitness': 'batch_fitparents', 'uniform': 'randparents'}[conf.parent_selection]
+    mutation = {'sparsity': 'sparseflip', 'uniform': 'randflip'}[conf.mutation]
+    if conf.crossover:
+        mutation = 'cross_' + mutation
+    eem_conf = {'parent_selection': selection, 'mutation': mutation,
+                'n_parents': conf.n_parents, 'n_children': conf.n_children,
+                'n_generations': conf.n_generations, 'S': conf.n_states,
+                'N': N, 'H': H, 'dtype': dtype}
+    return EEMVariationalStates(eem_conf)
+
+
 class Experiment(ABC):
     """Abstract base class for all experiments."""
     @abstractmethod
@@ -27,35 +47,37 @@ class Experiment(ABC):
 
 
 class _TrainingAndOrValidation(Experiment):
-    def __init__(self, conf: Dict[str, Any], model: TVEMModel, train_dataset: to.Tensor = None,
-                 test_dataset: to.Tensor = None):
+    def __init__(self, conf: Dict[str, Any], estep_conf: EStepConfig, model: TVEMModel,
+                 train_dataset: to.Tensor = None, test_dataset: to.Tensor = None):
         """Helper class to avoid code repetition between Training and Testing.
 
         It performs training and/or validation/testings depending on what input is provided.
         """
-        S = conf['n_states']
-        dtype = conf['dtype']
+        required_keys = ('precision', 'batch_size')
+        for k in required_keys:
+            assert k in conf
+        assert conf['precision'] in (to.float32, to.float64)
+        dtype = conf['precision']
         H = sum(model.shape[1:])
         self.model = model
-        eem_conf = {'parent_selection': 'batch_fitparents', 'mutation': 'randflip', 'n_parents': 3,
-                    'n_children': 2, 'n_generations': 1, 'S': S, 'H': H, 'dtype': dtype}
 
         self.train_data = None
         self.train_states = None
         if train_dataset is not None:
-            self.train_data = TVEMDataLoader(train_dataset.to(device=tvem.get_device()))
-            eem_conf['N'] = train_dataset.shape[0]
-            self.train_states = EEMVariationalStates(eem_conf)
+            dataset = train_dataset.to(device=tvem.get_device())
+            self.train_data = TVEMDataLoader(dataset, batch_size=conf['batch_size'])
+            N = train_dataset.shape[0]
+            self.train_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.train_states.precision is self.model.precision
             if train_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.train_data.precision
-
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
-            self.test_data = TVEMDataLoader(test_dataset.to(device=tvem.get_device()))
-            eem_conf['N'] = test_dataset.shape[0]
-            self.test_states = EEMVariationalStates(eem_conf)
+            dataset = test_dataset.to(device=tvem.get_device())
+            self.test_data = TVEMDataLoader(dataset, batch_size=conf['batch_size'])
+            N = test_dataset.shape[0]
+            self.test_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.test_states.precision is self.model.precision
             if test_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.test_data.precision
@@ -102,11 +124,19 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
 
 
 class Training(_TrainingAndOrValidation):
-    def __init__(self, conf: Dict[str, Any], model: TVEMModel, train_data_file: str,
-                 val_data_file: str = None):
+    def __init__(self, conf: Dict[str, Any], estep_conf: EStepConfig, model: TVEMModel,
+                 train_data_file: str, val_data_file: str = None):
         """Train model on given dataset for the given number of epochs.
 
-        :param conf: TODO: document required keys etc.
+        :param conf: Experiment configuration.
+                     Optional keys (if not present, the corresponding default will be used):
+                     - precision: Must be one of torch.float32 or torch.float64. It's the floating
+                                  point precision that will be used throughout the experiment for
+                                  all quantities. Defaults to torch.float64 (double precision).
+                     - batch_size: Batch size for the data loaders.
+                     - shuffle: Whether data should be reshuffled at every epoch.
+                       See also torch's `DataLoader docs`_
+        :param estep_conf: Instance of a class inheriting from EStepConfig.
         :param model: TVEMModel to train
         :param train_data_file: Path to an HDF5 file containing the training dataset.
                                 Datasets with name "train_data" and "data" will be
@@ -119,6 +149,8 @@ class Training(_TrainingAndOrValidation):
 
         On the validation dataset, Training only performs E-steps without updating
         the model parameters.
+
+        .. _DataLoader docs: https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
         """
         if tvem.get_run_policy() == 'mpi':
             init_processes()
@@ -127,14 +159,21 @@ class Training(_TrainingAndOrValidation):
         if val_data_file is not None:
             val_dataset = _get_h5_dataset_to_processes(val_data_file, ('val_data', 'data'))
 
-        super().__init__(conf, model, train_dataset, val_dataset)
+        super().__init__(conf, estep_conf, model, train_dataset, val_dataset)
 
 
 class Testing(_TrainingAndOrValidation):
-    def __init__(self, conf: Dict[str, Any], model: TVEMModel, data_file: str):
+    def __init__(self, conf: Dict[str, Any], estep_conf: EStepConfig, model: TVEMModel,
+                 data_file: str):
         """Test given model on given dataset for the given number of epochs.
 
-        :param conf: TODO: document required keys etc.
+        :param conf: Experiment configuration.
+                     Optional keys (if not present, the corresponding default will be used):
+                     - precision: Must be one of torch.float32 or torch.float64. It's the floating
+                                  point precision that will be used throughout the experiment for
+                                  all quantities. Defaults to torch.float64 (double precision).
+                     - batch_size: Batch size for the data loaders.
+        :param estep_conf: Instance of a class inheriting from EStepConfig.
         :param model: TVEMModel to test
         :param data_file: Path to an HDF5 file containing the training dataset. Datasets with name
                           "test_data" and "data" will be searched in the file, in this order.
@@ -145,4 +184,4 @@ class Testing(_TrainingAndOrValidation):
         if tvem.get_run_policy() == 'mpi':
             init_processes()
         dataset = _get_h5_dataset_to_processes(data_file, ('test_data', 'data'))
-        super().__init__(conf, model, None, dataset)
+        super().__init__(conf, estep_conf, model, None, dataset)
