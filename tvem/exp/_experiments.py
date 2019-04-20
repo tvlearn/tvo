@@ -64,8 +64,10 @@ class _TrainingAndOrValidation(Experiment):
         self.train_data = None
         self.train_states = None
         if train_dataset is not None:
-            dataset = train_dataset.to(device=tvem.get_device())
-            self.train_data = TVEMDataLoader(dataset, batch_size=conf['batch_size'])
+            if train_dataset.dtype is not to.uint8:
+                train_dataset = train_dataset.to(dtype=dtype)
+            train_dataset = train_dataset.to(device=tvem.get_device())
+            self.train_data = TVEMDataLoader(train_dataset, batch_size=conf['batch_size'])
             N = train_dataset.shape[0]
             self.train_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.train_states.precision is self.model.precision
@@ -74,8 +76,10 @@ class _TrainingAndOrValidation(Experiment):
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
-            dataset = test_dataset.to(device=tvem.get_device())
-            self.test_data = TVEMDataLoader(dataset, batch_size=conf['batch_size'])
+            if test_dataset.dtype is not to.uint8:
+                test_dataset = test_dataset.to(dtype=dtype)
+            test_dataset = test_dataset.to(device=tvem.get_device())
+            self.test_data = TVEMDataLoader(test_dataset, batch_size=conf['batch_size'])
             N = test_dataset.shape[0]
             self.test_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.test_states.precision is self.model.precision
