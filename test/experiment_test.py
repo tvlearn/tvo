@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import Training, Testing as _Testing
+from tvem.exp import EEMConfig, Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC
 from tvem.util.parallel import init_processes
 from tvem.util import get
@@ -87,22 +87,31 @@ def model_and_data(request, hyperparams, input_files):
         return BSC(conf), input_files.continuous_data
 
 
-def test_training(model_and_data, hyperparams, add_gpu_and_mpi_marks):
+@pytest.fixture(scope='module')
+def estep_conf(hyperparams):
+    return EEMConfig(n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=1,
+                     crossover=False)
+
+
+@pytest.fixture(scope='module')
+def exp_conf():
+    return {'precision': to.float32, 'batch_size': 1}
+
+
+def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
-    exp = Training({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
-                   train_data_file=input_file)
+    exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
     exp.run(10)
 
 
-def test_training_and_validation(model_and_data, hyperparams, add_gpu_and_mpi_marks):
+def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
-    exp = Training({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
-                   train_data_file=input_file, val_data_file=input_file)
+    exp = Training(exp_conf, estep_conf, model, train_data_file=input_file,
+                   val_data_file=input_file)
     exp.run(10)
 
 
-def test_testing(model_and_data, hyperparams, add_gpu_and_mpi_marks):
+def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
-    exp = _Testing({'n_states': hyperparams.S, 'dtype': to.float32}, model=model,
-                   data_file=input_file)
+    exp = _Testing(exp_conf, estep_conf, model, data_file=input_file)
     exp.run(10)
