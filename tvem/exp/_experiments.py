@@ -53,7 +53,7 @@ class _TrainingAndOrValidation(Experiment):
 
         It performs training and/or validation/testings depending on what input is provided.
         """
-        required_keys = ('precision', 'batch_size')
+        required_keys = ('precision', 'batch_size', 'shuffle')
         for k in required_keys:
             assert k in conf
         assert conf['precision'] in (to.float32, to.float64)
@@ -67,7 +67,8 @@ class _TrainingAndOrValidation(Experiment):
             if train_dataset.dtype is not to.uint8:
                 train_dataset = train_dataset.to(dtype=dtype)
             train_dataset = train_dataset.to(device=tvem.get_device())
-            self.train_data = TVEMDataLoader(train_dataset, batch_size=conf['batch_size'])
+            self.train_data = TVEMDataLoader(train_dataset, batch_size=conf['batch_size'],
+                                             shuffle=conf['shuffle'])
             N = train_dataset.shape[0]
             self.train_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.train_states.precision is self.model.precision
@@ -79,7 +80,8 @@ class _TrainingAndOrValidation(Experiment):
             if test_dataset.dtype is not to.uint8:
                 test_dataset = test_dataset.to(dtype=dtype)
             test_dataset = test_dataset.to(device=tvem.get_device())
-            self.test_data = TVEMDataLoader(test_dataset, batch_size=conf['batch_size'])
+            self.test_data = TVEMDataLoader(test_dataset, batch_size=conf['batch_size'],
+                                            shuffle=conf['shuffle'])
             N = test_dataset.shape[0]
             self.test_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.test_states.precision is self.model.precision
@@ -139,7 +141,7 @@ class Training(_TrainingAndOrValidation):
                                   all quantities. Defaults to torch.float64 (double precision).
                      - batch_size: Batch size for the data loaders.
                      - shuffle: Whether data should be reshuffled at every epoch.
-                       See also torch's `DataLoader docs`_
+                       Defaults to true. See also torch's `DataLoader docs`_
         :param estep_conf: Instance of a class inheriting from EStepConfig.
         :param model: TVEMModel to train
         :param train_data_file: Path to an HDF5 file containing the training dataset.
@@ -163,6 +165,8 @@ class Training(_TrainingAndOrValidation):
         if val_data_file is not None:
             val_dataset = _get_h5_dataset_to_processes(val_data_file, ('val_data', 'data'))
 
+        if 'shuffle' not in conf:
+            conf['shuffle'] = True
         super().__init__(conf, estep_conf, model, train_dataset, val_dataset)
 
 
@@ -188,4 +192,5 @@ class Testing(_TrainingAndOrValidation):
         if tvem.get_run_policy() == 'mpi':
             init_processes()
         dataset = _get_h5_dataset_to_processes(data_file, ('test_data', 'data'))
+        conf['shuffle'] = False
         super().__init__(conf, estep_conf, model, None, dataset)
