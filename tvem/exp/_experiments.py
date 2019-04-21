@@ -14,7 +14,7 @@ import tvem
 
 import math
 import h5py
-from typing import Tuple, Dict, Any
+from typing import Tuple
 import torch as to
 import torch.distributed as dist
 import numpy as np
@@ -39,6 +39,26 @@ def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
     return EEMVariationalStates(eem_conf)
 
 
+class ExpConfig:
+    def __init__(self, batch_size: int = 1, precision: to.dtype = to.float64, shuffle: bool = True,
+                 warmup_Esteps: int = 0):
+        """Configuration object for Experiment classes.
+
+        :param batch_size: Batch size for the data loaders.
+        :param precision: Must be one of torch.float32 or torch.float64. It's the floating
+                          point precision that will be used throughout the experiment for
+                          all quantities.
+        :param shuffle: Whether data should be reshuffled at every epoch.
+                        See also torch's `DataLoader docs`_
+        :param warmup_Esteps: Number of warm-up E-steps to perform.
+        """
+        assert precision in (to.float32, to.float64), 'Precision must be one of torch.float{32,64}'
+        self.batch_size = batch_size
+        self.precision = precision
+        self.shuffle = shuffle
+        self.warmup_Esteps = warmup_Esteps
+
+
 class Experiment(ABC):
     """Abstract base class for all experiments."""
     @abstractmethod
@@ -47,20 +67,16 @@ class Experiment(ABC):
 
 
 class _TrainingAndOrValidation(Experiment):
-    def __init__(self, conf: Dict[str, Any], estep_conf: EStepConfig, model: TVEMModel,
+    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel,
                  train_dataset: to.Tensor = None, test_dataset: to.Tensor = None):
         """Helper class to avoid code repetition between Training and Testing.
 
         It performs training and/or validation/testings depending on what input is provided.
         """
-        required_keys = ('precision', 'batch_size', 'shuffle', 'warmup_Esteps')
-        for k in required_keys:
-            assert k in conf
-        assert conf['precision'] in (to.float32, to.float64)
-        dtype = conf['precision']
+        dtype = conf.precision
         H = sum(model.shape[1:])
         self.model = model
-        self.warmup_Esteps = conf['warmup_Esteps']
+        self.warmup_Esteps = conf.warmup_Esteps
 
         self.train_data = None
         self.train_states = None
@@ -68,8 +84,8 @@ class _TrainingAndOrValidation(Experiment):
             if train_dataset.dtype is not to.uint8:
                 train_dataset = train_dataset.to(dtype=dtype)
             train_dataset = train_dataset.to(device=tvem.get_device())
-            self.train_data = TVEMDataLoader(train_dataset, batch_size=conf['batch_size'],
-                                             shuffle=conf['shuffle'])
+            self.train_data = TVEMDataLoader(train_dataset, batch_size=conf.batch_size,
+                                             shuffle=conf.shuffle)
             N = train_dataset.shape[0]
             self.train_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.train_states.precision is self.model.precision
@@ -81,8 +97,8 @@ class _TrainingAndOrValidation(Experiment):
             if test_dataset.dtype is not to.uint8:
                 test_dataset = test_dataset.to(dtype=dtype)
             test_dataset = test_dataset.to(device=tvem.get_device())
-            self.test_data = TVEMDataLoader(test_dataset, batch_size=conf['batch_size'],
-                                            shuffle=conf['shuffle'])
+            self.test_data = TVEMDataLoader(test_dataset, batch_size=conf.batch_size,
+                                            shuffle=conf.shuffle)
             N = test_dataset.shape[0]
             self.test_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.test_states.precision is self.model.precision
@@ -133,20 +149,11 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
 
 
 class Training(_TrainingAndOrValidation):
-    def __init__(self, conf: Dict[str, Any], estep_conf: EStepConfig, model: TVEMModel,
+    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel,
                  train_data_file: str, val_data_file: str = None):
         """Train model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.
-                     Optional keys (if not present, the corresponding default will be used):
-                     - precision: Must be one of torch.float32 or torch.float64. It's the floating
-                                  point precision that will be used throughout the experiment for
-                                  all quantities. Defaults to torch.float64 (double precision).
-                     - batch_size: Batch size for the data loaders.
-                     - shuffle (optional): Whether data should be reshuffled at every epoch.
-                       Defaults to true. See also torch's `DataLoader docs`_
-                     - warmup_Esteps (optional): Number of warm-up E-steps to perform.
-                       Defaults to 0.
         :param estep_conf: Instance of a class inheriting from EStepConfig.
         :param model: TVEMModel to train
         :param train_data_file: Path to an HDF5 file containing the training dataset.
@@ -170,26 +177,15 @@ class Training(_TrainingAndOrValidation):
         if val_data_file is not None:
             val_dataset = _get_h5_dataset_to_processes(val_data_file, ('val_data', 'data'))
 
-        if 'shuffle' not in conf:
-            conf['shuffle'] = True
-        if 'warmup_Esteps' not in conf:
-            conf['warmup_Esteps'] = 0
         super().__init__(conf, estep_conf, model, train_dataset, val_dataset)
 
 
 class Testing(_TrainingAndOrValidation):
-    def __init__(self, conf: Dict[str, Any], estep_conf: EStepConfig, model: TVEMModel,
+    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel,
                  data_file: str):
         """Test given model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.
-                     Optional keys (if not present, the corresponding default will be used):
-                     - precision: Must be one of torch.float32 or torch.float64. It's the floating
-                                  point precision that will be used throughout the experiment for
-                                  all quantities. Defaults to torch.float64 (double precision).
-                     - batch_size: Batch size for the data loaders.
-                     - warmup_Esteps (optional): Number of warm-up E-steps to perform.
-                       Defaults to 0.
         :param estep_conf: Instance of a class inheriting from EStepConfig.
         :param model: TVEMModel to test
         :param data_file: Path to an HDF5 file containing the training dataset. Datasets with name
@@ -201,7 +197,4 @@ class Testing(_TrainingAndOrValidation):
         if tvem.get_run_policy() == 'mpi':
             init_processes()
         dataset = _get_h5_dataset_to_processes(data_file, ('test_data', 'data'))
-        conf['shuffle'] = False
-        if 'warmup_Esteps' not in conf:
-            conf['warmup_Esteps'] = 0
         super().__init__(conf, estep_conf, model, None, dataset)

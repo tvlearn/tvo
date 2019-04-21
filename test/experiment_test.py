@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import EEMConfig, Training, Testing as _Testing
+from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC
 from tvem.util.parallel import init_processes
 from tvem.util import get
@@ -95,7 +95,7 @@ def estep_conf(hyperparams):
 
 @pytest.fixture(scope='module')
 def exp_conf():
-    return {'precision': to.float32, 'batch_size': 1}
+    return ExpConfig(precision=to.float32)
 
 
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
