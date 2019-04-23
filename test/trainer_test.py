@@ -18,7 +18,7 @@ from torch.utils.data.dataset import TensorDataset
 def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
-        model = NoisyOR(H, D)
+        model = NoisyOR(H, D, precision=to.float32)
         _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
         data = TVEMDataLoader(_td, batch_size=N)
         _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
