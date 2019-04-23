@@ -46,12 +46,19 @@ class _TrainingAndOrValidation(Experiment):
             self.train_data = TVEMDataLoader(train_dataset.to(device=tvem.get_device()))
             eem_conf['N'] = train_dataset.shape[0]
             self.train_states = EEMVariationalStates(eem_conf)
+            assert self.train_states.precision is self.model.precision
+            if train_dataset.dtype is not to.uint8:
+                assert self.model.precision is self.train_data.precision
+
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
             self.test_data = TVEMDataLoader(test_dataset.to(device=tvem.get_device()))
             eem_conf['N'] = test_dataset.shape[0]
             self.test_states = EEMVariationalStates(eem_conf)
+            assert self.test_states.precision is self.model.precision
+            if test_dataset.dtype is not to.uint8:
+                assert self.model.precision is self.test_data.precision
 
     def run(self, epochs: int):
         """Run training and/or testing.
