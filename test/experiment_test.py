@@ -38,6 +38,11 @@ def hyperparams():
     return HyperParams
 
 
+@pytest.fixture(scope='module', params=[to.float32, to.float64], ids=['float32', 'float64'])
+def precision(request):
+    return request.param
+
+
 @pytest.fixture(scope='module')
 def input_files(hyperparams):
     """Create hd5 input files for tests, remove them before exiting the module."""
@@ -73,17 +78,17 @@ def input_files(hyperparams):
 
 
 @pytest.fixture(scope='function', params=('NoisyOR', 'BSC'))
-def model_and_data(request, hyperparams, input_files):
+def model_and_data(request, hyperparams, input_files, precision):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
     """
     N, S, D, H = get(hyperparams.__dict__, 'N', 'S', 'D', 'H')
     if request.param == 'NoisyOR':
-        return NoisyOR(H=H, D=D, precision=to.float32), input_files.binary_data
+        return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == 'BSC':
         conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': 6,
-                'batch_size': 1, 'dtype': to.float32}
+                'batch_size': 1, 'dtype': precision}
         return BSC(conf), input_files.continuous_data
 
 
@@ -94,8 +99,8 @@ def estep_conf(hyperparams):
 
 
 @pytest.fixture(scope='module')
-def exp_conf():
-    return ExpConfig(precision=to.float32)
+def exp_conf(precision):
+    return ExpConfig(precision=precision)
 
 
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
