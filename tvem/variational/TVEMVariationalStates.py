@@ -69,10 +69,9 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     new_states have been evaluated (i.e. the states in new_states[0] are to
     be put into all_s[idx[0]]. all_s[n] is updated to contain the set of
     variational states with best log-pseudo-joints.
-
-    TODO Find out why lpj precision decreases for states without substitutions
-    (difference on the order of 1e-15).
     """
+    # TODO Find out why lpj precision decreases for states without substitutions
+    # (difference on the order of 1e-15).
 
     S = all_states.shape[1]
     batch_size, newS, H = new_states.shape
