@@ -16,7 +16,6 @@ import h5py
 from typing import Tuple, Dict, Any
 import torch as to
 import torch.distributed as dist
-from torch.utils.data import TensorDataset
 import numpy as np
 
 
@@ -44,19 +43,13 @@ class _TrainingAndOrValidation(Experiment):
         self.train_data = None
         self.train_states = None
         if train_dataset is not None:
-            self.train_data = TVEMDataLoader(
-                TensorDataset(
-                    train_dataset.to(
-                        device=tvem.get_device())))
+            self.train_data = TVEMDataLoader(train_dataset.to(device=tvem.get_device()))
             eem_conf['N'] = train_dataset.shape[0]
             self.train_states = EEMVariationalStates(eem_conf)
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
-            self.test_data = TVEMDataLoader(
-                TensorDataset(
-                    test_dataset.to(
-                        device=tvem.get_device())))
+            self.test_data = TVEMDataLoader(test_dataset.to(device=tvem.get_device()))
             eem_conf['N'] = test_dataset.shape[0]
             self.test_states = EEMVariationalStates(eem_conf)
 

@@ -10,7 +10,6 @@ from tvem.util.data import TVEMDataLoader
 
 import pytest
 import torch as to
-from torch.utils.data.dataset import TensorDataset
 
 
 @pytest.fixture(scope='function',
@@ -19,9 +18,9 @@ def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
         model = NoisyOR(H, D, precision=to.float32)
-        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
+        _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
         data = TVEMDataLoader(_td, batch_size=N)
-        _td = TensorDataset(to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device()))
+        _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
         test_data = TVEMDataLoader(_td, batch_size=N)
         _varstates_conf = {'N': N, 'H': H, 'S': S, 'dtype': to.float32, 'device': tvem.get_device()}
         var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
