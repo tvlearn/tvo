@@ -4,6 +4,10 @@
 
 import torch as to
 from torch.utils.data import TensorDataset, DataLoader
+import torch.distributed as dist
+import h5py
+from typing import Dict
+from os import path, rename
 
 
 class TVEMDataLoader(DataLoader):
@@ -25,3 +29,64 @@ class TVEMDataLoader(DataLoader):
         if data.dtype is not to.uint8:
             self.precision = data.dtype
         super().__init__(TensorDataset(to.arange(N), data), *args, **kwargs)
+
+
+class H5Logger:
+    def __init__(self, output: str):
+        """Utility class to iteratively write to HD5 files.
+
+        :param output: Output filename or file path. Overwritten if it already exists.
+
+        If tvem.get_run_policy() is 'mpi', operations on H5Logger are no-op for all processes
+        except for the process with rank 0.
+        """
+        self._rank = dist.get_rank() if dist.is_initialized() else 0
+        self._fname = output
+        self._data: Dict[str, to.Tensor] = {}
+
+    def append(self, **kwargs):
+        """Append input arguments to log. All arguments must be torch.Tensors."""
+        if self._rank != 0:
+            return
+
+        data = self._data
+
+        for k, v in kwargs.items():
+            assert isinstance(v, to.Tensor), 'all arguments must be torch.Tensors'
+
+            if k not in data:
+                data[k] = v.unsqueeze(0)  # extra dim will be used for concatenation
+            else:
+                assert data[k].shape[1:] == v.shape, f'variable {k} changed shape between appends'
+                data[k] = to.cat((data[k], v.unsqueeze(0)))
+
+    def set(self, **kwargs):
+        """Set keyword arguments to desired value in output file.
+
+        All arguments must be torch.Tensors.
+        """
+        if self._rank != 0:
+            return
+
+        for k, v in kwargs.items():
+            assert isinstance(v, to.Tensor), 'all arguments must be torch.Tensors'
+            self._data[k] = v
+
+    def write(self):
+        """Write logged data to output file.
+
+        If a file with this name already exists (e.g. because of a previous call to this method)
+        the old file is renamed to `<fname>.old`.
+        """
+        if self._rank != 0:
+            return
+
+        fname = self._fname
+
+        if path.exists(fname):
+            rename(fname, fname + '.old')
+
+        f = h5py.File(fname, 'w')
+        for k, v in self._data.items():
+            f.create_dataset(k, data=v)
+        f.close()
