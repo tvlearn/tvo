@@ -15,30 +15,41 @@ import tvem
 class NoisyOR(TVEMModel):
     eps = 1e-7
 
-    def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None):
+    def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None,
+                 precision: to.dtype = to.float64):
         """Shallow NoisyOR model.
 
         :param H: Number of hidden units.
         :param D: Number of observables.
         :param W_init: Tensor with shape (D,H), initializes NoisyOR weights.
         :param pi_init: Tensor with shape (H,), initializes NoisyOR priors.
+        :param precision: Floating point precision required. Must be one of torch.float32 or
+                          torch.float64.
         """
 
+        assert precision in (to.float32, to.float64), 'precision must be one of torch.float{32,64}'
+        self.precision = precision
+
         device = tvem.get_device()
+
         if W_init is not None:
             assert W_init.shape == (D, H)
         else:
             W_init = to.rand(D, H, device=device)
+
         if pi_init is not None:
             assert pi_init.shape == (H,)
             assert (pi_init <= 1.).all() and (pi_init >= 0).all()
         else:
-            pi_init = to.full((H,), 1./H, device=device)
+            pi_init = to.full((H,), 1./H, device=device, dtype=self.precision)
 
-        super().__init__(theta={'pies': pi_init.to(device=device), 'W': W_init.to(device=device)})
-        self.new_pi = to.zeros(H, device=device)
-        self.Btilde = to.zeros(D, H, device=device)
-        self.Ctilde = to.zeros(D, H, device=device)
+        theta = {'pies': pi_init.to(device=device, dtype=precision),
+                 'W': W_init.to(device=device, dtype=precision)}
+        super().__init__(theta)
+
+        self.new_pi = to.zeros(H, device=device, dtype=precision)
+        self.Btilde = to.zeros(D, H, device=device, dtype=precision)
+        self.Ctilde = to.zeros(D, H, device=device, dtype=precision)
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for NoisyOR."""
@@ -50,7 +61,7 @@ class NoisyOR(TVEMModel):
         N, S, H = K.shape
         D = W.shape[0]
         dev = pi.device
-        logPy = to.empty((N, S), device=dev)
+        logPy = to.empty((N, S), device=dev, dtype=self.precision)
         logPriors = to.matmul(K.type_as(pi), to.log(pi/(1-pi)))
         # the general routine for eem sometimes require evaluation of lpjs of all-zero states,
         # which is not supported for noisy-OR.

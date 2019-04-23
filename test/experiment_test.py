@@ -80,7 +80,7 @@ def model_and_data(request, hyperparams, input_files):
     """
     N, S, D, H = get(hyperparams.__dict__, 'N', 'S', 'D', 'H')
     if request.param == 'NoisyOR':
-        return NoisyOR(H=H, D=D), input_files.binary_data
+        return NoisyOR(H=H, D=D, precision=to.float32), input_files.binary_data
     elif request.param == 'BSC':
         conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': 6,
                 'batch_size': 1, 'dtype': to.float32}
