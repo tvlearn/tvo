@@ -13,11 +13,17 @@ import tvem
 
 
 class NoisyOR(TVEMModel):
-    """Shallow NoisyOR Model."""
-
     eps = 1e-7
 
     def __init__(self, H: int, D: int, W_init: Tensor = None, pi_init: Tensor = None):
+        """Shallow NoisyOR model.
+
+        :param H: Number of hidden units.
+        :param D: Number of observables.
+        :param W_init: Tensor with shape (D,H), initializes NoisyOR weights.
+        :param pi_init: Tensor with shape (H,), initializes NoisyOR priors.
+        """
+
         device = tvem.get_device()
         if W_init is not None:
             assert W_init.shape == (D, H)
