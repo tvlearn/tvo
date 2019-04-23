@@ -90,8 +90,13 @@ def get_eem_new_states(c: EEMConfig):
         return c.n_parents*c.n_children*c.n_generations
 
 
+@pytest.fixture(scope='module', params=(1, 2, 3))
+def batch_size(request):
+    return request.param
+
+
 @pytest.fixture(scope='function', params=('NoisyOR', 'BSC'))
-def model_and_data(request, hyperparams, input_files, precision, estep_conf):
+def model_and_data(request, hyperparams, input_files, precision, estep_conf, batch_size):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
@@ -101,13 +106,18 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf):
         return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == 'BSC':
         conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': get_eem_new_states(estep_conf),
-                'batch_size': 1, 'dtype': precision}
+                'batch_size': batch_size, 'dtype': precision}
         return BSC(conf), input_files.continuous_data
 
 
+@pytest.fixture(scope='module', params=(0, 3))
+def warmup_Esteps(request):
+    return request.param
+
+
 @pytest.fixture(scope='module')
-def exp_conf(precision):
-    return ExpConfig(precision=precision)
+def exp_conf(precision, batch_size, warmup_Esteps):
+    return ExpConfig(batch_size=batch_size, precision=precision, warmup_Esteps=warmup_Esteps)
 
 
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
