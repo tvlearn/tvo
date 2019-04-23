@@ -56,6 +56,7 @@ class Trainer:
     def _do_e_step(data, states, model, N):
         F = to.tensor(0.)
         subs = to.tensor(0)
+        model.init_epoch()
         for idx, batch in data:
             model.init_batch()
             subs += states.update(idx, batch, model.log_pseudo_joint)
@@ -127,7 +128,6 @@ class Trainer:
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            model.init_epoch()
             res = self._do_e_step(test_data, test_states, model, self.N_test)
             ret_dict['test_F'], ret_dict['test_subs'] = res
 
