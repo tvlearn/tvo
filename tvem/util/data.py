@@ -7,17 +7,21 @@ from torch.utils.data import TensorDataset, DataLoader
 
 
 class TVEMDataLoader(DataLoader):
-    def __init__(self, data: TensorDataset, *args, **kwargs):
-        """General TVEM DataLoader class. Derived from torch.utils.data.DataLoader.
+    def __init__(self, data: to.Tensor, *args, **kwargs):
+        """TVEM DataLoader class. Derived from torch.utils.data.DataLoader.
 
         TVEMDataLoader is constructed exactly the same way as pytorch's DataLoader,
-        but it restricts possible input datasets to TensorDataset, and when looped
-        over it yields a tuple containing the indeces of the datapoints in each batch
-        as well as the actual datapoints for each tensor in the input TensorDataset.
+        but it restricts possible input datasets to a single to.Tensor.
+        All other arguments are forwarded to pytorch's DataLoader.
+        When iterated over, TVEMDataLoader yields a tuple containing the indeces of
+        the datapoints in each batch as well as the actual datapoints for each
+        tensor in the input Tensor.
 
-        :param data: a TensorDataset from which to load the data.
+        :param data: Tensor containing the input dataset. Must have exactly two dimensions (N,D).
         :param args: forwarded to pytorch's DataLoader.
         :param kwargs: forwarded to pytorch's DataLoader.
         """
-        N = data.tensors[0].shape[0]
-        super().__init__(TensorDataset(to.arange(N), *data.tensors), *args, **kwargs)
+        N = data.shape[0]
+        if data.dtype is not to.uint8:
+            self.precision = data.dtype
+        super().__init__(TensorDataset(to.arange(N), data), *args, **kwargs)
