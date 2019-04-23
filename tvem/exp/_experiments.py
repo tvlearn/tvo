@@ -41,7 +41,7 @@ def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
 
 class ExpConfig:
     def __init__(self, batch_size: int = 1, precision: to.dtype = to.float64, shuffle: bool = True,
-                 warmup_Esteps: int = 0):
+                 drop_last: bool = False, warmup_Esteps: int = 0):
         """Configuration object for Experiment classes.
 
         :param batch_size: Batch size for the data loaders.
@@ -49,13 +49,16 @@ class ExpConfig:
                           point precision that will be used throughout the experiment for
                           all quantities.
         :param shuffle: Whether data should be reshuffled at every epoch.
-                        See also torch's `DataLoader docs`_
+                        See also torch's `DataLoader docs`_.
+        :param drop_last: set to True to drop the last incomplete batch, if the dataset size is not
+                          divisible by the batch size. See also torch's `DataLoader docs`_.
         :param warmup_Esteps: Number of warm-up E-steps to perform.
         """
         assert precision in (to.float32, to.float64), 'Precision must be one of torch.float{32,64}'
         self.batch_size = batch_size
         self.precision = precision
         self.shuffle = shuffle
+        self.drop_last = drop_last
         self.warmup_Esteps = warmup_Esteps
 
 
@@ -85,7 +88,7 @@ class _TrainingAndOrValidation(Experiment):
                 train_dataset = train_dataset.to(dtype=dtype)
             train_dataset = train_dataset.to(device=tvem.get_device())
             self.train_data = TVEMDataLoader(train_dataset, batch_size=conf.batch_size,
-                                             shuffle=conf.shuffle)
+                                             shuffle=conf.shuffle, drop_last=conf.drop_last)
             N = train_dataset.shape[0]
             self.train_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.train_states.precision is self.model.precision
@@ -98,7 +101,7 @@ class _TrainingAndOrValidation(Experiment):
                 test_dataset = test_dataset.to(dtype=dtype)
             test_dataset = test_dataset.to(device=tvem.get_device())
             self.test_data = TVEMDataLoader(test_dataset, batch_size=conf.batch_size,
-                                            shuffle=conf.shuffle)
+                                            shuffle=conf.shuffle, drop_last=conf.drop_last)
             N = test_dataset.shape[0]
             self.test_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.test_states.precision is self.model.precision
