@@ -23,7 +23,7 @@ import numpy as np
 def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMVariationalStates:
     if isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, dtype)
-    else:
+    else:  # pragma: no cover
         raise NotImplementedError()
 
 
