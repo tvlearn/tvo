@@ -14,7 +14,20 @@ import tvem
 class TVEMModel(ABC):
     def __init__(self, theta: Dict[str, Tensor]):
         """Abstract base class for probabilistic generative models to be trained with TVEM."""
+        # assert that all parameters have compatible precision
+        last_dtype = None
+        for p in theta.values():
+            this_dtype = p.dtype
+            if this_dtype is to.uint8:
+                continue
+            if last_dtype is not None:
+                assert last_dtype is this_dtype,\
+                    'All floating point model parameters must have the same precision'
+            last_dtype = this_dtype
+
         self.theta = theta
+        if last_dtype is not None:
+            self.precision = last_dtype
 
     @abstractmethod
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
