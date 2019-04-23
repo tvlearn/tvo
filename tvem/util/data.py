@@ -88,5 +88,5 @@ class H5Logger:
 
         f = h5py.File(fname, "w")
         for k, v in self._data.items():
-            f.create_dataset(k, data=v)
+            f.create_dataset(k, data=v.cpu())
         f.close()

@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from tvem.variational import EEMVariationalStates
-from tvem.util.data import TVEMDataLoader
+from tvem.util.data import TVEMDataLoader, H5Logger
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
 from tvem.util.parallel import pprint, init_processes, scatter_to_processes
@@ -14,7 +14,7 @@ import tvem
 
 import math
 import h5py
-from typing import Tuple
+from typing import Tuple, Dict
 import torch as to
 import torch.distributed as dist
 
@@ -53,6 +53,7 @@ class ExpConfig:
         shuffle: bool = True,
         drop_last: bool = False,
         warmup_Esteps: int = 0,
+        output="tvem_exp.h5",
     ):
         """Configuration object for Experiment classes.
 
@@ -65,6 +66,7 @@ class ExpConfig:
         :param drop_last: set to True to drop the last incomplete batch, if the dataset size is not
                           divisible by the batch size. See also torch's `DataLoader docs`_.
         :param warmup_Esteps: Number of warm-up E-steps to perform.
+        :param output: Name or path of output HDF5 file. It is overwritten if it already exists.
         """
         assert precision in (to.float32, to.float64), "Precision must be one of torch.float{32,64}"
         self.batch_size = batch_size
@@ -72,6 +74,7 @@ class ExpConfig:
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.warmup_Esteps = warmup_Esteps
+        self.output = output
 
 
 class Experiment(ABC):
@@ -99,6 +102,7 @@ class _TrainingAndOrValidation(Experiment):
         H = sum(model.shape[1:])
         self.model = model
         self.warmup_Esteps = conf.warmup_Esteps
+        self.out_fname = conf.output
 
         self.train_data = None
         self.train_states = None
@@ -117,6 +121,7 @@ class _TrainingAndOrValidation(Experiment):
             assert self.train_states.precision is self.model.precision
             if train_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.train_data.precision
+
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
@@ -143,20 +148,67 @@ class _TrainingAndOrValidation(Experiment):
         trainer = Trainer(
             self.model, self.train_data, self.train_states, self.test_data, self.test_states
         )
+        logger = H5Logger(self.out_fname)
+
+        # warm-up E-steps
         for e in range(self.warmup_Esteps):
             trainer.e_step()
+
+        # log initial model parameters
+        logger.append(**self.model.theta)
+
+        # EM steps
         for e in range(epochs):
             pprint(f"epoch {e}")
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
-            if self.train_data is not None:
-                F, subs = get(d, "train_F", "train_subs")
-                assert not (math.isnan(F) or math.isinf(F)), "training free energy is nan!"
-                pprint(f"\ttrain F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
-            if self.test_data is not None:
-                F, subs = get(d, "test_F", "test_subs")
-                test_or_valid = "valid." if self.train_data is not None else "test"
-                assert not (math.isnan(F) or math.isinf(F)), f"{test_or_valid} free energy is nan!"
-                pprint(f"\t{test_or_valid} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
+            self._log_epoch(logger, d)
+
+    def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float], prefix=None):
+        """Log F, subs, model.theta, states.K and states.lpj to file.
+
+        :param logger: the logger for this run
+        :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
+        :param prefix: optional prefix for the variables that will be logged to file
+        """
+        if self.train_data is not None:
+            self._log_epoch_helper(logger, epoch_results, prefix=prefix, data_kind="train")
+
+        if self.test_data is not None:
+            test_or_valid = "valid" if self.train_data is not None else "test"
+            self._log_epoch_helper(logger, epoch_results, prefix=prefix, data_kind=test_or_valid)
+
+        logger.append(**self.model.theta)
+
+        logger.write()
+
+    def _log_epoch_helper(
+        self, logger: H5Logger, epoch_results: Dict[str, float], data_kind: str, prefix: str = None
+    ):
+        """Append (F, subs) to logger, set (states.K, states.lpj).
+
+        :param logger: the logger for this run
+        :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
+        :param data_kind: one of 'train', 'valid' or 'test'
+        :param prefix: optional prefix for the variables that will be logged to file
+        """
+        train_or_test = "test" if data_kind == "valid" else data_kind
+        F, subs = get(epoch_results, f"{train_or_test}_F", f"{train_or_test}_subs")
+        assert not (math.isnan(F) or math.isinf(F)), f"{data_kind} free energy is invalid!"
+
+        pprint(f"\t{data_kind} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
+
+        prefix = prefix + "_" if prefix is not None else ""
+        F_and_subs_dict = {
+            f"{prefix}{data_kind}_F": to.tensor(F),
+            f"{prefix}{data_kind}_subs": to.tensor(subs),
+        }
+        logger.append(**F_and_subs_dict)
+
+        states_and_lpj_dict = {
+            f"{prefix}{data_kind}_states": self.__dict__[f"{train_or_test}_states"].K,
+            f"{prefix}{data_kind}_lpj": self.__dict__[f"{train_or_test}_states"].lpj,
+        }
+        logger.set(**states_and_lpj_dict)
 
 
 def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:
