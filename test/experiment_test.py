@@ -90,7 +90,7 @@ def get_eem_new_states(c: EEMConfig):
         return c.n_parents*c.n_children*c.n_generations
 
 
-@pytest.fixture(scope='module', params=(1, 2, 3))
+@pytest.fixture(scope='module', params=(1, 2, 3), ids=('batch1', 'batch2', 'batch3'))
 def batch_size(request):
     return request.param
 
@@ -110,7 +110,7 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
         return BSC(conf), input_files.continuous_data
 
 
-@pytest.fixture(scope='module', params=(0, 3))
+@pytest.fixture(scope='module', params=(0, 3), ids=('nowarmup', 'warmup'))
 def warmup_Esteps(request):
     return request.param
 
