@@ -79,7 +79,7 @@ def input_files(hyperparams):
 
 @pytest.fixture(scope='module', params=(True, False), ids=('cross', 'nocross'))
 def estep_conf(request, hyperparams):
-    return EEMConfig(n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=1,
+    return EEMConfig(n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=2,
                      crossover=request.param)
 
 
