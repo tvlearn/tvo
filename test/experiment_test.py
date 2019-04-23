@@ -77,8 +77,21 @@ def input_files(hyperparams):
         os.remove(continuous_fname)
 
 
+@pytest.fixture(scope='module', params=(True, False), ids=('cross', 'nocross'))
+def estep_conf(request, hyperparams):
+    return EEMConfig(n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=1,
+                     crossover=request.param)
+
+
+def get_eem_new_states(c: EEMConfig):
+    if c.crossover:
+        return c.n_parents*(c.n_parents-1)*c.n_children*c.n_generations
+    else:
+        return c.n_parents*c.n_children*c.n_generations
+
+
 @pytest.fixture(scope='function', params=('NoisyOR', 'BSC'))
-def model_and_data(request, hyperparams, input_files, precision):
+def model_and_data(request, hyperparams, input_files, precision, estep_conf):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
@@ -87,15 +100,9 @@ def model_and_data(request, hyperparams, input_files, precision):
     if request.param == 'NoisyOR':
         return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == 'BSC':
-        conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': 6,
+        conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': get_eem_new_states(estep_conf),
                 'batch_size': 1, 'dtype': precision}
         return BSC(conf), input_files.continuous_data
-
-
-@pytest.fixture(scope='module')
-def estep_conf(hyperparams):
-    return EEMConfig(n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=1,
-                     crossover=False)
 
 
 @pytest.fixture(scope='module')
