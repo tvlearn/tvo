@@ -154,6 +154,7 @@ class TVEMVariationalStates(ABC):
         else:
             self.K = generate_unique_states(S, H).repeat(N, 1, 1)  # (N, S, H)
         self.lpj = to.empty((N, S), dtype=dtype, device=tvem.get_device())
+        self.precision = dtype
 
     @abstractmethod
     def update(self, idx: Tensor, batch: Tensor,
