@@ -6,9 +6,11 @@ import torch as to
 
 from abc import ABC, abstractmethod
 from torch import Tensor
+import torch.distributed as dist
 from tvem.variational import TVEMVariationalStates  # type: ignore
 from typing import Dict, Optional, Tuple
 import tvem
+from tvem.util.parallel import broadcast
 
 
 class TVEMModel(ABC):
@@ -141,6 +143,39 @@ class TVEMModel(ABC):
         :returns: the model shape, observable layer followed by the hidden layers: (D, H1, H2, ...)
         """
         pass  # pragma: no cover
+
+
+def check_theta(theta_new: Dict[str, Tensor], policy: Dict[str, Tensor]):
+    """Perform sanity check of values in theta dict according to policy.
+
+    :param theta_new: Dictionary containing new model parameters
+    :param policy: Policy dictionary bounds and replacements for invalid values
+    """
+    rank = dist.get_rank() if dist.is_initialized() else 0
+
+    for key, val in policy.items():
+        new_value = theta_new[key]
+        if rank == 0:
+            replacement, low_bound, up_bound = val
+
+            if to.isnan(new_value).any():
+                new_value[to.isnan(new_value)] = replacement[to.isnan(new_value)]
+                print("Sanity check: Replaced nan entries of %s." % key)
+
+            if to.isinf(new_value).any():
+                new_value[to.isinf(new_value)] = replacement[to.isinf(new_value)]
+                print("Sanity check: Replaced infinite entries of %s." % key)
+
+            if (new_value < low_bound).any():
+                to.max(input=low_bound, other=new_value, out=new_value)
+                print("Sanity check: Reset lower bound of %s" % key)
+
+            if (new_value >= up_bound).any():
+                to.min(input=up_bound, other=new_value, out=new_value)
+                print("Sanity check: Reset upper bound of %s" % key)
+
+        broadcast(new_value)
+        theta_new[key] = new_value
 
 
 def init_W_data_mean(data_mean: Tensor, data_var: Tensor, H: int, dtype: to.dtype = to.float64,
