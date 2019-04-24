@@ -52,12 +52,12 @@ class H5Logger:
         data = self._data
 
         for k, v in kwargs.items():
-            assert isinstance(v, to.Tensor), 'all arguments must be torch.Tensors'
+            assert isinstance(v, to.Tensor), "all arguments must be torch.Tensors"
 
             if k not in data:
                 data[k] = v.unsqueeze(0)  # extra dim will be used for concatenation
             else:
-                assert data[k].shape[1:] == v.shape, f'variable {k} changed shape between appends'
+                assert data[k].shape[1:] == v.shape, f"variable {k} changed shape between appends"
                 data[k] = to.cat((data[k], v.unsqueeze(0)))
 
     def set(self, **kwargs):
@@ -69,7 +69,7 @@ class H5Logger:
             return
 
         for k, v in kwargs.items():
-            assert isinstance(v, to.Tensor), 'all arguments must be torch.Tensors'
+            assert isinstance(v, to.Tensor), "all arguments must be torch.Tensors"
             self._data[k] = v
 
     def write(self):
@@ -84,9 +84,9 @@ class H5Logger:
         fname = self._fname
 
         if path.exists(fname):
-            rename(fname, fname + '.old')
+            rename(fname, fname + ".old")
 
-        f = h5py.File(fname, 'w')
+        f = h5py.File(fname, "w")
         for k, v in self._data.items():
             f.create_dataset(k, data=v)
         f.close()

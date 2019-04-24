@@ -17,59 +17,60 @@ import torch.distributed as dist
 from collections import namedtuple
 
 
-gpu_and_mpi_marks = pytest.param(tvem.get_device().type,
-                                 marks=(pytest.mark.gpu, pytest.mark.mpi))
+gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
 
 
-@pytest.fixture(scope='module', params=(gpu_and_mpi_marks,))
+@pytest.fixture(scope="module", params=(gpu_and_mpi_marks,))
 def add_gpu_and_mpi_marks():
     """No-op fixture, use it to add the 'gpu' and 'mpi' marks to a test or fixture."""
     pass
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def hyperparams():
     """Return an object containing hyperparametrs N,D,S,H as data members."""
+
     class HyperParams:
         N = 10
         D = 8
         S = 4
         H = 10
+
     return HyperParams
 
 
-@pytest.fixture(scope='module', params=[to.float32, to.float64], ids=['float32', 'float64'])
+@pytest.fixture(scope="module", params=[to.float32, to.float64], ids=["float32", "float64"])
 def precision(request):
     return request.param
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def input_files(hyperparams):
     """Create hd5 input files for tests, remove them before exiting the module."""
-    if tvem.get_run_policy() == 'mpi':
+    if tvem.get_run_policy() == "mpi":
         init_processes()
     rank = dist.get_rank() if dist.is_initialized() else 0
 
-    binary_fname = 'experiment_test_data_binary.h5'
-    continuous_fname = 'experiment_test_data_continous.h5'
+    binary_fname = "experiment_test_data_binary.h5"
+    continuous_fname = "experiment_test_data_continous.h5"
 
     if rank == 0:
         N, D = hyperparams.N, hyperparams.D
 
-        f = h5py.File(binary_fname, mode='w')
-        data = f.create_dataset('data', (N, D), dtype=np.uint8)
+        f = h5py.File(binary_fname, mode="w")
+        data = f.create_dataset("data", (N, D), dtype=np.uint8)
         data[:] = np.random.randint(2, size=(N, D), dtype=np.uint8)
         f.close()
 
-        f = h5py.File(continuous_fname, mode='w')
-        data = f.create_dataset('data', (N, D), dtype=np.float32)
+        f = h5py.File(continuous_fname, mode="w")
+        data = f.create_dataset("data", (N, D), dtype=np.float32)
         data[:] = np.random.rand(N, D)
         f.close()
 
-    if tvem.get_run_policy() == 'mpi':
+    if tvem.get_run_policy() == "mpi":
         dist.barrier()
 
-    FileNames = namedtuple('FileNames', 'binary_data, continuous_data')
+    FileNames = namedtuple("FileNames", "binary_data, continuous_data")
     yield FileNames(binary_data=binary_fname, continuous_data=continuous_fname)
 
     if rank == 0:
@@ -77,45 +78,53 @@ def input_files(hyperparams):
         os.remove(continuous_fname)
 
 
-@pytest.fixture(scope='module', params=(True, False), ids=('cross', 'nocross'))
+@pytest.fixture(scope="module", params=(True, False), ids=("cross", "nocross"))
 def estep_conf(request, hyperparams):
-    return EEMConfig(n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=2,
-                     crossover=request.param)
+    return EEMConfig(
+        n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=2, crossover=request.param
+    )
 
 
 def get_eem_new_states(c: EEMConfig):
     if c.crossover:
-        return c.n_parents*(c.n_parents-1)*c.n_children*c.n_generations
+        return c.n_parents * (c.n_parents - 1) * c.n_children * c.n_generations
     else:
-        return c.n_parents*c.n_children*c.n_generations
+        return c.n_parents * c.n_children * c.n_generations
 
 
-@pytest.fixture(scope='module', params=(1, 2, 3), ids=('batch1', 'batch2', 'batch3'))
+@pytest.fixture(scope="module", params=(1, 2, 3), ids=("batch1", "batch2", "batch3"))
 def batch_size(request):
     return request.param
 
 
-@pytest.fixture(scope='function', params=('NoisyOR', 'BSC'))
+@pytest.fixture(scope="function", params=("NoisyOR", "BSC"))
 def model_and_data(request, hyperparams, input_files, precision, estep_conf, batch_size):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
     """
-    N, S, D, H = get(hyperparams.__dict__, 'N', 'S', 'D', 'H')
-    if request.param == 'NoisyOR':
+    N, S, D, H = get(hyperparams.__dict__, "N", "S", "D", "H")
+    if request.param == "NoisyOR":
         return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
-    elif request.param == 'BSC':
-        conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': get_eem_new_states(estep_conf),
-                'batch_size': batch_size, 'dtype': precision}
+    elif request.param == "BSC":
+        conf = {
+            "N": N,
+            "D": D,
+            "H": H,
+            "S": S,
+            "Snew": get_eem_new_states(estep_conf),
+            "batch_size": batch_size,
+            "dtype": precision,
+        }
         return BSC(conf), input_files.continuous_data
 
 
-@pytest.fixture(scope='module', params=(0, 3), ids=('nowarmup', 'warmup'))
+@pytest.fixture(scope="module", params=(0, 3), ids=("nowarmup", "warmup"))
 def warmup_Esteps(request):
     return request.param
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def exp_conf(precision, batch_size, warmup_Esteps):
     return ExpConfig(batch_size=batch_size, precision=precision, warmup_Esteps=warmup_Esteps)
 
@@ -128,8 +137,9 @@ def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
 
 def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
-    exp = Training(exp_conf, estep_conf, model, train_data_file=input_file,
-                   val_data_file=input_file)
+    exp = Training(
+        exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
+    )
     exp.run(10)
 
 

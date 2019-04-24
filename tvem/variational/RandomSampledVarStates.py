@@ -23,9 +23,13 @@ class RandomSampledVarStates(TVEMVariationalStates):
         self.n_new_states = n_new_states
         self.sparsity = sparsity
 
-    def update(self, idx: Tensor, batch: Tensor,
-               lpj_fn: Callable[[Tensor, Tensor], Tensor],
-               sort_by_lpj: Dict[str, Tensor] = {}) -> int:
+    def update(
+        self,
+        idx: Tensor,
+        batch: Tensor,
+        lpj_fn: Callable[[Tensor, Tensor], Tensor],
+        sort_by_lpj: Dict[str, Tensor] = {},
+    ) -> int:
         """See :func:`TVEMVariationalStates.update <tvem.variational.TVEMVariationalStates.update>`.
         """
         K = self.K[idx]
@@ -34,5 +38,6 @@ class RandomSampledVarStates(TVEMVariationalStates):
         new_K = to.rand(batch_size, self.n_new_states, H, device=K.device) < self.sparsity
         new_lpj = lpj_fn(batch, new_K)
 
-        return update_states_for_batch(new_K, new_lpj, idx, self.K, self.lpj,
-                                       sort_by_lpj=sort_by_lpj)
+        return update_states_for_batch(
+            new_K, new_lpj, idx, self.K, self.lpj, sort_by_lpj=sort_by_lpj
+        )

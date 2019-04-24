@@ -3,10 +3,10 @@ import torch as to
 
 
 def _choose_device() -> to.device:
-    dev = to.device('cpu')
-    if 'TVEM_GPU' in os.environ:
-        gpu_n = int(os.environ['TVEM_GPU'])
-        dev = to.device(f'cuda:{gpu_n}')
+    dev = to.device("cpu")
+    if "TVEM_GPU" in os.environ:
+        gpu_n = int(os.environ["TVEM_GPU"])
+        dev = to.device(f"cuda:{gpu_n}")
     return dev
 
 
@@ -15,6 +15,7 @@ class _GlobalDevice:
 
     Set and get the corresponding to.device with `{set,get}_device()`.
     """
+
     _device: to.device = _choose_device()
 
     @classmethod
@@ -43,10 +44,11 @@ def _set_device(dev: to.device):
 
 
 def _choose_run_policy() -> str:
-    policy = 'seq'
-    if ('TVEM_MPI' in os.environ and os.environ['TVEM_MPI'] != 0)\
-       or 'OMPI_COMM_WORLD_SIZE' in os.environ:
-        policy = 'mpi'
+    policy = "seq"
+    if (
+        "TVEM_MPI" in os.environ and os.environ["TVEM_MPI"] != 0
+    ) or "OMPI_COMM_WORLD_SIZE" in os.environ:
+        policy = "mpi"
     return policy
 
 
@@ -55,6 +57,7 @@ class _GlobalPolicy:
 
     Set and get the policy with `{set,get}_run_policy()`.
     """
+
     _policy: str = _choose_run_policy()
 
     @classmethod

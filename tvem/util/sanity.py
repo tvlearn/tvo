@@ -14,7 +14,7 @@ def fix_infinite(values: Tensor, replacement: Union[float, Tensor], name: str = 
     :param replacement: Scalar or tensor with replacements for infinite values
     :param name: Name of input tensor (optional).
     """
-    mask_infinite = (to.isnan(values) | to.isinf(values))
+    mask_infinite = to.isnan(values) | to.isinf(values)
     if mask_infinite.any():
         if isinstance(replacement, float):
             values[mask_infinite] = replacement
@@ -24,8 +24,12 @@ def fix_infinite(values: Tensor, replacement: Union[float, Tensor], name: str = 
             print("Sanity check: Replaced infinite entries of %s." % name)
 
 
-def fix_bounds(values: Tensor, lower: Union[float, Tensor] = None,
-               upper: Union[float, Tensor] = None, name: str = None):
+def fix_bounds(
+    values: Tensor,
+    lower: Union[float, Tensor] = None,
+    upper: Union[float, Tensor] = None,
+    name: str = None,
+):
     """Clamp entries in values to not exceed lower and upper bounds.
     :param values: Input tensor
     :param lower: Scalar or tensor with lower bounds for values

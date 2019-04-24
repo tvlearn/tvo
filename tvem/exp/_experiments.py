@@ -28,20 +28,33 @@ def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMV
 
 
 def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
-    selection = {'fitness': 'batch_fitparents', 'uniform': 'randparents'}[conf.parent_selection]
-    mutation = {'sparsity': 'sparseflip', 'uniform': 'randflip'}[conf.mutation]
+    selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
+    mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
     if conf.crossover:
-        mutation = 'cross_' + mutation
-    eem_conf = {'parent_selection': selection, 'mutation': mutation,
-                'n_parents': conf.n_parents, 'n_children': conf.n_children,
-                'n_generations': conf.n_generations, 'S': conf.n_states,
-                'N': N, 'H': H, 'dtype': dtype}
+        mutation = "cross_" + mutation
+    eem_conf = {
+        "parent_selection": selection,
+        "mutation": mutation,
+        "n_parents": conf.n_parents,
+        "n_children": conf.n_children,
+        "n_generations": conf.n_generations,
+        "S": conf.n_states,
+        "N": N,
+        "H": H,
+        "dtype": dtype,
+    }
     return EEMVariationalStates(eem_conf)
 
 
 class ExpConfig:
-    def __init__(self, batch_size: int = 1, precision: to.dtype = to.float64, shuffle: bool = True,
-                 drop_last: bool = False, warmup_Esteps: int = 0):
+    def __init__(
+        self,
+        batch_size: int = 1,
+        precision: to.dtype = to.float64,
+        shuffle: bool = True,
+        drop_last: bool = False,
+        warmup_Esteps: int = 0,
+    ):
         """Configuration object for Experiment classes.
 
         :param batch_size: Batch size for the data loaders.
@@ -54,7 +67,7 @@ class ExpConfig:
                           divisible by the batch size. See also torch's `DataLoader docs`_.
         :param warmup_Esteps: Number of warm-up E-steps to perform.
         """
-        assert precision in (to.float32, to.float64), 'Precision must be one of torch.float{32,64}'
+        assert precision in (to.float32, to.float64), "Precision must be one of torch.float{32,64}"
         self.batch_size = batch_size
         self.precision = precision
         self.shuffle = shuffle
@@ -64,14 +77,21 @@ class ExpConfig:
 
 class Experiment(ABC):
     """Abstract base class for all experiments."""
+
     @abstractmethod
     def run(self, epochs: int):
         pass  # pragma: no cover
 
 
 class _TrainingAndOrValidation(Experiment):
-    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel,
-                 train_dataset: to.Tensor = None, test_dataset: to.Tensor = None):
+    def __init__(
+        self,
+        conf: ExpConfig,
+        estep_conf: EStepConfig,
+        model: TVEMModel,
+        train_dataset: to.Tensor = None,
+        test_dataset: to.Tensor = None,
+    ):
         """Helper class to avoid code repetition between Training and Testing.
 
         It performs training and/or validation/testings depending on what input is provided.
@@ -87,8 +107,12 @@ class _TrainingAndOrValidation(Experiment):
             if train_dataset.dtype is not to.uint8:
                 train_dataset = train_dataset.to(dtype=dtype)
             train_dataset = train_dataset.to(device=tvem.get_device())
-            self.train_data = TVEMDataLoader(train_dataset, batch_size=conf.batch_size,
-                                             shuffle=conf.shuffle, drop_last=conf.drop_last)
+            self.train_data = TVEMDataLoader(
+                train_dataset,
+                batch_size=conf.batch_size,
+                shuffle=conf.shuffle,
+                drop_last=conf.drop_last,
+            )
             N = train_dataset.shape[0]
             self.train_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.train_states.precision is self.model.precision
@@ -100,8 +124,12 @@ class _TrainingAndOrValidation(Experiment):
             if test_dataset.dtype is not to.uint8:
                 test_dataset = test_dataset.to(dtype=dtype)
             test_dataset = test_dataset.to(device=tvem.get_device())
-            self.test_data = TVEMDataLoader(test_dataset, batch_size=conf.batch_size,
-                                            shuffle=conf.shuffle, drop_last=conf.drop_last)
+            self.test_data = TVEMDataLoader(
+                test_dataset,
+                batch_size=conf.batch_size,
+                shuffle=conf.shuffle,
+                drop_last=conf.drop_last,
+            )
             N = test_dataset.shape[0]
             self.test_states = _make_var_states(estep_conf, N, H, dtype)
             assert self.test_states.precision is self.model.precision
@@ -113,29 +141,30 @@ class _TrainingAndOrValidation(Experiment):
 
         :param epochs: Number of epochs to train for
         """
-        trainer = Trainer(self.model, self.train_data, self.train_states,
-                          self.test_data, self.test_states)
+        trainer = Trainer(
+            self.model, self.train_data, self.train_states, self.test_data, self.test_states
+        )
         for e in range(self.warmup_Esteps):
             trainer.e_step()
         for e in range(epochs):
-            pprint(f'epoch {e}')
+            pprint(f"epoch {e}")
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
             if self.train_data is not None:
-                F, subs = get(d, 'train_F', 'train_subs')
-                assert not (math.isnan(F) or math.isinf(F)), 'training free energy is nan!'
-                pprint(f'\ttrain F/N: {F:<10.5f} avg subs: {subs:<6.2f}')
+                F, subs = get(d, "train_F", "train_subs")
+                assert not (math.isnan(F) or math.isinf(F)), "training free energy is nan!"
+                pprint(f"\ttrain F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
             if self.test_data is not None:
-                F, subs = get(d, 'test_F', 'test_subs')
-                test_or_valid = 'valid.' if self.train_data is not None else 'test'
-                assert not (math.isnan(F) or math.isinf(F)), f'{test_or_valid} free energy is nan!'
-                pprint(f'\t{test_or_valid} F/N: {F:<10.5f} avg subs: {subs:<6.2f}')
+                F, subs = get(d, "test_F", "test_subs")
+                test_or_valid = "valid." if self.train_data is not None else "test"
+                assert not (math.isnan(F) or math.isinf(F)), f"{test_or_valid} free energy is nan!"
+                pprint(f"\t{test_or_valid} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
 
 
 def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:
     """Return dataset with the first of `possible_keys` that is found in hdf5 file `fname`."""
     rank = dist.get_rank() if dist.is_initialized() else 0
 
-    f = h5py.File(fname, 'r')
+    f = h5py.File(fname, "r")
     for dataset in possible_keys:
         if dataset in f.keys():
             break
@@ -152,8 +181,14 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
 
 
 class Training(_TrainingAndOrValidation):
-    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel,
-                 train_data_file: str, val_data_file: str = None):
+    def __init__(
+        self,
+        conf: ExpConfig,
+        estep_conf: EStepConfig,
+        model: TVEMModel,
+        train_data_file: str,
+        val_data_file: str = None,
+    ):
         """Train model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.
@@ -173,19 +208,18 @@ class Training(_TrainingAndOrValidation):
 
         .. _DataLoader docs: https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
         """
-        if tvem.get_run_policy() == 'mpi':
+        if tvem.get_run_policy() == "mpi":
             init_processes()
-        train_dataset = _get_h5_dataset_to_processes(train_data_file, ('train_data', 'data'))
+        train_dataset = _get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
         val_dataset = None
         if val_data_file is not None:
-            val_dataset = _get_h5_dataset_to_processes(val_data_file, ('val_data', 'data'))
+            val_dataset = _get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
 
         super().__init__(conf, estep_conf, model, train_dataset, val_dataset)
 
 
 class Testing(_TrainingAndOrValidation):
-    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel,
-                 data_file: str):
+    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel, data_file: str):
         """Test given model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.
@@ -197,7 +231,7 @@ class Testing(_TrainingAndOrValidation):
 
         Only E-steps are run. Model parameters are not updated.
         """
-        if tvem.get_run_policy() == 'mpi':
+        if tvem.get_run_policy() == "mpi":
             init_processes()
-        dataset = _get_h5_dataset_to_processes(data_file, ('test_data', 'data'))
+        dataset = _get_h5_dataset_to_processes(data_file, ("test_data", "data"))
         super().__init__(conf, estep_conf, model, None, dataset)

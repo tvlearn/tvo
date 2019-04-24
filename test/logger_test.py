@@ -10,16 +10,16 @@ import h5py
 import os
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def file_and_logger():
-    fname = 'logger_test_output.h5'
+    fname = "logger_test_output.h5"
 
     yield fname, H5Logger(fname)
 
     rank = dist.get_rank() if dist.is_initialized() else 0
     if rank == 0:
         os.remove(fname)
-        os.remove(fname + '.old')
+        os.remove(fname + ".old")
 
 
 def check_contents(fname):
@@ -27,8 +27,8 @@ def check_contents(fname):
     if rank != 0:
         return
 
-    f = h5py.File(fname, 'r')
-    t = f['v']
+    f = h5py.File(fname, "r")
+    t = f["v"]
     assert (to.tensor(t) == to.arange(6).reshape(2, 3)).all()
     f.close()
 

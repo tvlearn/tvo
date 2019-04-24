@@ -15,9 +15,9 @@ def count_active_units(data, states):
 @pytest.mark.gpu
 def test_update():
     device = tvem.get_device()
-    conf = {'N': 10, 'H': 8, 'S': 4, 'dtype': to.float32, 'device': device}
+    conf = {"N": 10, "H": 8, "S": 4, "dtype": to.float32, "device": device}
     var_states = RandomSampledVarStates(10, conf)
-    data = to.rand(conf['N'], 1, device=device)
+    data = to.rand(conf["N"], 1, device=device)
     idx = to.arange(data.shape[0], device=device)
 
     # lpj simply counts active units in each latent state:

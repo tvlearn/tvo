@@ -25,8 +25,9 @@ def unique_ind(x: Tensor, dim: int = None) -> Tensor:
     return inverse.new_empty(unique.size(0)).scatter_(0, inverse, perm)
 
 
-def generate_unique_states(n_states: int, H: int, crowdedness: float = 1.,
-                           device: to.device = None) -> Tensor:
+def generate_unique_states(
+    n_states: int, H: int, crowdedness: float = 1.0, device: to.device = None
+) -> Tensor:
     """Generate a torch tensor containing random and unique binary vectors.
 
     :param n_states: number of unique vectors to be generated
@@ -38,21 +39,27 @@ def generate_unique_states(n_states: int, H: int, crowdedness: float = 1.,
     """
     if device is None:
         device = tvem.get_device()
-    assert n_states <= 2**H, "n_states must be smaller than 2**H"
-    s_set = {tuple(s) for s in np.random.binomial(
-        1, p=crowdedness/H, size=(n_states//2, H))}
+    assert n_states <= 2 ** H, "n_states must be smaller than 2**H"
+    s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_states // 2, H))}
     while len(s_set) < n_states:
-        s_set.update({tuple(s) for s in np.random.binomial(
-            1, p=crowdedness/H, size=(n_states//2, H))})
+        s_set.update(
+            {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_states // 2, H))}
+        )
     while len(s_set) > n_states:
         s_set.pop()
     return to.from_numpy(np.array(tuple(s for s in s_set), dtype=int)).to(
-        dtype=to.uint8, device=device)
+        dtype=to.uint8, device=device
+    )
 
 
-def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
-                            all_states: Tensor, all_lpj: Tensor,
-                            sort_by_lpj: Dict[str, Tensor] = {}) -> int:
+def update_states_for_batch(
+    new_states: Tensor,
+    new_lpj: Tensor,
+    idx: Tensor,
+    all_states: Tensor,
+    all_lpj: Tensor,
+    sort_by_lpj: Dict[str, Tensor] = {},
+) -> int:
     """Perform substitution of old and new states (and lpj, ...)
        according to TVEM criterion.
 
@@ -85,14 +92,14 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     conc_states = to.cat((old_states, new_states), dim=1)
     conc_lpj = to.cat((old_lpj, new_lpj), dim=1)  # (batch_size, S+newS)
 
-    sorted_idx = to.flip(to.topk(conc_lpj, k=S, dim=1, largest=True,
-                                 sorted=True)[1], [1])  # is (batch_size, S)
+    sorted_idx = to.flip(
+        to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1]
+    )  # is (batch_size, S)
     flattened_sorted_idx = sorted_idx.flatten()
 
     idx_n = idx.repeat(S, 1).t().flatten()
     idx_s = to.arange(S, device=all_states.device).repeat(batch_size)
-    idx_sc = to.arange(batch_size, device=all_states.device).repeat(
-        S, 1).t().flatten()
+    idx_sc = to.arange(batch_size, device=all_states.device).repeat(S, 1).t().flatten()
 
     all_states[idx_n, idx_s] = conc_states[idx_sc, flattened_sorted_idx]
     all_lpj[idx_n, idx_s] = conc_lpj[idx_sc, flattened_sorted_idx]
@@ -104,8 +111,7 @@ def update_states_for_batch(new_states: Tensor, new_lpj: Tensor, idx: Tensor,
     return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
 
 
-def set_redundant_lpj_to_low(new_states: Tensor, new_lpj: Tensor,
-                             old_states: Tensor):
+def set_redundant_lpj_to_low(new_states: Tensor, new_lpj: Tensor, old_states: Tensor):
     """Find redundant states in new_states w.r.t. old_states and set
        corresponding lpg to low.
 
@@ -129,8 +135,7 @@ def set_redundant_lpj_to_low(new_states: Tensor, new_lpj: Tensor,
         # new_uniq_idx)
         mask[new_uniq_idx.to(device=new_lpj.device)] = 0
         # set lpj of redundant states to an arbitrary low value
-        new_lpj[n][mask] = to.tensor(
-            [-1e100], dtype=new_lpj.dtype, device=new_lpj.device)
+        new_lpj[n][mask] = to.tensor([-1e100], dtype=new_lpj.dtype, device=new_lpj.device)
 
 
 class TVEMVariationalStates(ABC):
@@ -140,7 +145,7 @@ class TVEMVariationalStates(ABC):
         :param conf: dictionary with hyper-parameters. Required keys: N, H, S, dtype, device
         :param K_init: if specified, self.K will be initialized with this Tensor of shape (N,S,H)
         """
-        required_keys = ('N', 'H', 'S', 'dtype')
+        required_keys = ("N", "H", "S", "dtype")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.conf = conf
@@ -156,9 +161,13 @@ class TVEMVariationalStates(ABC):
         self.precision = dtype
 
     @abstractmethod
-    def update(self, idx: Tensor, batch: Tensor,
-               lpj_fn: Callable[[Tensor, Tensor], Tensor],
-               sort_by_lpj: Dict[str, Tensor] = {}) -> int:
+    def update(
+        self,
+        idx: Tensor,
+        batch: Tensor,
+        lpj_fn: Callable[[Tensor, Tensor], Tensor],
+        sort_by_lpj: Dict[str, Tensor] = {},
+    ) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 
         :param idx: data point indices of batch w.r.t. K
@@ -177,13 +186,13 @@ def _lpj2pjc(lpj: Tensor):
     :param lpj: log-pseudo-joint tensor
     :returns: probability tensor
     """
-    up_lpg_bound = 0.
+    up_lpg_bound = 0.0
     shft = up_lpg_bound - lpj.max(dim=1)[0]
     tmp = to.exp(lpj + shft[:, None])
     return tmp / tmp.sum(dim=1)[:, None]
 
 
-def mean_posterior(g: Tensor, lpj: Tensor, equation: str = 'ns...,ns->n...'):
+def mean_posterior(g: Tensor, lpj: Tensor, equation: str = "ns...,ns->n..."):
     """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
 
     :param g: Values of g(s) with shape (N,S,...). For other shapes equation must be specified.

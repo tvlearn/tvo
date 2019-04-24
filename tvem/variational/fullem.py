@@ -23,7 +23,7 @@ def state_matrix(H: int, device: to.device = None):
     if device is None:
         device = tvem.get_device()
     sl = []
-    for g in range(0, H+1):
+    for g in range(0, H + 1):
         for s in combinations(range(H), g):
             sl.append(to.tensor(s, dtype=to.int64))
     SM = to.zeros((len(sl), H), dtype=to.uint8, device=device)
@@ -39,16 +39,20 @@ class FullEM(TVEMVariationalStates):
 
         :param conf: dictionary with hyper-parameters
         """
-        required_keys = ('N', 'H')
+        required_keys = ("N", "H")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         N, H = get(conf, *required_keys)
 
         super().__init__(conf, state_matrix(H)[None, :, :].expand(N, -1, -1))
 
-    def update(self, idx: Tensor, batch: Tensor,
-               lpj_fn: Callable[[Tensor, Tensor], Tensor],
-               sort_by_lpj: Dict[str, Tensor] = {}) -> int:
+    def update(
+        self,
+        idx: Tensor,
+        batch: Tensor,
+        lpj_fn: Callable[[Tensor, Tensor], Tensor],
+        sort_by_lpj: Dict[str, Tensor] = {},
+    ) -> int:
 
         K = self.K
         lpj = self.lpj

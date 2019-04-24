@@ -15,9 +15,16 @@ class EStepConfig(ABC):
 
 
 class EEMConfig(EStepConfig):
-    def __init__(self, n_states: int, n_parents: int, n_children: int,
-                 n_generations: int, parent_selection: str = 'fitness', crossover: bool = True,
-                 mutation: str = 'uniform'):
+    def __init__(
+        self,
+        n_states: int,
+        n_parents: int,
+        n_children: int,
+        n_generations: int,
+        parent_selection: str = "fitness",
+        crossover: bool = True,
+        mutation: str = "uniform",
+    ):
         """Configuration object for EEM E-step.
 
         :param n_states: Number of variational states per datapoint to keep in memory.
@@ -34,12 +41,13 @@ class EEMConfig(EStepConfig):
                             towards current model sparsity.
                          - 'uniform': random uniform selection of bits to flip.
         """
-        valid_selections = ('fitness', 'random')
-        assert parent_selection in valid_selections, f'Unknown parent selection {parent_selection}'
-        valid_mutations = ('sparsity', 'uniform')
-        assert mutation in valid_mutations, f'Unknown mutation {mutation}'
-        assert n_parents <= n_states,\
-            f'n_parents ({n_parents}) must be lower than n_states ({n_states})'
+        valid_selections = ("fitness", "random")
+        assert parent_selection in valid_selections, f"Unknown parent selection {parent_selection}"
+        valid_mutations = ("sparsity", "uniform")
+        assert mutation in valid_mutations, f"Unknown mutation {mutation}"
+        assert (
+            n_parents <= n_states
+        ), f"n_parents ({n_parents}) must be lower than n_states ({n_states})"
 
         self.n_parents = n_parents
         self.n_children = n_children

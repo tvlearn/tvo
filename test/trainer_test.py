@@ -12,8 +12,9 @@ import pytest
 import torch as to
 
 
-@pytest.fixture(scope='function',
-                params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)])
+@pytest.fixture(
+    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+)
 def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
@@ -22,9 +23,10 @@ def setup(request):
         data = TVEMDataLoader(_td, batch_size=N)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
         test_data = TVEMDataLoader(_td, batch_size=N)
-        _varstates_conf = {'N': N, 'H': H, 'S': S, 'dtype': to.float32, 'device': tvem.get_device()}
+        _varstates_conf = {"N": N, "H": H, "S": S, "dtype": to.float32, "device": tvem.get_device()}
         var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
         test_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
+
     return Setup
 
 
@@ -32,32 +34,37 @@ def test_training(setup):
     trainer = Trainer(setup.model, setup.data, setup.var_states)
     d1 = trainer.em_step()
     d2 = trainer.em_step()
-    assert 'train_F' in d1 and 'train_subs' in d1
-    assert 'test_F' not in d1 and 'test_subs' not in d1
-    assert d1['train_F'] < d2['train_F']
+    assert "train_F" in d1 and "train_subs" in d1
+    assert "test_F" not in d1 and "test_subs" not in d1
+    assert d1["train_F"] < d2["train_F"]
 
 
 def test_training_with_valid(setup):
-    trainer = Trainer(setup.model, train_data=setup.data, train_states=setup.var_states,
-                      test_data=setup.test_data, test_states=setup.test_states)
+    trainer = Trainer(
+        setup.model,
+        train_data=setup.data,
+        train_states=setup.var_states,
+        test_data=setup.test_data,
+        test_states=setup.test_states,
+    )
     d1 = trainer.em_step()
     d2 = trainer.em_step()
-    assert 'train_F' in d1 and 'train_subs' in d1
-    assert 'test_F' in d1 and 'test_subs' in d1
-    assert d1['train_F'] < d2['train_F']
+    assert "train_F" in d1 and "train_subs" in d1
+    assert "test_F" in d1 and "test_subs" in d1
+    assert d1["train_F"] < d2["train_F"]
 
 
 def test_testing(setup):
     trainer = Trainer(setup.model, test_data=setup.test_data, test_states=setup.test_states)
     d1 = trainer.em_step()
     d2 = trainer.em_step()
-    assert 'train_F' not in d1 and 'train_subs' not in d1
-    assert 'test_F' in d1 and 'test_subs' in d1
-    assert d1['test_F'] < d2['test_F']
+    assert "train_F" not in d1 and "train_subs" not in d1
+    assert "test_F" in d1 and "test_subs" in d1
+    assert d1["test_F"] < d2["test_F"]
 
 
 def test_estep(setup):
     trainer = Trainer(setup.model, test_data=setup.test_data, test_states=setup.test_states)
     d1 = trainer.e_step()
     d2 = trainer.e_step()
-    assert d1['test_F'] < d2['test_F']
+    assert d1["test_F"] < d2["test_F"]

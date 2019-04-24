@@ -11,8 +11,11 @@ from torch import Tensor
 
 import tvem
 from tvem.util import get
-from tvem.variational.TVEMVariationalStates import update_states_for_batch,\
-    set_redundant_lpj_to_low, TVEMVariationalStates
+from tvem.variational.TVEMVariationalStates import (
+    update_states_for_batch,
+    set_redundant_lpj_to_low,
+    TVEMVariationalStates,
+)
 
 
 class EEMVariationalStates(TVEMVariationalStates):
@@ -22,23 +25,25 @@ class EEMVariationalStates(TVEMVariationalStates):
         :param conf: dictionary with hyper-parameters
         """
         super().__init__(conf)
-        required_keys = ('parent_selection', 'mutation', 'n_parents',
-                         'n_children', 'n_generations')
+        required_keys = ("parent_selection", "mutation", "n_parents", "n_children", "n_generations")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.required_keys = required_keys
 
-    def update(self, idx: Tensor, batch: Tensor,
-               lpj_fn: Callable[[Tensor, Tensor], Tensor],
-               sort_by_lpj: Dict[str, Tensor] = {}) -> int:
+    def update(
+        self,
+        idx: Tensor,
+        batch: Tensor,
+        lpj_fn: Callable[[Tensor, Tensor], Tensor],
+        sort_by_lpj: Dict[str, Tensor] = {},
+    ) -> int:
 
         conf = self.conf
         K = self.K
         lpj = self.lpj
         required_keys = self.required_keys
 
-        parent_selection, mutation, n_parents, n_children,\
-            n_generations = get(conf, *required_keys)
+        parent_selection, mutation, n_parents, n_children, n_generations = get(conf, *required_keys)
 
         lpj[idx] = lpj_fn(batch, K[idx])
 
@@ -46,27 +51,33 @@ class EEMVariationalStates(TVEMVariationalStates):
             return lpj_fn(batch, states)
 
         new_states, new_lpj = evolve_states(
-            lpj=lpj[idx].to(device='cpu'),
-            states=K[idx].to(device='cpu'),
+            lpj=lpj[idx].to(device="cpu"),
+            states=K[idx].to(device="cpu"),
             lpj_fn=lpj_fn_,
             n_parents=n_parents,
             n_children=n_children,
             n_generations=n_generations,
             parent_selection=parent_selection,
-            mutation=mutation)
+            mutation=mutation,
+        )
 
-        return update_states_for_batch(new_states.to(device=K.device),
-                                       new_lpj.to(device=lpj.device),
-                                       idx, K, lpj, sort_by_lpj)
+        return update_states_for_batch(
+            new_states.to(device=K.device), new_lpj.to(device=lpj.device), idx, K, lpj, sort_by_lpj
+        )
 
 
-def evolve_states(lpj: Tensor, states: Tensor,
-                  lpj_fn: Callable[[Tensor], Tensor], n_parents: int,
-                  n_children: int, n_generations: int,
-                  parent_selection: str = 'batch_fitparents',
-                  mutation: str = 'cross_randflip',
-                  sparseness: Optional[float] = None,
-                  p_bf: Optional[float] = None) -> Tuple[Tensor, Tensor]:
+def evolve_states(
+    lpj: Tensor,
+    states: Tensor,
+    lpj_fn: Callable[[Tensor], Tensor],
+    n_parents: int,
+    n_children: int,
+    n_generations: int,
+    parent_selection: str = "batch_fitparents",
+    mutation: str = "cross_randflip",
+    sparseness: Optional[float] = None,
+    p_bf: Optional[float] = None,
+) -> Tuple[Tensor, Tensor]:
     """
     Take old variational states states (N,K,H) with lpj values (N,K) and
     return new states and their log-pseudo-joints for each datapoint. The
@@ -113,8 +124,7 @@ def evolve_states(lpj: Tensor, states: Tensor,
     """
     dtype_f, device = lpj.dtype, lpj.device
     N, K, H = states.shape
-    max_new_states = get_n_new_states(
-        mutation, n_parents, n_children, n_generations)
+    max_new_states = get_n_new_states(mutation, n_parents, n_children, n_generations)
     new_states_per_gen = max_new_states // n_generations
 
     # Pre-allocations
@@ -122,8 +132,7 @@ def evolve_states(lpj: Tensor, states: Tensor,
     # new unique state. Unfilled new_states will remain uninitialized and
     # their corresponding new_lpj will be lower than any state in states[n].
     # TODO would (max_new_states, N, H) be more performant?
-    new_states = to.empty((N, max_new_states, H),
-                          dtype=to.uint8, device=device)
+    new_states = to.empty((N, max_new_states, H), dtype=to.uint8, device=device)
     new_lpj = to.empty((N, max_new_states), dtype=dtype_f, device=device)
     parents = to.empty((N, n_parents, H), dtype=to.uint8, device=device)
 
@@ -131,24 +140,22 @@ def evolve_states(lpj: Tensor, states: Tensor,
 
     for g in range(n_generations):
         # parent selection
-        gen_idx = to.arange(g * new_states_per_gen, (g + 1) *
-                            new_states_per_gen, device=device)
+        gen_idx = to.arange(g * new_states_per_gen, (g + 1) * new_states_per_gen, device=device)
         if g == 0:
             parents[:] = select(states, n_parents, lpj)
         else:
             old_gen_idx = gen_idx - new_states_per_gen
-            parents[:] = select(new_states[:, old_gen_idx],
-                                n_parents, new_lpj[:, old_gen_idx])
+            parents[:] = select(new_states[:, old_gen_idx], n_parents, new_lpj[:, old_gen_idx])
 
         # children generation
         for n in range(N):
-            new_states[n, gen_idx] = mutate(
-                parents[n], n_children, sparseness, p_bf)
+            new_states[n, gen_idx] = mutate(parents[n], n_children, sparseness, p_bf)
 
         # children fitness evaluation
         # new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
-        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx].to(
-            device=tvem.get_device())).to(device='cpu')
+        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx].to(device=tvem.get_device())).to(
+            device="cpu"
+        )
 
     # TODO check that new_lpj contains very low numbers
     set_redundant_lpj_to_low(new_states, new_lpj, states)
@@ -156,45 +163,56 @@ def evolve_states(lpj: Tensor, states: Tensor,
     return new_states, new_lpj
 
 
-def get_n_new_states(mutation: str, n_parents: int, n_children: int,
-                     n_gen: int) -> int:
-    if mutation[:5] == 'cross':
+def get_n_new_states(mutation: str, n_parents: int, n_children: int, n_gen: int) -> int:
+    if mutation[:5] == "cross":
         return n_parents * (n_parents - 1) * n_children * n_gen
     else:
         return n_parents * n_children * n_gen
 
 
 def get_EA(parent_selection: str, mutation: str) -> Tuple:
-    '''Refer to the doc of `evolve_states` for the list of valid arguments'''
-    parent_sel_dict = {'batch_fitparents': batch_fitparents}
+    """Refer to the doc of `evolve_states` for the list of valid arguments"""
+    parent_sel_dict = {"batch_fitparents": batch_fitparents}
     mutation_dict = {
-        'randflip': randflip, 'sparseflip': sparseflip, 'cross': cross,
-        'cross_randflip': cross_randflip,
-        'cross_sparseflip': cross_sparseflip}
+        "randflip": randflip,
+        "sparseflip": sparseflip,
+        "cross": cross,
+        "cross_randflip": cross_randflip,
+        "cross_sparseflip": cross_sparseflip,
+    }
     # input validation
     valid_parent_sel = parent_sel_dict.keys()
     if parent_selection not in valid_parent_sel:  # pragma: no cover
-        raise ValueError(f'Parent selection "{parent_selection}" \
-not supported. Valid options: {list(valid_parent_sel)}')
+        raise ValueError(
+            f'Parent selection "{parent_selection}" \
+not supported. Valid options: {list(valid_parent_sel)}'
+        )
     valid_mutations = mutation_dict.keys()
     if mutation not in valid_mutations:  # pragma: no cover
-        raise ValueError(f'Mutation operator "{mutation}" not \
-supported. Valid options: {list(valid_mutations)}')
+        raise ValueError(
+            f'Mutation operator "{mutation}" not \
+supported. Valid options: {list(valid_mutations)}'
+        )
 
     return (parent_sel_dict[parent_selection], mutation_dict[mutation])
 
 
-def randflip(parents: Tensor, n_children: int,
-             sparsity: Optional[float] = None,
-             p_bf: Optional[float] = None) -> Tensor:
+def randflip(
+    parents: Tensor, n_children: int, sparsity: Optional[float] = None, p_bf: Optional[float] = None
+) -> Tensor:
 
     dtype_f, device = to.float64, parents.device
 
     # Indices to be flipped. Bitflips for a given parent are ensured
     # to be unique.
     n_parents, H = parents.shape
-    ind_flip = to.topk(to.rand((n_parents, H), dtype=dtype_f, device=device),
-                       k=n_children, dim=1, largest=True, sorted=False)[1]
+    ind_flip = to.topk(
+        to.rand((n_parents, H), dtype=dtype_f, device=device),
+        k=n_children,
+        dim=1,
+        largest=True,
+        sorted=False,
+    )[1]
     ind_flip_flat = ind_flip.flatten()  # [ parent1bitflip1, parent1bitflip2,
     # parent2bitflip1, parent2bitflip2 ]
 
@@ -207,14 +225,14 @@ def randflip(parents: Tensor, n_children: int,
     # position indicated by ind_flip_flat
     ind_slice_flat = to.arange(n_children * n_parents, device=parents.device)
 
-    children[ind_slice_flat, ind_flip_flat] = ~(children[ind_slice_flat,
-                                                         ind_flip_flat])
+    children[ind_slice_flat, ind_flip_flat] = ~(children[ind_slice_flat, ind_flip_flat])
 
     return children
 
 
-def sparseflip(parents: Tensor, n_children: int, sparsity: Optional[float],
-               p_bf: Optional[float]) -> Tensor:
+def sparseflip(
+    parents: Tensor, n_children: int, sparsity: Optional[float], p_bf: Optional[float]
+) -> Tensor:
     """ Take a set of parent bitstrings, generate n_children new bitstrings
         by performing bitflips on each of the parents.
 
@@ -244,21 +262,23 @@ def sparseflip(parents: Tensor, n_children: int, sparsity: Optional[float],
 
     # Probability to flip a 1 to a 0 and vice versa
     # (modification of Joerg's idea)
-    alpha = (H - s_abs) * ((H * p_bf) - (crowdedness - s_abs)) /\
-        ((crowdedness - s_abs + H * p_bf) * s_abs + eps)  # is (n_parents)
-    p_0 = ((H * p_bf) / (H + (alpha - 1.) * s_abs) + eps)  # is (n_parents,)
-    p_1 = (alpha * p_0)[:, None].expand(-1, int(H)).repeat(1, n_children)\
-        .view(-1, int(H))  # is (n_parents*n_children, H)
-    p_0 = p_0[:, None].expand(-1, int(H)).repeat(1,
-                                                 n_children).view(-1, int(H))
+    alpha = (
+        (H - s_abs)
+        * ((H * p_bf) - (crowdedness - s_abs))
+        / ((crowdedness - s_abs + H * p_bf) * s_abs + eps)
+    )  # is (n_parents)
+    p_0 = (H * p_bf) / (H + (alpha - 1.0) * s_abs) + eps  # is (n_parents,)
+    p_1 = (
+        (alpha * p_0)[:, None].expand(-1, int(H)).repeat(1, n_children).view(-1, int(H))
+    )  # is (n_parents*n_children, H)
+    p_0 = p_0[:, None].expand(-1, int(H)).repeat(1, n_children).view(-1, int(H))
     # is (n_parents*n_children, H)
     p = to.empty(p_0.shape, dtype=dtype_f, device=device)
     p[children] = p_1[children]
     p[~children] = p_0[~children]
 
     # Determine bits to be flipped and do the bitflip
-    flips = to.rand((n_parents * n_children, int(H)),
-                    dtype=dtype_f, device=device) < p
+    flips = to.rand((n_parents * n_children, int(H)), dtype=dtype_f, device=device) < p
     children[flips] = ~children[flips]
 
     return children
@@ -274,8 +294,7 @@ def cross(parents: Tensor) -> Tensor:
     ind_children = to.arange(2, device=device)
 
     # All combinations of parents lead to n_parents*(n_parents-1) new children
-    children = to.empty((n_parents * (n_parents - 1), H),
-                        dtype=to.uint8, device=device)
+    children = to.empty((n_parents * (n_parents - 1), H), dtype=to.uint8, device=device)
     for p in combinations(range(n_parents), 2):
         # Cross tails
         cp = to.randint(low=1, high=H, size=(1,), device=device).item()
@@ -285,14 +304,14 @@ def cross(parents: Tensor) -> Tensor:
     return children
 
 
-def cross_randflip(parents: Tensor, n_children: int,
-                   sparseness: float = None, p_bf: float = None) -> Tensor:
+def cross_randflip(
+    parents: Tensor, n_children: int, sparseness: float = None, p_bf: float = None
+) -> Tensor:
     children = randflip(cross(parents), n_children)
     return children
 
 
-def cross_sparseflip(parents: Tensor, n_children: int,
-                     sparseness: float, p_bf: float) -> Tensor:
+def cross_sparseflip(parents: Tensor, n_children: int, sparseness: float, p_bf: float) -> Tensor:
     children = sparseflip(cross(parents), n_children, sparseness, p_bf)
     return children
 
@@ -302,28 +321,29 @@ def fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     device = candidates.device
 
     # compute fitness (per data point)
-    lpj_fitness = lpj - 2 * to.min([to.min(lpj), 0.])  # is (no_candidates,)
+    lpj_fitness = lpj - 2 * to.min([to.min(lpj), 0.0])  # is (no_candidates,)
     lpj_fitness = lpj_fitness / lpj_fitness.sum()
 
     # sample (indices of) parents according to fitness
     # TODO Find solution without numpy conversion
-    ind_children = np.random.choice(candidates.shape[0], size=n_parents,
-                                    replace=False,
-                                    p=lpj_fitness.to(device='cpu').numpy())
+    ind_children = np.random.choice(
+        candidates.shape[0], size=n_parents, replace=False, p=lpj_fitness.to(device="cpu").numpy()
+    )
     # is (n_parents, H)
     return candidates[to.from_numpy(ind_children).to(device=device)]
 
 
-def batch_fitparents(candidates: Tensor, n_parents: int,
-                     lpj: Tensor) -> Tensor:
+def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     # FIXME this a fitness-proportional parent selection __with replacement__
 
     dtype_f, device = lpj.dtype, candidates.device
-    assert candidates.shape[:2] == lpj.shape, 'candidates and lpj must \
-                                                have same shape'
+    assert (
+        candidates.shape[:2] == lpj.shape
+    ), "candidates and lpj must \
+                                                have same shape"
 
     # compute fitness (per batch)
-    lpj_fitness = lpj - 2 * to.min(to.tensor([to.min(lpj).item(), 0.])).item()
+    lpj_fitness = lpj - 2 * to.min(to.tensor([to.min(lpj).item(), 0.0])).item()
     # is (batch_size, no_candidates). TODO Check if size is correct
     lpj_fitness = lpj_fitness / lpj_fitness.sum()
 
@@ -343,23 +363,18 @@ def batch_fitparents(candidates: Tensor, n_parents: int,
     cum_p_view.insert(-1, -1)
     cum_p_view = tuple(cum_p_view)  # type: ignore
 
-    chosen_idx = cum_p.shape[-1] - 1 - (x.view(x_view) <
-                                        cum_p.view(cum_p_view)).sum(dim=-1)
+    chosen_idx = cum_p.shape[-1] - 1 - (x.view(x_view) < cum_p.view(cum_p_view)).sum(dim=-1)
 
     # TODO Find solution without numpy conversion
-    all_idx = to.from_numpy(np.indices(tuple(chosen_idx.shape)))\
-        .to(device=device)
+    all_idx = to.from_numpy(np.indices(tuple(chosen_idx.shape))).to(device=device)
     # TODO Find solution without numpy conversion
     all_idx[-1] = chosen_idx
     choices = candidates[tuple(i for i in all_idx)]
-    assert choices.shape == (
-        candidates.shape[0], n_parents, candidates.shape[2])
+    assert choices.shape == (candidates.shape[0], n_parents, candidates.shape[2])
     return choices
 
 
-def randparents(candidates: Tensor, n_parents: int,
-                lpj: Tensor = None) -> Tensor:
+def randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) -> Tensor:
     device = candidates.device
-    ind_children = np.random.choice(
-        candidates.shape[0], size=n_parents, replace=False)
+    ind_children = np.random.choice(candidates.shape[0], size=n_parents, replace=False)
     return candidates[to.from_numpy(ind_children).to(device=device)]

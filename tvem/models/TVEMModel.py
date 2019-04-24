@@ -24,8 +24,9 @@ class TVEMModel(ABC):
             if this_dtype is to.uint8:
                 continue
             if last_dtype is not None:
-                assert last_dtype is this_dtype,\
-                    'All floating point model parameters must have the same precision'
+                assert (
+                    last_dtype is this_dtype
+                ), "All floating point model parameters must have the same precision"
             last_dtype = this_dtype
 
         self.theta = theta
@@ -55,8 +56,9 @@ class TVEMModel(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def update_param_batch(self, idx: Tensor, batch: Tensor,
-                           states: TVEMVariationalStates) -> Optional[float]:
+    def update_param_batch(
+        self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates
+    ) -> Optional[float]:
         """Execute batch-wise M-step or batch-wise section of an M-step computation.
 
         :param idx: indeces of the datapoints that compose the batch within the dataset
@@ -102,11 +104,11 @@ class TVEMModel(ABC):
         """
         theta = self.theta
 
-        pies = theta['pies']
+        pies = theta["pies"]
 
         S = to.rand((N, pies.numel()), dtype=pies.dtype, device=pies.device) <= pies
 
-        return {'data': self.generate_from_hidden(S), 'hidden_state': S}
+        return {"data": self.generate_from_hidden(S), "hidden_state": S}
 
     @abstractmethod
     def generate_from_hidden(self, hidden_state: Tensor) -> Dict[str, Tensor]:
@@ -160,7 +162,7 @@ def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List]):
     - the values in tensors from the theta dictionary are clamped to the corresponding values
     of low_bound and up_bound.
     """
-    assert set(theta.keys()) == set(policy.keys()), 'theta and policy must have same keys'
+    assert set(theta.keys()) == set(policy.keys()), "theta and policy must have same keys"
 
     rank = dist.get_rank() if dist.is_initialized() else 0
 
@@ -176,8 +178,13 @@ def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List]):
         theta[key] = new_val
 
 
-def init_W_data_mean(data_mean: Tensor, data_var: Tensor, H: int, dtype: to.dtype = to.float64,
-                     device: to.device = None) -> Tensor:
+def init_W_data_mean(
+    data_mean: Tensor,
+    data_var: Tensor,
+    H: int,
+    dtype: to.dtype = to.float64,
+    device: to.device = None,
+) -> Tensor:
     """Initialize weights W based on noisy mean of the data points.
 
     param data_mean: Mean of all data points. Length equals data dimensionality D.
@@ -190,13 +197,14 @@ def init_W_data_mean(data_mean: Tensor, data_var: Tensor, H: int, dtype: to.dtyp
 
     if device is None:
         device = tvem.get_device()
-    return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() +\
-        to.mean(to.sqrt(data_var.to(dtype=dtype, device=device))) * \
-        to.randn((data_mean.size(), H), dtype=dtype, device=device)
+    return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() + to.mean(
+        to.sqrt(data_var.to(dtype=dtype, device=device))
+    ) * to.randn((data_mean.size(), H), dtype=dtype, device=device)
 
 
-def init_sigma_default(data_var: Tensor, dtype: to.dtype = to.float64,
-                       device: to.device = None) -> Tensor:
+def init_sigma_default(
+    data_var: Tensor, dtype: to.dtype = to.float64, device: to.device = None
+) -> Tensor:
     """Initialize scalar sigma parameter based on variance of the data points.
 
     param data_var: Variance of all data points in each dimension d=1,...D of the data.
@@ -212,8 +220,9 @@ def init_sigma_default(data_var: Tensor, dtype: to.dtype = to.float64,
     return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)))
 
 
-def init_pies_default(H: int, crowdedness: float = 2., dtype: to.dtype = to.float64,
-                      device: to.device = None):
+def init_pies_default(
+    H: int, crowdedness: float = 2.0, dtype: to.dtype = to.float64, device: to.device = None
+):
     """Initialize pi parameter based on given crowdedness.
 
     param H: Length of pi vector.
@@ -225,4 +234,4 @@ def init_pies_default(H: int, crowdedness: float = 2., dtype: to.dtype = to.floa
 
     if device is None:
         device = tvem.get_device()
-    return to.full((H,), fill_value=crowdedness/H, dtype=dtype, device=device)
+    return to.full((H,), fill_value=crowdedness / H, dtype=dtype, device=device)

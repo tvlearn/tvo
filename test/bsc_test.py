@@ -12,21 +12,21 @@ from tvem.models import BSC
 from tvem.variational import FullEM
 
 
-@pytest.fixture(scope="module",
-                params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)])
+@pytest.fixture(
+    scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+)
 def setup(request):
     class Setup:
         _device = tvem.get_device()
         N, D, H = 2, 1, 2
         dtype = to.float32
-        pi_init = to.full((H,), .5, dtype=dtype, device=_device)
-        W_init = to.full((D, H), 1., dtype=dtype, device=_device)
-        sigma_init = to.tensor([1., ], dtype=dtype, device=_device)
+        pi_init = to.full((H,), 0.5, dtype=dtype, device=_device)
+        W_init = to.full((D, H), 1.0, dtype=dtype, device=_device)
+        sigma_init = to.tensor([1.0], dtype=dtype, device=_device)
 
-        conf = {'N': N, 'D': D, 'H': H, 'S': 2**H,
-                'Snew': 0, 'batch_size': N, 'dtype': dtype}
+        conf = {"N": N, "D": D, "H": H, "S": 2 ** H, "Snew": 0, "batch_size": N, "dtype": dtype}
         m = BSC(conf, W_init, sigma_init, pi_init)
-        conf = {'N': N, 'H': H, 'S': 2**H, 'dtype': dtype}
+        conf = {"N": N, "H": H, "S": 2 ** H, "dtype": dtype}
         all_s = FullEM(conf)
         all_s.lpj = to.zeros_like(all_s.lpj)
         data = to.tensor([[0], [1]], dtype=dtype, device=_device)
@@ -34,14 +34,22 @@ def setup(request):
         #        - 1/(2\sigma^2) ( \vec{y}-W\vec{s})^T (\vec{y}-W\vec{s}) )
         # const = \sum_h \log(1-\pi_h) - (D/2) \log(2\pi\sigma^2)
         # free_energy_all_datapoints = to.log(to.exp(lpj + const).sum(dim=1)).sum()
-        true_lpj = to.tensor([[0., np.log(1.)-(1./2), np.log(1.)-(1./2),
-                               2.*np.log(1.)-(1./2)*2.**2],
-                              [-(1./2), np.log(1.), np.log(1.), 2.*np.log(1.)-(1./2)]],
-                             device=_device)
-        true_const = 2*np.log(0.5) - 0.5 * np.log(2*math.pi)
+        true_lpj = to.tensor(
+            [
+                [
+                    0.0,
+                    np.log(1.0) - (1.0 / 2),
+                    np.log(1.0) - (1.0 / 2),
+                    2.0 * np.log(1.0) - (1.0 / 2) * 2.0 ** 2,
+                ],
+                [-(1.0 / 2), np.log(1.0), np.log(1.0), 2.0 * np.log(1.0) - (1.0 / 2)],
+            ],
+            device=_device,
+        )
+        true_const = 2 * np.log(0.5) - 0.5 * np.log(2 * math.pi)
         # per datap.
-        true_free_energy = to.log(
-            to.exp(true_lpj + true_const).sum(dim=1)).sum() / N
+        true_free_energy = to.log(to.exp(true_lpj + true_const).sum(dim=1)).sum() / N
+
     return Setup
 
 
@@ -87,5 +95,5 @@ def test_generate_from_hidden(setup):
 def test_generate_data(setup):
     N = 3
     d = setup.m.generate_data(N)
-    assert d['data'].shape == (N, setup.D)
-    assert d['hidden_state'].shape == (N, setup.H)
+    assert d["data"].shape == (N, setup.D)
+    assert d["hidden_state"].shape == (N, setup.H)

@@ -11,9 +11,14 @@ import torch as to
 
 
 class Trainer:
-    def __init__(self, model: TVEMModel,
-                 train_data: TVEMDataLoader = None, train_states: TVEMVariationalStates = None,
-                 test_data: TVEMDataLoader = None, test_states: TVEMVariationalStates = None):
+    def __init__(
+        self,
+        model: TVEMModel,
+        train_data: TVEMDataLoader = None,
+        train_states: TVEMVariationalStates = None,
+        test_data: TVEMDataLoader = None,
+        test_states: TVEMVariationalStates = None,
+    ):
         """Train and/or test a given TVEMModel.
 
         :param model: an object of a concrete type inheriting from TVEMModel
@@ -30,12 +35,13 @@ class Trainer:
         not updated but test_states are. Therefore test_data can also be used for validation.
         """
         for data, states in ((train_data, train_states), (test_data, test_states)):
-            assert (data is not None) == (states is not None),\
-                'Please provide both dataset and variational states, or neither'
+            assert (data is not None) == (
+                states is not None
+            ), "Please provide both dataset and variational states, or neither"
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:  # pragma: no cover
-            raise RuntimeError('Please provide at least one pair of dataset and variational states')
+            raise RuntimeError("Please provide at least one pair of dataset and variational states")
 
         self.model = model
         self.train_data = train_data
@@ -53,7 +59,7 @@ class Trainer:
 
     @staticmethod
     def _do_e_step(data, states, model, N):
-        F = to.tensor(0.)
+        F = to.tensor(0.0)
         subs = to.tensor(0)
         model.init_epoch()
         for idx, batch in data:
@@ -79,14 +85,16 @@ class Trainer:
         # Training #
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
-            ret['train_F'], ret['train_subs'] = self._do_e_step(train_data, train_states, model,
-                                                                self.N_train)
+            ret["train_F"], ret["train_subs"] = self._do_e_step(
+                train_data, train_states, model, self.N_train
+            )
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            ret['test_F'], ret['test_subs'] = self._do_e_step(test_data, test_states, model,
-                                                              self.N_test)
+            ret["test_F"], ret["test_subs"] = self._do_e_step(
+                test_data, test_states, model, self.N_test
+            )
 
         return ret
 
@@ -107,13 +115,12 @@ class Trainer:
         # Training #
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
-            F = to.tensor(0.)
+            F = to.tensor(0.0)
             subs = to.tensor(0)
             model.init_epoch()
             for idx, batch in train_data:
                 model.init_batch()
-                subs += train_states.update(idx, batch,
-                                            lpj_fn, sort_by_lpj=model.sorted_by_lpj)
+                subs += train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
@@ -121,13 +128,13 @@ class Trainer:
             model.update_param_epoch()
             all_reduce(F)
             all_reduce(subs)
-            ret_dict['train_F'] = F.item() / self.N_train
-            ret_dict['train_subs'] = subs.item() / self.N_train
+            ret_dict["train_F"] = F.item() / self.N_train
+            ret_dict["train_subs"] = subs.item() / self.N_train
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
             res = self._do_e_step(test_data, test_states, model, self.N_test)
-            ret_dict['test_F'], ret_dict['test_subs'] = res
+            ret_dict["test_F"], ret_dict["test_subs"] = res
 
         return ret_dict

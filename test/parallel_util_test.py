@@ -13,23 +13,23 @@ from collections import namedtuple
 
 @pytest.fixture(scope="module")
 def setup(request):
-    if tvem.get_run_policy() == 'seq':
+    if tvem.get_run_policy() == "seq":
         rank, n_procs = 0, 1
     else:
-        assert tvem.get_run_policy() == 'mpi'
+        assert tvem.get_run_policy() == "mpi"
         init_processes()
         rank = to.distributed.get_rank()
         n_procs = to.distributed.get_world_size()
-    Setup = namedtuple('Setup', 'rank, n_procs')
+    Setup = namedtuple("Setup", "rank, n_procs")
     return Setup(rank, n_procs)
 
 
 @pytest.mark.mpi
 def test_scatter2processes(setup):
-    t = to.arange(setup.n_procs*2).reshape(setup.n_procs, 2)
+    t = to.arange(setup.n_procs * 2).reshape(setup.n_procs, 2)
     my_t = scatter2processes(t)
     assert my_t.shape == (1, 2)
-    assert to.allclose(my_t, to.arange(2) + setup.rank*2)
+    assert to.allclose(my_t, to.arange(2) + setup.rank * 2)
 
 
 @pytest.mark.mpi
@@ -42,7 +42,7 @@ def test_all_reduce(setup):
 @pytest.mark.gpu
 @pytest.mark.mpi
 def test_device(setup):
-    if 'TVEM_GPU' in os.environ:
-        assert tvem.get_device().type == 'cuda'
+    if "TVEM_GPU" in os.environ:
+        assert tvem.get_device().type == "cuda"
     else:
-        assert tvem.get_device() == to.device('cpu')
+        assert tvem.get_device() == to.device("cpu")

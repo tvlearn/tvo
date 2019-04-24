@@ -4,7 +4,8 @@
 
 from coverage import coverage
 import sys
-assert len(sys.argv) == 2, f'Usage: {sys.argv[0]} <output directory>'
+
+assert len(sys.argv) == 2, f"Usage: {sys.argv[0]} <output directory>"
 
 cov = coverage()
 cov.load()
