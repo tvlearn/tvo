@@ -13,7 +13,7 @@ fi
 
 COV_RANK=${1-0} # $1 if present, 0 otherwise
 if [[ $OMPI_COMM_WORLD_RANK -eq $COV_RANK ]]; then
-   pytest --cov=tvem --cov-append -v -m mpi test
+   pytest -x --cov=tvem --cov-append -v -m mpi test
 else
-   pytest -m mpi test > /dev/null
+   pytest -q -x -m mpi test
 fi
