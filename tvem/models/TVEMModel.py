@@ -151,6 +151,8 @@ def check_theta(theta_new: Dict[str, Tensor], policy: Dict[str, Tensor]):
     :param theta_new: Dictionary containing new model parameters
     :param policy: Policy dictionary bounds and replacements for invalid values
     """
+    assert set(theta_new.keys()) == set(policy.keys()), 'theta_new and policy must have same keys'
+
     rank = dist.get_rank() if dist.is_initialized() else 0
 
     for key, val in policy.items():
