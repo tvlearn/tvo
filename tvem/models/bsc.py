@@ -35,10 +35,8 @@ class BSC(TVEMModel):
             "my_Wq": to.empty((H, H), dtype=dtype, device=device),
             "my_pies": to.empty(H, dtype=dtype, device=device),
             "my_sigma": to.empty(1, dtype=dtype, device=device),
-            "pil_bar_cuda": to.empty(H, dtype=dtype, device=device),
-            "pil_bar_cpu": to.empty(H, dtype=dtype, device=to.device('cpu')),
-            "WT_cuda": to.empty((H, D), dtype=dtype, device=device),
-            "WT_cpu": to.empty((H, D), dtype=dtype, device=to.device('cpu')),
+            "pil_bar": to.empty(H, dtype=dtype, device=device),
+            "WT": to.empty((H, D), dtype=dtype, device=device),
             "batch_Wbar": to.empty((batch_size, S+Snew, D), dtype=dtype, device=device),
             "batch_s_pjc": to.empty((batch_size, H), dtype=dtype, device=device),
             "batch_Wp": to.empty((batch_size, D, H), dtype=dtype, device=device),
@@ -111,14 +109,9 @@ class BSC(TVEMModel):
         tmp["my_pies"].fill_(0.)
         tmp["my_sigma"].fill_(0.)
 
-        tmp["pil_bar_cuda"][:] = to.log(
-            theta["pies"]/(1.-theta["pies"]))
-        tmp["pil_bar_cpu"][:] = tmp["pil_bar_cuda"].to(
-            device=to.device('cpu'))
+        tmp["pil_bar"][:] = to.log(theta["pies"]/(1.-theta["pies"]))
 
-        tmp["WT_cuda"][:, :] = theta["W"].t()
-        tmp["WT_cpu"][:, :] = tmp["WT_cuda"].to(
-            device=to.device('cpu'))
+        tmp["WT"][:, :] = theta["W"].t()
 
         tmp["pre1"] = -1./2./theta["sigma"]/theta["sigma"]
 
@@ -144,10 +137,9 @@ class BSC(TVEMModel):
         sorted_by_lpj = self.sorted_by_lpj
 
         batch_size, S, _ = states.shape
-        device_type = states.device.type
 
-        pil_bar = tmp['pil_bar_%s' % device_type]
-        WT = tmp['WT_%s' % device_type]
+        pil_bar = tmp['pil_bar']
+        WT = tmp['WT']
         pre1 = tmp['pre1']
         indS_filled = tmp["indS_filled"]
 
