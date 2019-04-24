@@ -133,9 +133,12 @@ class NoisyOR(TVEMModel):
         N = batch.shape[0]
         # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
         deltaY = (batch.any(dim=1) == 0).type_as(states.lpj)
+        B = -to.max(states.lpj[idx], dim=1, keepdim=True)[0]
+        to.clamp(B, -80, 80, out=B)
         F = N * to.sum(to.log(1 - pi))\
-            + to.sum(to.log(to.sum(to.exp(states.lpj[idx]) + self.eps, dim=1) + deltaY))
-        assert not (to.isnan(F) or to.isinf(F)), 'free energy is nan!'
+            + to.sum(to.log(to.sum(to.exp(states.lpj[idx] + B) + self.eps, dim=1)
+                     + to.exp(B[:, 0]) * deltaY) - B[:, 0])
+        assert not (to.isnan(F) or to.isinf(F)), f'free energy is invalid!'
         return F.item()
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
