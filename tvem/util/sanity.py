@@ -16,9 +16,9 @@ def fix_infinite(values: Tensor, replacement: Union[float, Tensor], name: str = 
     """
     mask_infinite = (to.isnan(values) | to.isinf(values))
     if mask_infinite.any():
-        if type(replacement) == float:
+        if isinstance(replacement, float):
             values[mask_infinite] = replacement
-        elif type(replacement) == Tensor:
+        elif isinstance(replacement, Tensor):
             values[mask_infinite] = replacement[mask_infinite]
         if name is not None:
             print("Sanity check: Replaced infinite entries of %s." % name)
@@ -33,17 +33,17 @@ def fix_bounds(values: Tensor, lower: Union[float, Tensor] = None,
     :param name: Name of input tensor (optional).
     """
     if (lower is not None) and (values < lower).any():
-        if type(lower) == float:
+        if isinstance(lower, float):
             to.clamp(input=values, min=lower, out=values)
-        elif type(lower) == Tensor:
+        elif isinstance(lower, Tensor):
             to.max(input=lower, other=values, out=values)
         if name is not None:
             print("Sanity check: Reset lower bound of %s" % name)
 
     if (upper is not None) and (values >= upper).any():
-        if type(upper) == float:
+        if isinstance(upper, float):
             to.clamp(input=values, max=upper, out=values)
-        elif type(upper) == Tensor:
+        elif isinstance(upper, Tensor):
             to.min(input=upper, other=values, out=values)
         if name is not None:
             print("Sanity check: Reset upper bound of %s" % name)
