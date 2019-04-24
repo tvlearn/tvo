@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from torch import Tensor
 import torch.distributed as dist
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 import tvem
 from tvem.util.parallel import broadcast
 
@@ -145,7 +145,7 @@ class TVEMModel(ABC):
         pass  # pragma: no cover
 
 
-def check_theta(theta_new: Dict[str, Tensor], policy: Dict[str, Tensor]):
+def check_theta(theta_new: Dict[str, Tensor], policy: Dict[str, List[Tensor]]):
     """Perform sanity check of values in theta dict according to policy.
 
     :param theta_new: Dictionary containing new model parameters
