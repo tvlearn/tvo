@@ -62,8 +62,8 @@ class BSC(TVEMModel):
         eps, inf = 1.e-5, math.inf
         self.policy = {
             'W': [None, to.full_like(theta['W'], -inf), to.full_like(theta['W'], inf)],
-            'pies': [None, to.full_like(theta['pies'], eps), to.full_like(theta['W'], 1.-eps)],
-            'sigma': [None, to.full_like(theta['sigma'], eps), to.full_like(theta['W'], inf)]
+            'pies': [None, to.full_like(theta['pies'], eps), to.full_like(theta['pies'], 1.-eps)],
+            'sigma': [None, to.full_like(theta['sigma'], eps), to.full_like(theta['sigma'], inf)]
         }
 
         super().__init__(theta=theta)
