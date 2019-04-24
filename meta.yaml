@@ -1,0 +1,28 @@
+package:
+  name: tvem
+  version: 0.1
+
+source:
+  path: .
+
+build:
+  number: 0
+  noarch: python
+  script: python -m pip install --no-deps --ignore-installed .
+
+requirements:
+  host:
+    - python
+    - setuptools
+  run:
+    - python=3
+    - numpy
+    - pytorch=1
+    - torchvision
+    - cudatoolkit=10.0
+    - matplotlib
+    - h5py
+
+test:
+  imports:
+    - tvem
