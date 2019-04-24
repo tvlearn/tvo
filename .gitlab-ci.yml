@@ -12,6 +12,7 @@ test:
   stage: test
   only:
      - master
+     - tags
      - merge_requests
   script:
     # static checkers
@@ -33,7 +34,7 @@ test:
 conda:
   stage: deploy
   only:
-    - conda_packaging
+    - tags
   script:
     - anaconda login --username $ANACONDA_USER --password $ANACONDA_PASSWORD
     - conda build -c pytorch -c conda-forge .
@@ -44,6 +45,7 @@ pages:
   stage: deploy
   only:
     - master
+    - tags
   script:
     - sphinx-build docs public
     - python .ci_scripts/make_coverage_badge.py public/cov_badge.svg
