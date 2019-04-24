@@ -174,7 +174,7 @@ class _TrainingAndOrValidation(Experiment):
             self._log_epoch(logger, d)
 
         # log initial model parameters
-        logger.append(**self.model.theta)
+        logger.append(theta=self.model.theta)
 
         # EM steps
         for e in range(epochs):
@@ -208,7 +208,7 @@ class _TrainingAndOrValidation(Experiment):
             states_and_lpj_dict = {f"{log_kind}_states": states.K, f"{log_kind}_lpj": states.lpj}
             logger.set(**states_and_lpj_dict)
 
-        logger.append(**self.model.theta)
+        logger.append(theta=self.model.theta)
         logger.write()
 
 

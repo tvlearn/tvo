@@ -6,7 +6,7 @@ import torch as to
 from torch.utils.data import TensorDataset, DataLoader
 import torch.distributed as dist
 import h5py
-from typing import Dict, Iterable
+from typing import Union, Dict, Iterable
 from os import path, rename
 
 
@@ -46,29 +46,44 @@ class H5Logger:
         self._data: Dict[str, to.Tensor] = {}
         self._blacklist = blacklist
 
-    def append(self, **kwargs):
-        """Append input arguments to log. All arguments must be torch.Tensors."""
+    def append(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
+        """Append arguments to log. Arguments can be torch.Tensors or dictionaries thereof.
+
+        The output HDF5 file will contain one dataset for each of the tensors and one group
+        for each of the dictionaries.
+        """
         if self._rank != 0:
             return
 
-        data = self._data
+        def append_to_dict(d: Dict[str, to.Tensor], k: str, t: to.Tensor):
+            """Append tensor t to dict d at key k."""
+            if k not in d:
+                # the extra 0-sized dimension will be used for concatenation
+                d[k] = to.empty((0, *t.shape))
+            assert d[k].shape[1:] == t.shape, f"variable {k} changed shape between appends"
+            d[k] = to.cat((d[k].to(t), t.unsqueeze(0)))
 
+        data = self._data
         for k, v in kwargs.items():
             if k in self._blacklist:
                 continue
 
-            assert isinstance(v, to.Tensor), "all arguments must be torch.Tensors"
-
-            if k not in data:
-                data[k] = v.unsqueeze(0)  # extra dim will be used for concatenation
+            if isinstance(v, to.Tensor):
+                append_to_dict(data, k, v)
+            elif isinstance(v, dict):
+                if k not in data:
+                    data[k] = {}
+                for name, tensor in v.items():
+                    append_to_dict(data[k], name, tensor)
             else:
-                assert data[k].shape[1:] == v.shape, f"variable {k} changed shape between appends"
-                data[k] = to.cat((data[k], v.unsqueeze(0)))
+                raise TypeError("Arguments must be torch.Tensors or dictionaries thereof.")
 
-    def set(self, **kwargs):
-        """Set keyword arguments to desired value in output file.
+    def set(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
+        """Set or reset arguments to desired value in log.
 
-        All arguments must be torch.Tensors.
+        Arguments can be torch.Tensors or dictionaries thereof.
+        The output HDF5 file will contain one dataset for each of the tensors and one group
+        for each of the dictionaries.
         """
         if self._rank != 0:
             return
@@ -77,7 +92,9 @@ class H5Logger:
             if k in self._blacklist:
                 continue
 
-            assert isinstance(v, to.Tensor), "all arguments must be torch.Tensors"
+            if not isinstance(v, to.Tensor) and not isinstance(v, dict):
+                raise TypeError("Arguments must be torch.Tensors or dictionaries thereof.")
+
             self._data[k] = v
 
     def write(self):
@@ -96,5 +113,10 @@ class H5Logger:
 
         f = h5py.File(fname, "w")
         for k, v in self._data.items():
-            f.create_dataset(k, data=v.cpu())
+            if isinstance(v, to.Tensor):
+                f.create_dataset(k, data=v.cpu())
+            else:  # dictionary
+                g = f.create_group(k)
+                for name, tensor in v.items():
+                    g.create_dataset(name, data=tensor.cpu())
         f.close()
