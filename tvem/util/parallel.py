@@ -169,3 +169,9 @@ def all_reduce(tensor: Tensor, op=dist.ReduceOp.SUM):
     """Equivalent to torch's all_reduce if tvem.get_run_policy() is 'mpi', no-op otherwise."""
     if tvem.get_run_policy() == 'mpi':
         dist.all_reduce(tensor, op)
+
+
+def broadcast(tensor: Tensor, src: int = 0):
+    """Equivalent to torch's broadcast if tvem.get_run_policy() is 'mpi', no-op otherwise."""
+    if tvem.get_run_policy() == 'mpi':
+        dist.broadcast(tensor, src)
