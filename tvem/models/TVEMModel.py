@@ -11,6 +11,7 @@ from tvem.variational import TVEMVariationalStates  # type: ignore
 from typing import Dict, Optional, Tuple, List
 import tvem
 from tvem.util.parallel import broadcast
+from tvem.util.sanity import fix_infinite, fix_bounds
 
 
 class TVEMModel(ABC):
@@ -145,19 +146,19 @@ class TVEMModel(ABC):
         pass  # pragma: no cover
 
 
-def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List[Tensor]]):
+def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List]):
     """Perform sanity check of values in theta dict according to policy.
 
     :param theta: Dictionary containing model parameters
     :param policy: Policy dictionary. Must have same keys as theta.
 
-    Each key in policy contains a list with three tensors referred to as replacement,
-    low_bound and up_bound. These have the same shape as the corresponding tensors in the
-    theta dictionary. For each key
+    Each key in policy contains a list with three floats/tensors referred to as replacement,
+    low_bound and up_bound. If tensors are provided these must have the same shape as the
+    corresponding tensors in the theta dictionary. For each key
     - infinite values in tensors from the theta dictionary are replaced with values from the
-    corresponding replacement tensor and
-    - the values in tensors from the theta dictionary are clamped to values from the corresponding
-    low_bound and up_bound tensors.
+    corresponding entry in replacement and
+    - the values in tensors from the theta dictionary are clamped to the corresponding values
+    of low_bound and up_bound.
     """
     assert set(theta.keys()) == set(policy.keys()), 'theta and policy must have same keys'
 
@@ -168,21 +169,8 @@ def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List[Tensor]]):
         if rank == 0:
             replacement, low_bound, up_bound = val
 
-            if to.isnan(new_val).any():
-                new_val[to.isnan(new_val)] = replacement[to.isnan(new_val)]
-                print("Sanity check: Replaced nan entries of %s." % key)
-
-            if to.isinf(new_val).any():
-                new_val[to.isinf(new_val)] = replacement[to.isinf(new_val)]
-                print("Sanity check: Replaced infinite entries of %s." % key)
-
-            if (new_val < low_bound).any():
-                to.max(input=low_bound, other=new_val, out=new_val)
-                print("Sanity check: Reset lower bound of %s" % key)
-
-            if (new_val >= up_bound).any():
-                to.min(input=up_bound, other=new_val, out=new_val)
-                print("Sanity check: Reset upper bound of %s" % key)
+            fix_infinite(new_val, replacement, key)
+            fix_bounds(new_val, low_bound, up_bound, key)
 
         broadcast(new_val)
         theta[key] = new_val
