@@ -131,10 +131,38 @@ def exp_conf(precision, batch_size, warmup_Esteps):
     return ExpConfig(batch_size=batch_size, precision=precision, warmup_Esteps=warmup_Esteps)
 
 
+def check_file(fname, *prefixes: str):
+    rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    if rank != 0:
+        return
+
+    f = h5py.File(fname, "r")
+    eps = 1e-5  # to tolerate a bit of noise in floating point calculations
+
+    for prefix in prefixes:
+        F = to.tensor(f[prefix + "_F"])
+        subs = to.tensor(f[prefix + "_subs"])
+
+        assert subs.shape[0] == F.shape[0]
+        if prefix == "test":
+            assert np.all(np.diff(F) >= -eps)
+        else:
+            warmup_Esteps: int = f["warmup_Esteps"][...]
+            assert np.all(np.diff(F[:warmup_Esteps]) >= -eps)
+
+        K = f[prefix + "_states"]
+        lpj = f[prefix + "_lpj"]
+        assert K.shape[:2] == lpj.shape
+
+    assert "theta" in f and len(f["theta"].keys()) > 0
+    f.close()
+
+
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
     exp.run(10)
+    check_file(exp_conf.output, "train")
 
 
 def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
@@ -143,9 +171,11 @@ def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_a
         exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
     )
     exp.run(10)
+    check_file(exp_conf.output, "train", "valid")
 
 
 def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = _Testing(exp_conf, estep_conf, model, data_file=input_file)
     exp.run(10)
+    check_file(exp_conf.output, "test")
