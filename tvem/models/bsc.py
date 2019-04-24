@@ -12,7 +12,7 @@ import tvem
 from tvem.util import get
 from tvem.util.parallel import pprint, all_reduce
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates, mean_posterior
-from tvem.models.TVEMModel import TVEMModel, check_theta
+from tvem.models.TVEMModel import TVEMModel, fix_theta
 
 
 class BSC(TVEMModel):
@@ -254,7 +254,7 @@ class BSC(TVEMModel):
         policy['W'][0] = Wold_noisy
         policy['pies'][0] = theta['pies']
         policy['sigma'][0] = theta['sigma']
-        check_theta(theta_new, policy)
+        fix_theta(theta_new, policy)
 
         for key in theta:
             theta[key] = theta_new[key]

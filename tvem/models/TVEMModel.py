@@ -145,7 +145,7 @@ class TVEMModel(ABC):
         pass  # pragma: no cover
 
 
-def check_theta(theta: Dict[str, Tensor], policy: Dict[str, List[Tensor]]):
+def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List[Tensor]]):
     """Perform sanity check of values in theta dict according to policy.
 
     :param theta: Dictionary containing model parameters
