@@ -12,7 +12,7 @@ import tvem
 from tvem.util import get
 from tvem.util.parallel import pprint, all_reduce
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates, mean_posterior
-from tvem.models.TVEMModel import TVEMModel
+from tvem.models.TVEMModel import TVEMModel, check_theta
 
 
 class BSC(TVEMModel):
@@ -59,6 +59,13 @@ class BSC(TVEMModel):
             'sigma': sigma_init if sigma_init is not None else to.tensor([1., ],
                                                                          dtype=dtype,
                                                                          device=device)}
+        eps, inf = 1.e-5, math.inf
+        self.policy = {
+            'W': [None, to.full_like(theta['W'], -inf), to.full_like(theta['W'], inf)],
+            'pies': [None, to.full_like(theta['pies'], eps), to.full_like(theta['W'], 1.-eps)],
+            'sigma': [None, to.full_like(theta['sigma'], eps), to.full_like(theta['W'], inf)]
+        }
+
         super().__init__(theta=theta)
 
     @property
@@ -217,6 +224,7 @@ class BSC(TVEMModel):
         conf = self.conf
         theta = self.theta
         tmp = self.tmp
+        policy = self.policy
 
         N, H = get(conf, *('N', 'H'))
         my_pies, my_Wp, my_Wq, my_sigma = get(
@@ -230,33 +238,23 @@ class BSC(TVEMModel):
         all_reduce(my_sigma)
 
         # Calculate updated W
+        Wold_noisy = theta['W'] + to.randn_like(theta['W'])
         try:
-            # to.gels assumes full-commrank matrices
             theta_new['W'] = to.gels(my_Wp.t(), my_Wq)[0].t()
-            if to.isnan(theta_new['W']).any() or to.isinf(theta_new['W']).any():
-                pprint("Infinite Wnew. Will not update W but add some noise instead.")
-                W_old = theta['W']
-                theta_new['W'] = W_old + to.randn(
-                    W_old.shape, dtype=W_old.dtype, device=W_old.device)
         except RuntimeError:
-            pprint("Infinite Wnew. Will not update W but add some noise instead.")
-            W_old = theta['W']
-            theta_new['W'] = W_old + \
-                to.randn(W_old.shape, dtype=W_old.dtype, device=W_old.device)
+            pprint("Inversion error. Will not update W but add some noise instead.")
+            theta_new['W'] = Wold_noisy
 
         # Calculate updated pi
         theta_new['pies'] = my_pies / N
-        if to.isnan(theta_new['pies']).any() or to.isinf(theta_new['pies']).any():
-            pprint("Infinite pies. Will not update pies.")
-            theta_new['pies'] = theta['pies']
-        eps = 1.e-5
-        theta_new['pies'][theta_new['pies'] <= eps] = eps
 
         # Calculate updated sigma
         theta_new['sigma'] = to.sqrt(my_sigma / N / ((H / 2)**2))
-        if to.isnan(theta_new['sigma']).any() or to.isinf(theta_new['sigma']).any():
-            pprint("Infinite sigma. Will not update sigma.")
-            theta_new['sigma'] = theta['sigma']
+
+        policy['W'][0] = Wold_noisy
+        policy['pies'][0] = theta['pies']
+        policy['sigma'][0] = theta['sigma']
+        check_theta(theta_new, policy)
 
         for key in theta:
             theta[key] = theta_new[key]
