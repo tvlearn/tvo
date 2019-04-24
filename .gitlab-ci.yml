@@ -15,6 +15,7 @@ test:
      - merge_requests
   script:
     # static checkers
+    - black --check -q . || { black --diff -q . && false; }
     - pylama --options .config/pylama.ini
     - mypy --ignore-missing-imports tvem test
     # CPU tests
