@@ -30,6 +30,16 @@ test:
     paths:
       - .coverage
 
+conda:
+  stage: deploy
+  only:
+    - conda_packaging
+  script:
+    - anaconda login --username $ANACONDA_USER --password $ANACONDA_PASSWORD
+    - conda build -c pytorch -c conda-forge .
+    - anaconda upload -u mloldenburg $(conda build --output .)
+    - anaconda logout
+
 pages:
   stage: deploy
   only:
