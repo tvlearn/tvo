@@ -174,11 +174,11 @@ def get_EA(parent_selection: str, mutation: str) -> Tuple:
     # input validation
     valid_parent_sel = parent_sel_dict.keys()
     if parent_selection not in valid_parent_sel:  # pragma: no cover
-        raise RuntimeError(f'Parent selection "{parent_selection}" \
+        raise ValueError(f'Parent selection "{parent_selection}" \
 not supported. Valid options: {list(valid_parent_sel)}')
     valid_mutations = mutation_dict.keys()
     if mutation not in valid_mutations:  # pragma: no cover
-        raise RuntimeError(f'Mutation operator "{mutation}" not \
+        raise ValueError(f'Mutation operator "{mutation}" not \
 supported. Valid options: {list(valid_mutations)}')
 
     return (parent_sel_dict[parent_selection], mutation_dict[mutation])

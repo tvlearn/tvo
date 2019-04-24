@@ -24,7 +24,7 @@ def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMV
     if isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, dtype)
     else:
-        raise RuntimeError('Unimplemented')
+        raise NotImplementedError()
 
 
 def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
@@ -140,7 +140,7 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
         if dataset in f.keys():
             break
     else:  # pragma: no cover
-        raise RuntimeError(f'File "{fname}" does not contain any of keys {possible_keys}')
+        raise ValueError(f'File "{fname}" does not contain any of keys {possible_keys}')
     if rank == 0:
         data = to.tensor(f[dataset], device=tvem.get_device())
         dtype = data.dtype
