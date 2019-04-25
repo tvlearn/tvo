@@ -3,19 +3,16 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
+from tvem.exp import ExpConfig, EEMConfig, Training
 from tvem.models import NoisyOR, BSC
 from tvem.util.parallel import init_processes, broadcast
 from tvem.util import get
 import tvem
-import os
 import numpy as np
 import h5py
 import pytest
 import torch as to
 import torch.distributed as dist
-from collections import namedtuple
-
 
 gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
 
