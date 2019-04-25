@@ -1,6 +1,6 @@
 package:
   name: tvem
-  version: 0.1
+  version: 0.1.0
 
 about:
   home: https://gitlab.com/mloldenburg/tvem
