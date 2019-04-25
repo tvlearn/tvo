@@ -152,7 +152,8 @@ class _TrainingAndOrValidation(Experiment):
 
         # warm-up E-steps
         for e in range(self.warmup_Esteps):
-            trainer.e_step()
+            d = trainer.e_step()
+            self._log_epoch(logger, d, prefix="warmup")
 
         # log initial model parameters
         logger.append(**self.model.theta)
