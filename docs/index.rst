@@ -8,6 +8,7 @@ TVEM user guide
    :caption: Contents:
 
    tvem
+   tvem.exp
    tvem.models
    tvem.variational
    tvem.util
