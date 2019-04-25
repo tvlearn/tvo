@@ -3,16 +3,19 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import Training, Testing as _Testing
-from tvem.models import BSC
-from tvem.util.parallel import init_processes
+from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
+from tvem.models import NoisyOR, BSC
+from tvem.util.parallel import init_processes, broadcast
 from tvem.util import get
 import tvem
+import os
 import numpy as np
 import h5py
 import pytest
 import torch as to
 import torch.distributed as dist
+from collections import namedtuple
+
 
 gpu_and_mpi_marks = pytest.param(tvem.get_device().type,
                                  marks=(pytest.mark.gpu, pytest.mark.mpi))
@@ -62,21 +65,32 @@ def add_gpu_and_mpi_marks():
 @pytest.fixture(scope='module')
 def hyperparams():
     """Return an object containing hyperparametrs N,D,S,H as data members."""
-    class HyperParams:
-        dtype = to.float32
+    class BarsParams:
         N = 500
         H = 10
         D = (H // 2)**2
         S = 60
-        W_gt = generate_bars(H, bar_amp=10., dtype=dtype)
-        sigma_gt = to.ones((1,), dtype=dtype, device=tvem.get_device())
-        pies_gt = to.full((H,), 2./H, dtype=dtype, device=tvem.get_device())
-        batch_size = 1
-    return HyperParams
+        batch_size = 10
+        precision = to.float32
+    return BarsParams
 
 
-@pytest.fixture(scope='function', params=('BSC',))
-def model_and_data(request, hyperparams):
+@pytest.fixture(scope="module")
+def estep_conf(request, hyperparams):
+    return EEMConfig(
+        n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=2, crossover=False
+    )
+
+
+def get_eem_new_states(c: EEMConfig):
+    if c.crossover:
+        return c.n_parents * (c.n_parents - 1) * c.n_children * c.n_generations
+    else:
+        return c.n_parents * c.n_children * c.n_generations
+
+
+@pytest.fixture(scope='function', params=('BSC', 'NoisyOR'))
+def model_and_data(request, hyperparams, estep_conf):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
@@ -85,21 +99,58 @@ def model_and_data(request, hyperparams):
         init_processes()
     rank = dist.get_rank() if dist.is_initialized() else 0
 
-    dtype, N, S, D, H, batch_size = get(hyperparams.__dict__, 'dtype', 'N', 'S', 'D',
-                                        'H', 'batch_size')
+    precision, N, S, D, H, batch_size = get(hyperparams.__dict__, 'precision', 'N', 'S', 'D',
+                                            'H', 'batch_size')
+
     if request.param == 'BSC':
 
-        conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': 6,
-                'batch_size': batch_size, 'dtype': dtype}
-        model = BSC(conf, hyperparams.W_gt, hyperparams.sigma_gt, hyperparams.pies_gt)
+        W_gt = generate_bars(H, bar_amp=10., dtype=precision)
+        sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
+        pies_gt = to.full((H,), 2. / H, dtype=precision, device=tvem.get_device())
+
+        W_init = to.rand((D, H), dtype=precision, device=tvem.get_device())
+        broadcast(W_init)
+
+        sigma_init = to.tensor([1.0], dtype=precision, device=tvem.get_device())
+        pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
+
+        conf = {'N': N, 'D': D, 'H': H, 'S': S, 'Snew': get_eem_new_states(estep_conf),
+                'batch_size': batch_size, 'dtype': precision}
+        model = BSC(conf, W_gt, sigma_gt, pies_gt)
 
         fname = 'bars_test_data_bsc.h5'
 
         if rank == 0:
             f = h5py.File(fname, mode='w')
             data = f.create_dataset('data', (N, D), dtype=np.float32)
-            data[:] = model.generate_data(N)['data']
+            data[:] = model.generate_data(N)['data'].cpu()
             f.close()
+
+        model.theta['W'] = W_init
+        model.theta['sigma'] = sigma_init
+        model.theta['pies'] = pies_init
+
+    elif request.param == 'NoisyOR':
+
+        W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, dtype=precision)
+        pies_gt = to.full((H,), 2. / H, dtype=precision, device=tvem.get_device())
+
+        W_init = to.rand((D, H), dtype=precision, device=tvem.get_device())
+        broadcast(W_init)
+        pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
+
+        model = NoisyOR(H=H, D=D, W_init=W_gt, pi_init=pies_gt, precision=precision)
+
+        fname = 'bars_test_data_nor.h5'
+
+        if rank == 0:
+            f = h5py.File(fname, mode='w')
+            data = f.create_dataset('data', (N, D), dtype=np.uint8)
+            data[:] = model.generate_data(N)['data'].cpu()
+            f.close()
+
+        model.theta['W'] = W_init
+        model.theta['pies'] = pies_init
 
     if tvem.get_run_policy() == 'mpi':
         dist.barrier()
@@ -107,22 +158,12 @@ def model_and_data(request, hyperparams):
     return model, fname
 
 
-def test_training(model_and_data, hyperparams, add_gpu_and_mpi_marks):
+@pytest.fixture(scope="module")
+def exp_conf(hyperparams):
+    return ExpConfig(batch_size=hyperparams.batch_size, precision=hyperparams.precision)
+
+
+def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
-    exp = Training({'n_states': hyperparams.S, 'dtype': hyperparams.dtype}, model=model,
-                   train_data_file=input_file)
-    exp.run(5)
-
-
-def test_training_and_validation(model_and_data, hyperparams, add_gpu_and_mpi_marks):
-    model, input_file = model_and_data
-    exp = Training({'n_states': hyperparams.S, 'dtype': hyperparams.dtype}, model=model,
-                   train_data_file=input_file, val_data_file=input_file)
-    exp.run(5)
-
-
-def test_testing(model_and_data, hyperparams, add_gpu_and_mpi_marks):
-    model, input_file = model_and_data
-    exp = _Testing({'n_states': hyperparams.S, 'dtype': hyperparams.dtype}, model=model,
-                   data_file=input_file)
-    exp.run(5)
+    exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
+    exp.run(10)
