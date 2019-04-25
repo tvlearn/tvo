@@ -6,7 +6,7 @@ import torch as to
 from torch.utils.data import TensorDataset, DataLoader
 import torch.distributed as dist
 import h5py
-from typing import Dict
+from typing import Dict, Iterable
 from os import path, rename
 
 
@@ -32,10 +32,11 @@ class TVEMDataLoader(DataLoader):
 
 
 class H5Logger:
-    def __init__(self, output: str):
+    def __init__(self, output: str, blacklist: Iterable[str] = []):
         """Utility class to iteratively write to HD5 files.
 
         :param output: Output filename or file path. Overwritten if it already exists.
+        :param blacklist: Variables in `blacklist` are ignored and never get logged.
 
         If tvem.get_run_policy() is 'mpi', operations on H5Logger are no-op for all processes
         except for the process with rank 0.
@@ -43,6 +44,7 @@ class H5Logger:
         self._rank = dist.get_rank() if dist.is_initialized() else 0
         self._fname = output
         self._data: Dict[str, to.Tensor] = {}
+        self._blacklist = blacklist
 
     def append(self, **kwargs):
         """Append input arguments to log. All arguments must be torch.Tensors."""
@@ -52,6 +54,9 @@ class H5Logger:
         data = self._data
 
         for k, v in kwargs.items():
+            if k in self._blacklist:
+                continue
+
             assert isinstance(v, to.Tensor), "all arguments must be torch.Tensors"
 
             if k not in data:
@@ -69,6 +74,9 @@ class H5Logger:
             return
 
         for k, v in kwargs.items():
+            if k in self._blacklist:
+                continue
+
             assert isinstance(v, to.Tensor), "all arguments must be torch.Tensors"
             self._data[k] = v
 

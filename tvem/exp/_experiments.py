@@ -14,7 +14,7 @@ import tvem
 
 import math
 import h5py
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Iterable
 import torch as to
 import torch.distributed as dist
 
@@ -53,7 +53,8 @@ class ExpConfig:
         shuffle: bool = True,
         drop_last: bool = False,
         warmup_Esteps: int = 0,
-        output="tvem_exp.h5",
+        output: str = "tvem_exp.h5",
+        log_blacklist: Iterable[str] = [],
     ):
         """Configuration object for Experiment classes.
 
@@ -67,6 +68,18 @@ class ExpConfig:
                           divisible by the batch size. See also torch's `DataLoader docs`_.
         :param warmup_Esteps: Number of warm-up E-steps to perform.
         :param output: Name or path of output HDF5 file. It is overwritten if it already exists.
+        :param log_blacklist: By default, experiments log all available quantities. These are:
+                              - "{train,valid,test}_F": one or more of training/validation/test
+                                free energy, depending on the experiment
+                              - "{train,valid,test}_subs": average variational state substitutions
+                                per datapoint (which ones are available depends on the experiment)
+                              - "{train,valid,test}_states": latest snapshot of variational states
+                                                             per datapoint
+                              - "{train,valid,test}_lpj": latest snapshot of log-pseudo-joints
+                                                          per datapoint
+                              - "theta": a group containing logs of whatever model.theta contains
+                              If one of these names appears in `log_blacklist`, the corresponing
+                              quantity will not be logged.
         """
         assert precision in (to.float32, to.float64), "Precision must be one of torch.float{32,64}"
         self.batch_size = batch_size
@@ -75,6 +88,7 @@ class ExpConfig:
         self.drop_last = drop_last
         self.warmup_Esteps = warmup_Esteps
         self.output = output
+        self.log_blacklist = log_blacklist
 
 
 class Experiment(ABC):
@@ -103,6 +117,7 @@ class _TrainingAndOrValidation(Experiment):
         self.model = model
         self.warmup_Esteps = conf.warmup_Esteps
         self.out_fname = conf.output
+        self.log_blacklist = conf.log_blacklist
 
         self.train_data = None
         self.train_states = None
@@ -148,7 +163,7 @@ class _TrainingAndOrValidation(Experiment):
         trainer = Trainer(
             self.model, self.train_data, self.train_states, self.test_data, self.test_states
         )
-        logger = H5Logger(self.out_fname)
+        logger = H5Logger(self.out_fname, blacklist=self.log_blacklist)
         logger.set(warmup_Esteps=to.tensor(self.warmup_Esteps))
 
         # warm-up E-steps
