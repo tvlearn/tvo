@@ -152,6 +152,8 @@ class _TrainingAndOrValidation(Experiment):
         logger.set(warmup_Esteps=to.tensor(self.warmup_Esteps))
 
         # warm-up E-steps
+        if self.warmup_Esteps > 0:
+            pprint("Warm-up E-steps")
         for e in range(self.warmup_Esteps):
             d = trainer.e_step()
             self._log_epoch(logger, d)
