@@ -149,11 +149,12 @@ class _TrainingAndOrValidation(Experiment):
             self.model, self.train_data, self.train_states, self.test_data, self.test_states
         )
         logger = H5Logger(self.out_fname)
+        logger.set(warmup_Esteps=to.tensor(self.warmup_Esteps))
 
         # warm-up E-steps
         for e in range(self.warmup_Esteps):
             d = trainer.e_step()
-            self._log_epoch(logger, d, prefix="warmup")
+            self._log_epoch(logger, d)
 
         # log initial model parameters
         logger.append(**self.model.theta)
@@ -164,33 +165,29 @@ class _TrainingAndOrValidation(Experiment):
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
             self._log_epoch(logger, d)
 
-    def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float], prefix=None):
+    def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float]):
         """Log F, subs, model.theta, states.K and states.lpj to file.
 
         :param logger: the logger for this run
         :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
-        :param prefix: optional prefix for the variables that will be logged to file
         """
         if self.train_data is not None:
-            self._log_epoch_helper(logger, epoch_results, prefix=prefix, data_kind="train")
+            self._log_epoch_helper(logger, epoch_results, data_kind="train")
 
         if self.test_data is not None:
             test_or_valid = "valid" if self.train_data is not None else "test"
-            self._log_epoch_helper(logger, epoch_results, prefix=prefix, data_kind=test_or_valid)
+            self._log_epoch_helper(logger, epoch_results, data_kind=test_or_valid)
 
         logger.append(**self.model.theta)
 
         logger.write()
 
-    def _log_epoch_helper(
-        self, logger: H5Logger, epoch_results: Dict[str, float], data_kind: str, prefix: str = None
-    ):
+    def _log_epoch_helper(self, logger: H5Logger, epoch_results: Dict[str, float], data_kind: str):
         """Append (F, subs) to logger, set (states.K, states.lpj).
 
         :param logger: the logger for this run
         :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
         :param data_kind: one of 'train', 'valid' or 'test'
-        :param prefix: optional prefix for the variables that will be logged to file
         """
         train_or_test = "test" if data_kind == "valid" else data_kind
         F, subs = get(epoch_results, f"{train_or_test}_F", f"{train_or_test}_subs")
@@ -198,16 +195,12 @@ class _TrainingAndOrValidation(Experiment):
 
         pprint(f"\t{data_kind} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
 
-        prefix = prefix + "_" if prefix is not None else ""
-        F_and_subs_dict = {
-            f"{prefix}{data_kind}_F": to.tensor(F),
-            f"{prefix}{data_kind}_subs": to.tensor(subs),
-        }
+        F_and_subs_dict = {f"{data_kind}_F": to.tensor(F), f"{data_kind}_subs": to.tensor(subs)}
         logger.append(**F_and_subs_dict)
 
         states_and_lpj_dict = {
-            f"{prefix}{data_kind}_states": self.__dict__[f"{train_or_test}_states"].K,
-            f"{prefix}{data_kind}_lpj": self.__dict__[f"{train_or_test}_states"].lpj,
+            f"{data_kind}_states": self.__dict__[f"{train_or_test}_states"].K,
+            f"{data_kind}_lpj": self.__dict__[f"{train_or_test}_states"].lpj,
         }
         logger.set(**states_and_lpj_dict)
 
