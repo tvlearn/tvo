@@ -18,7 +18,7 @@ def pick_color(coverage):
 
 cov = coverage()
 cov.load()
-total = int(cov.report())
+total = round(cov.report())
 color = pick_color(total)
 
 badge_url = f"https://img.shields.io/badge/coverage-{total}%25-{color}.svg?style=flat-square"
