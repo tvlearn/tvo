@@ -2,6 +2,13 @@ package:
   name: tvem
   version: 0.1
 
+about:
+  home: https://gitlab.com/mloldenburg/tvem
+  license: Academic Free License v3.0
+  license_file: LICENSE
+  summary: Library for truncated variational expectation maximization
+  doc_url: https://mloldenburg.gitlab.io/tvem
+
 source:
   path: .
 
