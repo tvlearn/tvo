@@ -171,38 +171,28 @@ class _TrainingAndOrValidation(Experiment):
         :param logger: the logger for this run
         :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
         """
-        if self.train_data is not None:
-            self._log_epoch_helper(logger, epoch_results, data_kind="train")
+        for data_kind in "train", "test":
+            if data_kind + "_F" not in epoch_results:
+                continue
 
-        if self.test_data is not None:
-            test_or_valid = "valid" if self.train_data is not None else "test"
-            self._log_epoch_helper(logger, epoch_results, data_kind=test_or_valid)
+            # log_kind is one of "train", "valid" or "test"
+            # (while data_kind is one of "train" or "test")
+            log_kind = "valid" if data_kind == "test" and self.train_data is not None else data_kind
+
+            # log F and subs to stdout and file
+            F, subs = get(epoch_results, f"{data_kind}_F", f"{data_kind}_subs")
+            assert not (math.isnan(F) or math.isinf(F)), f"{log_kind} free energy is invalid!"
+            pprint(f"\t{log_kind} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
+            F_and_subs_dict = {f"{log_kind}_F": to.tensor(F), f"{log_kind}_subs": to.tensor(subs)}
+            logger.append(**F_and_subs_dict)
+
+            # log latest states and lpj to file (FIXME must gather K and lpj from all processes)
+            states = getattr(self, f"{data_kind}_states")
+            states_and_lpj_dict = {f"{log_kind}_states": states.K, f"{log_kind}_lpj": states.lpj}
+            logger.set(**states_and_lpj_dict)
 
         logger.append(**self.model.theta)
-
         logger.write()
-
-    def _log_epoch_helper(self, logger: H5Logger, epoch_results: Dict[str, float], data_kind: str):
-        """Append (F, subs) to logger, set (states.K, states.lpj).
-
-        :param logger: the logger for this run
-        :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
-        :param data_kind: one of 'train', 'valid' or 'test'
-        """
-        train_or_test = "test" if data_kind == "valid" else data_kind
-        F, subs = get(epoch_results, f"{train_or_test}_F", f"{train_or_test}_subs")
-        assert not (math.isnan(F) or math.isinf(F)), f"{data_kind} free energy is invalid!"
-
-        pprint(f"\t{data_kind} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
-
-        F_and_subs_dict = {f"{data_kind}_F": to.tensor(F), f"{data_kind}_subs": to.tensor(subs)}
-        logger.append(**F_and_subs_dict)
-
-        states_and_lpj_dict = {
-            f"{data_kind}_states": self.__dict__[f"{train_or_test}_states"].K,
-            f"{data_kind}_lpj": self.__dict__[f"{train_or_test}_states"].lpj,
-        }
-        logger.set(**states_and_lpj_dict)
 
 
 def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:
