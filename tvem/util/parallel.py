@@ -255,7 +255,7 @@ def gather_from_processes(
                 )
 
             dist.gather(tensor=my_data, gather_list=chunks, dst=dst)
-            print(chunks)
+
             if comm_rank == 0:
                 data = torch.cat(chunks)
                 tensors.append(data[:total_length])  # remove dummy rows again
