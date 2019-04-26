@@ -230,7 +230,7 @@ def gatherFROMprocesses(
             total_length = int(total_length)
 
             # no datapoints per process including dummy rows
-            local_length_ = int(torch.ceil(torch.tensor([float(total_length) / comm_size])))
+            local_length_ = math.ceil(total_length / comm_size)
             # determine number of and eventually add dummy rows for scatter/gather compatibility
             empty_length = local_length_ * comm_size - total_length
 
