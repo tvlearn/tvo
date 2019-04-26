@@ -48,13 +48,14 @@ def test_gather_from_processes(setup):
 @pytest.mark.mpi
 def test_gather_from_processes_uneven_chunks(setup):
     if setup.rank == setup.n_procs - 1:
-        my_t = (to.arange(4) + setup.rank * 2).view(2, 2)
+        my_t = (to.arange(2) + (setup.rank * 4))[None, :]
     else:
-        my_t = (to.arange(2) + setup.rank * 2)[None, :]
+        my_t = (to.arange(4) + (setup.rank * 4)).view(2, 2)
+
     t = gather_from_processes(my_t)
     if setup.rank == 0:
-        assert t.shape == (setup.n_procs + 1, 2)
-        assert to.allclose(t, to.arange((setup.n_procs + 1) * 2).view(setup.n_procs + 1, 2))
+        assert t.shape == (setup.n_procs * 2 - 1, 2)
+        assert to.allclose(t, to.arange(setup.n_procs * 4 - 2).view(setup.n_procs * 2 - 1, 2))
 
 
 @pytest.mark.mpi

@@ -189,7 +189,7 @@ def _append_dummy_rows(tensor: Tensor, to_add: int, comm_rank: int, comm_size: i
     :param tensor: Local MPI rank
     :param tensor: Size of MPI process group
     """
-    if comm_rank != comm_size - 1:
+    if comm_rank == comm_size - 1:
         tensor = torch.cat(
             (
                 tensor,
@@ -224,7 +224,6 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
 
             local_length = my_data.shape[0]
             other_length = tuple(my_data.shape[1:])
-
             total_length = torch.tensor([local_length])
             all_reduce(total_length)
             total_length = int(total_length)
@@ -232,7 +231,7 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
             # no datapoints per process including dummy rows
             local_length_ = math.ceil(total_length / comm_size)
             # determine number of and eventually add dummy rows for scatter/gather compatibility
-            empty_length = local_length_ - local_length
+            empty_length = local_length_ * comm_size - total_length
 
             chunks = []
             if comm_rank == 0:
@@ -252,9 +251,10 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
             )
 
             if comm_rank == 0:
-                if empty_length > 0:
-                    for r in range(comm_size - 1):
-                        chunks[r] = chunks[r][:-empty_length]  # remove dummy rows again
+                chunks[comm_size - 1] = chunks[comm_size - 1][
+                    : (local_length_ - empty_length)
+                ]  # remove dummy rows again
+                print(local_length)
                 data = torch.cat(chunks)
                 tensors.append(data)
 
