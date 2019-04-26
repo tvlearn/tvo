@@ -57,3 +57,8 @@ class EEMConfig(EStepConfig):
         self.mutation = mutation
 
         super().__init__(n_states)
+
+
+class FullEMConfig(EStepConfig):
+    def __init__(self):
+        pass

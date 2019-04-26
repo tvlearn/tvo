@@ -3,13 +3,13 @@
 # Licensed under the Academic Free License version 3.0
 
 from abc import ABC, abstractmethod
-from tvem.variational import EEMVariationalStates
+from tvem.variational import FullEM, EEMVariationalStates
 from tvem.util.data import TVEMDataLoader, H5Logger
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
 from tvem.util.parallel import pprint, init_processes, scatter_to_processes, gather_from_processes
 from tvem.util import get
-from tvem.exp._EStepConfig import EEMConfig, EStepConfig
+from tvem.exp._EStepConfig import FullEMConfig, EEMConfig, EStepConfig
 import tvem
 
 import math
@@ -20,10 +20,16 @@ import torch.distributed as dist
 
 
 def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMVariationalStates:
-    if isinstance(conf, EEMConfig):
+    if isinstance(conf, FullEMConfig):
+        return _make_FullEM_var_states(N, H)
+    elif isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, dtype)
     else:  # pragma: no cover
         raise NotImplementedError()
+
+
+def _make_FullEM_var_states(N: int, H: int):
+    return FullEM({"N": N, "H": H})
 
 
 def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
