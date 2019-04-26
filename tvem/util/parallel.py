@@ -190,18 +190,32 @@ def scatter2processes(
     return my_tensors[0] if len(my_tensors) == 1 else my_tensors
 
 
-def gather_from_processes(
-    *my_tensors: Tensor, dst: int = 0, dtype: torch.dtype = None, device: torch.device = None
-) -> Iterable[Tensor]:
+def _append_dummy_rows(tensor: Tensor, to_add: int, comm_rank: int, comm_size: int):
+    """Increase length of dimension 0 of tensor by to_add.
+    :param tensor: Input tensor
+    :param tensor: Number of entries to add in dimension 0
+    :param tensor: Local MPI rank
+    :param tensor: Size of MPI process group
+    """
+    if comm_rank != comm_size - 1:
+        tensor = torch.cat(
+            (
+                tensor,
+                torch.zeros(
+                    (to_add,) + tuple(tensor.shape[1:]), dtype=tensor.dtype, device=tensor.device
+                ),
+            )
+        )
+    return tensor
+
+
+def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]:
     """Gather tensors from process group.
 
     :param my_tensors: List of tensors to be gathered from local process on process dst.
                        For each element tensor.shape[1:] must be identical on
                        each process.
     :param dst: Rank of destination process to gather tensors.
-    :param dtype: dtype of resulting tensor. Defaults to the dtype of the corresponding
-                  input tensor if not specified.
-    :param device: device of resulting tensor. Defaults to tvem.get_device() if not specified.
     :returns: List of tensors gathered from process group.
 
     Only process with rank dst will contain gathered data.
@@ -210,18 +224,11 @@ def gather_from_processes(
 
     if tvem.get_run_policy() == "seq":
         for data in my_tensors:
-            this_dtype = data.dtype if dtype is None else dtype
-            this_device = tvem.get_device() if device is None else device
-            tensors.append(data.to(dtype=this_dtype, device=this_device))
+            tensors.append(data)
 
     elif tvem.get_run_policy() == "mpi":
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for my_data in my_tensors:
-            if dtype is None:
-                this_dtype = bcast_dtype(my_data, dst)
-            else:
-                this_dtype = dtype
-            this_device = tvem.get_device() if device is None else device
 
             local_length, other_length = my_data.shape[0], my_data.shape[1:]
             other_length = tuple(other_length)
@@ -233,32 +240,31 @@ def gather_from_processes(
             # no datapoints per process including dummy rows
             local_length_ = math.ceil(total_length / comm_size)
             # determine number of and eventually add dummy rows for scatter/gather compatibility
-            empty_length = local_length_ * comm_size - total_length
+            empty_length = local_length_ - local_length
 
             chunks = []  # type: ignore
             if comm_rank == 0:
                 for r in range(comm_size):
                     chunks.append(
                         torch.zeros(
-                            (local_length_,) + other_length, dtype=this_dtype, device=this_device
+                            (local_length_,) + other_length,
+                            dtype=my_data.dtype,
+                            device=my_data.device,
                         )
                     )
 
-            if comm_rank == comm_size - 1:
-                my_data = torch.cat(
-                    (
-                        my_data,
-                        torch.zeros(
-                            (empty_length,) + other_length, dtype=this_dtype, device=this_device
-                        ),
-                    )
-                )
-
-            dist.gather(tensor=my_data, gather_list=chunks, dst=dst)
+            dist.gather(
+                tensor=_append_dummy_rows(my_data, empty_length, comm_rank, comm_size),
+                gather_list=chunks,
+                dst=dst,
+            )
 
             if comm_rank == 0:
+                if empty_length > 0:
+                    for r in range(comm_size - 1):
+                        chunks[r] = chunks[r][:-empty_length]  # remove dummy rows again
                 data = torch.cat(chunks)
-                tensors.append(data[:total_length])  # remove dummy rows again
+                tensors.append(data)
 
     return tensors[0] if len(tensors) == 1 else tensors
 
