@@ -3,6 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import platform
+import math
 
 import torch
 import torch.distributed as dist
@@ -143,7 +144,7 @@ def scatter2processes(
             total_length, other_length = shape[0], shape[1:]
 
             # no datapoints per process
-            local_length_ = int(torch.ceil(torch.tensor([float(total_length) / comm_size])))
+            local_length_ = math.ceil(total_length / comm_size)
 
             # in case total_length is not evenly divisible by the number of processes
             # dummy rows are used in process with rank comm_rank -1
