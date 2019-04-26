@@ -109,16 +109,11 @@ def bcast_shape(data: Tensor, src: int) -> Tensor:
     return shape
 
 
-def scatter2processes(
-    *tensors: Tensor, src: int = 0, dtype: torch.dtype = None, device: torch.device = None
-) -> Iterable[Tensor]:
+def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
     """Split tensors into chunks and scatter within process group.
 
     :param tensors: Tensor to be scattered. Chunks are cut along dimension 0.
     :param src: Source rank to scatter from.
-    :param dtype: dtype of resulting tensor. Defaults to the dtype of the corresponding
-                  input tensor if not specified.
-    :param device: device of resulting tensor. Defaults to tvem.get_device() if not specified.
     :returns: Tensor scattered to local rank.
 
     Tensor data is assumed to be None on all but the root processes.
@@ -127,18 +122,13 @@ def scatter2processes(
 
     if tvem.get_run_policy() == "seq":
         for data in tensors:
-            this_dtype = data.dtype if dtype is None else dtype
-            this_device = tvem.get_device() if device is None else device
-            my_tensors.append(data.to(dtype=this_dtype, device=this_device))
+            my_tensors.append(data)
 
     elif tvem.get_run_policy() == "mpi":
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for data in tensors:
-            if dtype is None:
-                this_dtype = bcast_dtype(data, src)
-            else:
-                this_dtype = dtype
-            this_device = tvem.get_device() if device is None else device
+            this_dtype = bcast_dtype(data, src)
+            this_device = data.device
 
             shape = bcast_shape(data, src)
             total_length, other_length = shape[0], shape[1:]
