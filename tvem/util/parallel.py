@@ -242,7 +242,7 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
             # determine number of and eventually add dummy rows for scatter/gather compatibility
             empty_length = local_length_ - local_length
 
-            chunks = []  # type: ignore
+            chunks = []
             if comm_rank == 0:
                 for r in range(comm_size):
                     chunks.append(
