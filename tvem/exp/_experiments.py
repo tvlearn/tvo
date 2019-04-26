@@ -7,7 +7,7 @@ from tvem.variational import EEMVariationalStates
 from tvem.util.data import TVEMDataLoader
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
-from tvem.util.parallel import pprint, init_processes, scatter2processes
+from tvem.util.parallel import pprint, init_processes, scatter_to_processes
 from tvem.util import get
 from tvem.exp._EStepConfig import EEMConfig, EStepConfig
 import tvem
@@ -17,7 +17,6 @@ import h5py
 from typing import Tuple
 import torch as to
 import torch.distributed as dist
-import numpy as np
 
 
 def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMVariationalStates:
@@ -172,12 +171,9 @@ def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> 
         raise ValueError(f'File "{fname}" does not contain any of keys {possible_keys}')
     if rank == 0:
         data = to.tensor(f[dataset], device=tvem.get_device())
-        dtype = data.dtype
     else:
         data = None
-        # convert h5py dtype to torch dtype passing through numpy
-        dtype = to.from_numpy(np.empty(0, dtype=f[dataset].dtype)).dtype
-    return scatter2processes(data, dtype=dtype, device=tvem.get_device())
+    return scatter_to_processes(data)
 
 
 class Training(_TrainingAndOrValidation):
