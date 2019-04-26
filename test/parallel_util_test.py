@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.util.parallel import init_processes, scatter2processes, all_reduce
+from tvem.util.parallel import init_processes, scatter2processes, gatherFROMprocesses, all_reduce
 import tvem
 
 import os
@@ -30,6 +30,13 @@ def test_scatter2processes(setup):
     my_t = scatter2processes(t)
     assert my_t.shape == (1, 2)
     assert to.allclose(my_t, to.arange(2) + setup.rank * 2)
+
+
+@pytest.mark.mpi
+def test_gatherFROMprocesses(setup):
+    t = gatherFROMprocesses((to.arange(2) + setup.rank * 2)[None, :])
+    assert t.shape == (setup.n_procs, 2)
+    assert to.allclose(t, to.arange(setup.n_procs * 2).reshape(setup.n_procs, 2))
 
 
 @pytest.mark.mpi
