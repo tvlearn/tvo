@@ -190,20 +190,20 @@ def scatter2processes(
 
 
 def gatherFROMprocesses(
-    *my_tensors: Tensor, src: int = 0, dtype: torch.dtype = None, device: torch.device = None
+    *my_tensors: Tensor, dst: int = 0, dtype: torch.dtype = None, device: torch.device = None
 ) -> Iterable[Tensor]:
     """Gather tensors from process group.
 
     :param my_tensors: List of tensors to be gathered to be gathered from local process on
-                       process src. For each element tensor.shape[1:] must be identical on
+                       process dst. For each element tensor.shape[1:] must be identical on
                        each process.
-    :param src: Rank of destination process to gather tensors.
+    :param dst: Rank of destination process to gather tensors.
     :param dtype: dtype of resulting tensor. Defaults to the dtype of the corresponding
                   input tensor if not specified.
     :param device: device of resulting tensor. Defaults to tvem.get_device() if not specified.
     :returns: List of tensors gathered from process group.
 
-    Only process with rank src will contain gathered data.
+    Only process with rank dst will contain gathered data.
     """
     tensors = []
 
@@ -217,14 +217,17 @@ def gatherFROMprocesses(
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for my_data in my_tensors:
             if dtype is None:
-                this_dtype = bcast_dtype(my_data, src)
+                this_dtype = bcast_dtype(my_data, dst)
             else:
                 this_dtype = dtype
             this_device = tvem.get_device() if device is None else device
 
             local_length, other_length = my_data.shape[0], my_data.shape[1:]
+            other_length = tuple(other_length)
 
-            total_length = all_reduce(local_length)
+            total_length = torch.tensor([local_length])
+            all_reduce(total_length)
+            total_length = int(total_length)
 
             # no datapoints per process including dummy rows
             local_length_ = int(torch.ceil(torch.tensor([float(total_length) / comm_size])))
@@ -233,25 +236,27 @@ def gatherFROMprocesses(
 
             chunks = []  # type: ignore
             if comm_rank == 0:
-                chunks = [
-                    torch.zeros((local_length_, other_length), dtype=this_dtype, device=this_device)
-                ] * comm_size
+                for r in range(comm_size):
+                    chunks.append(
+                        torch.zeros(
+                            (local_length_,) + other_length, dtype=this_dtype, device=this_device
+                        )
+                    )
 
             if comm_rank == comm_size - 1:
                 my_data = torch.cat(
                     (
                         my_data,
                         torch.zeros(
-                            (empty_length, other_length), dtype=this_dtype, device=this_device
+                            (empty_length,) + other_length, dtype=this_dtype, device=this_device
                         ),
                     )
                 )
 
-            dist.gather(my_data, src=src, gather_list=chunks)
-
+            dist.gather(tensor=my_data, gather_list=chunks, dst=dst)
+            print(chunks)
             if comm_rank == 0:
                 data = torch.cat(chunks)
-
                 tensors.append(data[:total_length])  # remove dummy rows again
 
     return tensors[0] if len(tensors) == 1 else tensors
