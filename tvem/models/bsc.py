@@ -263,7 +263,7 @@ class BSC(TVEMModel):
         all_reduce(my_sigma)
 
         # Calculate updated W
-        Wold_noisy = theta["W"] + to.randn_like(theta["W"])
+        Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
         try:
             theta_new["W"] = to.gels(my_Wp.t(), my_Wq)[0].t()
         except RuntimeError:
