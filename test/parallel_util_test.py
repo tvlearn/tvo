@@ -59,6 +59,20 @@ def test_gather_from_processes_uneven_chunks(setup):
 
 
 @pytest.mark.mpi
+def test_scatter_and_gather(setup):
+    if setup.rank == 0:
+        t = to.arange(10).unsqueeze(1)
+    else:
+        t = []
+
+    my_t = scatter_to_processes(t)
+    mpi_t = gather_from_processes(my_t)
+
+    if setup.rank == 0:
+        assert (mpi_t == t).all()
+
+
+@pytest.mark.mpi
 def test_all_reduce(setup):
     t = to.ones(1)
     all_reduce(t)
