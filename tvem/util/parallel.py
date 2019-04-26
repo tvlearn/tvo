@@ -194,8 +194,8 @@ def gatherFROMprocesses(
 ) -> Iterable[Tensor]:
     """Gather tensors from process group.
 
-    :param my_tensors: List of tensors to be gathered to be gathered from local process on
-                       process dst. For each element tensor.shape[1:] must be identical on
+    :param my_tensors: List of tensors to be gathered from local process on process dst.
+                       For each element tensor.shape[1:] must be identical on
                        each process.
     :param dst: Rank of destination process to gather tensors.
     :param dtype: dtype of resulting tensor. Defaults to the dtype of the corresponding
