@@ -70,6 +70,8 @@ def test_scatter_and_gather(setup):
 
     if setup.rank == 0:
         assert (mpi_t == t).all()
+    else:
+        assert mpi_t == []
 
 
 @pytest.mark.mpi
