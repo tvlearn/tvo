@@ -222,7 +222,7 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for my_data in my_tensors:
 
-            local_length = my_data.shape[0].item()
+            local_length = my_data.shape[0]
             other_length = tuple(my_data.shape[1:])
 
             total_length = torch.tensor([local_length])
