@@ -35,8 +35,9 @@ def test_scatter2processes(setup):
 @pytest.mark.mpi
 def test_gatherFROMprocesses(setup):
     t = gatherFROMprocesses((to.arange(2) + setup.rank * 2)[None, :])
-    assert t.shape == (setup.n_procs, 2)
-    assert to.allclose(t, to.arange(setup.n_procs * 2).reshape(setup.n_procs, 2))
+    if setup.rank == 0:
+        assert t.shape == (setup.n_procs, 2)
+        assert to.allclose(t, to.arange(setup.n_procs * 2).reshape(setup.n_procs, 2))
 
 
 @pytest.mark.mpi
