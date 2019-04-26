@@ -7,7 +7,7 @@ from tvem.variational import EEMVariationalStates
 from tvem.util.data import TVEMDataLoader, H5Logger
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
-from tvem.util.parallel import pprint, init_processes, scatter_to_processes
+from tvem.util.parallel import pprint, init_processes, scatter_to_processes, gather_from_processes
 from tvem.util import get
 from tvem.exp._EStepConfig import EEMConfig, EStepConfig
 import tvem
@@ -203,9 +203,12 @@ class _TrainingAndOrValidation(Experiment):
             F_and_subs_dict = {f"{log_kind}_F": to.tensor(F), f"{log_kind}_subs": to.tensor(subs)}
             logger.append(**F_and_subs_dict)
 
-            # log latest states and lpj to file (FIXME must gather K and lpj from all processes)
+            # log latest states and lpj to file
             states = getattr(self, f"{data_kind}_states")
-            states_and_lpj_dict = {f"{log_kind}_states": states.K, f"{log_kind}_lpj": states.lpj}
+            states_and_lpj_dict = {
+                f"{log_kind}_states": gather_from_processes(states.K),
+                f"{log_kind}_lpj": gather_from_processes(states.lpj),
+            }
             logger.set(**states_and_lpj_dict)
 
         logger.append(theta=self.model.theta)
