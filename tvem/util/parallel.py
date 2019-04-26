@@ -190,7 +190,7 @@ def scatter2processes(
     return my_tensors[0] if len(my_tensors) == 1 else my_tensors
 
 
-def gatherFROMprocesses(
+def gather_from_processes(
     *my_tensors: Tensor, dst: int = 0, dtype: torch.dtype = None, device: torch.device = None
 ) -> Iterable[Tensor]:
     """Gather tensors from process group.
