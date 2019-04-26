@@ -127,11 +127,13 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
     elif tvem.get_run_policy() == "mpi":
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for data in tensors:
+
             this_dtype = bcast_dtype(data, src)
-            this_device = data.device
+            this_device = tvem.get_device()
 
             shape = bcast_shape(data, src)
-            total_length, other_length = shape[0], shape[1:]
+            total_length = shape[0].item()
+            other_length = tuple(shape[1:])
 
             # no datapoints per process
             local_length_ = math.ceil(total_length / comm_size)
@@ -152,7 +154,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                             (
                                 data.to(dtype=this_dtype, device=this_device),
                                 torch.zeros(
-                                    (empty_length, other_length),
+                                    (empty_length,) + other_length,
                                     dtype=this_dtype,
                                     device=this_device,
                                 ),
@@ -165,7 +167,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                 )
 
             my_data = torch.zeros(
-                (local_length_, other_length), dtype=this_dtype, device=this_device
+                (local_length_,) + other_length, dtype=this_dtype, device=this_device
             )
 
             dist.scatter(my_data, src=src, scatter_list=chunks)
@@ -220,8 +222,8 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for my_data in my_tensors:
 
-            local_length, other_length = my_data.shape[0], my_data.shape[1:]
-            other_length = tuple(other_length)
+            local_length = my_data.shape[0].item()
+            other_length = tuple(my_data.shape[1:])
 
             total_length = torch.tensor([local_length])
             all_reduce(total_length)
