@@ -106,27 +106,23 @@ class NoisyOR(TVEMModel):
     ) -> Optional[float]:
         lpj = states.lpj[idx]
         K = states.K[idx]
-        Kfloat = K.type_as(lpj)
+        Kfloat = K.type_as(lpj).permute(2, 0, 1)  # shape (H,N,S)
         deltaY = (batch.any(dim=1) == 0).type_as(lpj)
         N = states.K.shape[0]
 
         # pi_h = sum{n}{<K_nkh>} / N
-        self.new_pi += to.sum(self._mean_posterior(K.permute(2, 0, 1), lpj, deltaY), dim=1) / N
+        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1) / N
         assert not to.isnan(self.new_pi).any()
 
-        # Ws_dnkh = 1 - (W_dh * K_nkh)
-        Ws = 1 - self.theta["W"][:, None, None, :] * Kfloat[None, :, :, :]
-        Ws_prod = to.prod(Ws, dim=-1, keepdim=True)
-        B = Kfloat / ((Ws * (1 - Ws_prod)) + self.eps)
+        # Ws_dhns = 1 - (W_dh * Kfloat_hns)
+        Ws = 1 - self.theta["W"][:, :, None, None] * Kfloat[None, :, :, :]
+        Ws_prod = to.prod(Ws, dim=1, keepdim=True)
+        B = Kfloat / ((Ws * (1 - Ws_prod)) + self.eps)  # shape (D,H,N,S)
         self.Btilde.add_(
-            to.einsum(
-                "ijk,ki->ij",
-                self._mean_posterior(B.permute(0, 3, 1, 2), lpj, deltaY),
-                batch.type_as(lpj) - 1,
-            )
+            to.einsum("ijk,ki->ij", self._mean_posterior(B, lpj, deltaY), batch.type_as(lpj) - 1)
         )
         C = Ws_prod * B / Ws
-        self.Ctilde.add_(to.sum(self._mean_posterior(C.permute(0, 3, 1, 2), lpj, deltaY), dim=2))
+        self.Ctilde.add_(to.sum(self._mean_posterior(C, lpj, deltaY), dim=2))
         assert not to.isnan(self.Ctilde).any()
         assert not to.isnan(self.Btilde).any()
 
