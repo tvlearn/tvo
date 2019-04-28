@@ -184,6 +184,9 @@ class NoisyOR(TVEMModel):
 
         The array returned has shape (...,N). Each component is the average of
         g[...,n,k], over k, weighted by lpj[k,n].
+
+
+        N.B.: g, seen as a function of data-point and state g(y,s), must satisfy g(y=0, s=0) == 0.
         """
 
         # Evaluate constants B_n by which we can translate lpj
