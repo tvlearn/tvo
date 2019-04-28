@@ -103,3 +103,14 @@ def test_generate_data(setup):
     d = setup.m.generate_data(N)
     assert d["data"].shape == (N, setup.D)
     assert d["hidden_state"].shape == (N, setup.H)
+
+
+def test_mean_posterior(setup):
+    m = setup.m
+    states = setup.all_s
+    N, S, _ = states.K.shape
+    states.lpj[:] = m.log_pseudo_joint(setup.data, states.K)
+    deltaY = (setup.data.any(dim=1) == 0).to(states.lpj)
+    means = m._mean_posterior(to.ones((N, S)), states.lpj, deltaY)
+    assert means.shape == (N,)
+    assert to.allclose(means, to.tensor((5 / 9, 1.0), device=tvem.get_device()))
