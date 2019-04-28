@@ -14,22 +14,20 @@ import tvem
 
 import math
 import h5py
-from typing import Tuple, Dict, Iterable
+from typing import Tuple, Dict, Iterable, Union
 import torch as to
 import torch.distributed as dist
 
 
-def _make_var_states(conf: EStepConfig, N: int, H: int, dtype: to.dtype) -> EEMVariationalStates:
+def _make_var_states(
+    conf: EStepConfig, N: int, H: int, dtype: to.dtype
+) -> Union[EEMVariationalStates, FullEM]:
     if isinstance(conf, FullEMConfig):
-        return _make_FullEM_var_states(N, H)
+        return FullEM({"N": N, "H": H})
     elif isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, dtype)
     else:  # pragma: no cover
         raise NotImplementedError()
-
-
-def _make_FullEM_var_states(N: int, H: int):
-    return FullEM({"N": N, "H": H})
 
 
 def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
