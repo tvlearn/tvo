@@ -75,7 +75,7 @@ class H5Logger:
                     data[k] = {}
                 for name, tensor in v.items():
                     append_to_dict(data[k], name, tensor)
-            else:
+            else:  # pragma: no cover
                 raise TypeError("Arguments must be torch.Tensors or dictionaries thereof.")
 
     def set(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
@@ -92,7 +92,7 @@ class H5Logger:
             if k in self._blacklist:
                 continue
 
-            if not isinstance(v, to.Tensor) and not isinstance(v, dict):
+            if not isinstance(v, to.Tensor) and not isinstance(v, dict):  # pragma: no cover
                 raise TypeError("Arguments must be torch.Tensors or dictionaries thereof.")
 
             self._data[k] = v
