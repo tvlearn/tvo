@@ -39,7 +39,7 @@ class TestEEM(unittest.TestCase):
     """
 
     def setUp(self):
-        self.dtype_f = to.float64
+        self.precision = to.float64
         self.n_runs = 30
 
     def test_randflip(self):
@@ -175,7 +175,7 @@ class TestEEM(unittest.TestCase):
     def test_update(self):
 
         eem_conf = {
-            "dtype": self.dtype_f,
+            "precision": self.precision,
             "N": 2,
             "S": 3,
             "H": 4,

@@ -116,7 +116,7 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
             "S": S,
             "Snew": get_eem_new_states(estep_conf),
             "batch_size": batch_size,
-            "dtype": precision,
+            "precision": precision,
         }
         return BSC(conf), input_files.continuous_data
 

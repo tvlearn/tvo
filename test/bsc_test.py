@@ -19,17 +19,25 @@ def setup(request):
     class Setup:
         _device = tvem.get_device()
         N, D, H = 2, 1, 2
-        dtype = to.float32
-        pi_init = to.full((H,), 0.5, dtype=dtype, device=_device)
-        W_init = to.full((D, H), 1.0, dtype=dtype, device=_device)
-        sigma_init = to.tensor([1.0], dtype=dtype, device=_device)
+        precision = to.float32
+        pi_init = to.full((H,), 0.5, dtype=precision, device=_device)
+        W_init = to.full((D, H), 1.0, dtype=precision, device=_device)
+        sigma_init = to.tensor([1.0], dtype=precision, device=_device)
 
-        conf = {"N": N, "D": D, "H": H, "S": 2 ** H, "Snew": 0, "batch_size": N, "dtype": dtype}
+        conf = {
+            "N": N,
+            "D": D,
+            "H": H,
+            "S": 2 ** H,
+            "Snew": 0,
+            "batch_size": N,
+            "precision": precision,
+        }
         m = BSC(conf, W_init, sigma_init, pi_init)
-        conf = {"N": N, "H": H, "S": 2 ** H, "dtype": dtype}
+        conf = {"N": N, "H": H, "S": 2 ** H, "precision": precision}
         all_s = FullEM(conf)
         all_s.lpj = to.zeros_like(all_s.lpj)
-        data = to.tensor([[0], [1]], dtype=dtype, device=_device)
+        data = to.tensor([[0], [1]], dtype=precision, device=_device)
         # lpj = \sum_h s_h \log( \pi_h/(1-\pi_h) )
         #        - 1/(2\sigma^2) ( \vec{y}-W\vec{s})^T (\vec{y}-W\vec{s}) )
         # const = \sum_h \log(1-\pi_h) - (D/2) \log(2\pi\sigma^2)

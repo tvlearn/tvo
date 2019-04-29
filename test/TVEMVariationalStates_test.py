@@ -28,7 +28,7 @@ class TestTVEM(unittest.TestCase):
     """
 
     def setUp(self):
-        self.dtype_f = to.float64
+        self.precision = to.float64
 
     def test_unique_ind(self):
 
@@ -55,13 +55,13 @@ class TestTVEM(unittest.TestCase):
 
     def test_update_states_for_batch(self):
 
-        dtype_f = self.dtype_f
+        precision = self.precision
 
         idx = to.arange(2)
         new_states = to.ones((idx.numel(), 2, 1), dtype=to.uint8)
         all_states = to.zeros((4, 3, 1), dtype=to.uint8)  # is (N, S, H)
-        new_lpj = to.ones((2, 2), dtype=dtype_f)
-        all_lpj = to.zeros((4, 3), dtype=dtype_f)
+        new_lpj = to.ones((2, 2), dtype=precision)
+        all_lpj = to.zeros((4, 3), dtype=precision)
 
         n_subs = update_states_for_batch(new_states, new_lpj, idx, all_states, all_lpj)
 
@@ -80,7 +80,7 @@ class TestTVEM(unittest.TestCase):
 
     def test_set_redundant_lpj_to_low(self):
 
-        dtype_f = self.dtype_f
+        precision = self.precision
 
         device = tvem.get_device()
         old_states = to.tensor(
@@ -92,7 +92,7 @@ class TestTVEM(unittest.TestCase):
 
         N, S, H = old_states.shape
 
-        new_lpj = to.ones((N, S), dtype=dtype_f, device=device)
+        new_lpj = to.ones((N, S), dtype=precision, device=device)
 
         set_redundant_lpj_to_low(new_states, new_lpj, old_states)
 

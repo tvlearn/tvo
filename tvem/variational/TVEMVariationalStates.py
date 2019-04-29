@@ -145,20 +145,20 @@ class TVEMVariationalStates(ABC):
         :param conf: dictionary with hyper-parameters. Required keys: N, H, S, dtype, device
         :param K_init: if specified, self.K will be initialized with this Tensor of shape (N,S,H)
         """
-        required_keys = ("N", "H", "S", "dtype")
+        required_keys = ("N", "H", "S", "precision")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.conf = conf
 
-        N, H, S, dtype = get(conf, *required_keys)
+        N, H, S, precision = get(conf, *required_keys)
 
         if K_init is not None:
             assert K_init.shape == (N, S, H)
             self.K = K_init.clone()
         else:
             self.K = generate_unique_states(S, H).repeat(N, 1, 1)  # (N, S, H)
-        self.lpj = to.empty((N, S), dtype=dtype, device=tvem.get_device())
-        self.precision = dtype
+        self.lpj = to.empty((N, S), dtype=precision, device=tvem.get_device())
+        self.precision = precision
 
     @abstractmethod
     def update(

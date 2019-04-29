@@ -23,26 +23,26 @@ class BSC(TVEMModel):
     ):
         device = tvem.get_device()
 
-        required_keys = ("N", "D", "H", "S", "Snew", "batch_size", "dtype")
+        required_keys = ("N", "D", "H", "S", "Snew", "batch_size", "precision")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.conf = conf
         self.required_keys = required_keys
 
-        N, D, H, S, Snew, batch_size, dtype = get(conf, *required_keys)
+        N, D, H, S, Snew, batch_size, precision = get(conf, *required_keys)
 
         self.tmp = {
-            "my_Wp": to.empty((D, H), dtype=dtype, device=device),
-            "my_Wq": to.empty((H, H), dtype=dtype, device=device),
-            "my_pies": to.empty(H, dtype=dtype, device=device),
-            "my_sigma": to.empty(1, dtype=dtype, device=device),
-            "pil_bar": to.empty(H, dtype=dtype, device=device),
-            "WT": to.empty((H, D), dtype=dtype, device=device),
-            "batch_Wbar": to.empty((batch_size, S + Snew, D), dtype=dtype, device=device),
-            "batch_s_pjc": to.empty((batch_size, H), dtype=dtype, device=device),
-            "batch_Wp": to.empty((batch_size, D, H), dtype=dtype, device=device),
-            "batch_Wq": to.empty((batch_size, H, H), dtype=dtype, device=device),
-            "batch_sigma": to.empty((batch_size,), dtype=dtype, device=device),
+            "my_Wp": to.empty((D, H), dtype=precision, device=device),
+            "my_Wq": to.empty((H, H), dtype=precision, device=device),
+            "my_pies": to.empty(H, dtype=precision, device=device),
+            "my_sigma": to.empty(1, dtype=precision, device=device),
+            "pil_bar": to.empty(H, dtype=precision, device=device),
+            "WT": to.empty((H, D), dtype=precision, device=device),
+            "batch_Wbar": to.empty((batch_size, S + Snew, D), dtype=precision, device=device),
+            "batch_s_pjc": to.empty((batch_size, H), dtype=precision, device=device),
+            "batch_Wp": to.empty((batch_size, D, H), dtype=precision, device=device),
+            "batch_Wq": to.empty((batch_size, H, H), dtype=precision, device=device),
+            "batch_sigma": to.empty((batch_size,), dtype=precision, device=device),
             "indS_filled": 0,
         }
 
@@ -53,11 +53,11 @@ class BSC(TVEMModel):
         theta = {
             "pies": pies_init
             if pies_init is not None
-            else to.full((H,), 1.0 / H, dtype=dtype, device=device),
-            "W": W_init if W_init is not None else to.rand((D, H), dtype=dtype, device=device),
+            else to.full((H,), 1.0 / H, dtype=precision, device=device),
+            "W": W_init if W_init is not None else to.rand((D, H), dtype=precision, device=device),
             "sigma": sigma_init
             if sigma_init is not None
-            else to.tensor([1.0], dtype=dtype, device=device),
+            else to.tensor([1.0], dtype=precision, device=device),
         }
         eps, inf = 1.0e-5, math.inf
         self.policy = {
@@ -89,10 +89,10 @@ class BSC(TVEMModel):
 
         theta = self.theta
 
-        dtype_f, device = theta["W"].dtype, theta["W"].device
+        precision, device = theta["W"].dtype, theta["W"].device
         no_datapoints, D, H_gen = (hidden_state.shape[0],) + theta["W"].shape
 
-        Wbar = to.zeros((no_datapoints, D), dtype=dtype_f, device=device)
+        Wbar = to.zeros((no_datapoints, D), dtype=precision, device=device)
 
         # Linear superposition
         for n in range(no_datapoints):
@@ -101,7 +101,7 @@ class BSC(TVEMModel):
                     Wbar[n] += theta["W"][:, h]
 
         # Add noise according to the model parameters
-        Y = Wbar + theta["sigma"] * to.randn((no_datapoints, D), dtype=dtype_f, device=device)
+        Y = Wbar + theta["sigma"] * to.randn((no_datapoints, D), dtype=precision, device=device)
 
         return Y
 

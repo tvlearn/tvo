@@ -15,7 +15,7 @@ class AllStatesExceptZero(TVEMVariationalStates):
     """All possible latent states except the all-zero one, which NoisyOR deals with separately."""
 
     def __init__(self, N, H):
-        conf = {"N": N, "H": H, "S": 2 ** H - 1, "dtype": to.float32}
+        conf = {"N": N, "H": H, "S": 2 ** H - 1, "precision": to.float32}
         super().__init__(conf, self._generate_all_states(N, H))
 
     def update(self, idx, batch, lpj_fn, sort_by_lpj):

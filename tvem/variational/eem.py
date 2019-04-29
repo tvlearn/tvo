@@ -201,13 +201,13 @@ def randflip(
     parents: Tensor, n_children: int, sparsity: Optional[float] = None, p_bf: Optional[float] = None
 ) -> Tensor:
 
-    dtype_f, device = to.float64, parents.device
+    precision, device = to.float64, parents.device
 
     # Indices to be flipped. Bitflips for a given parent are ensured
     # to be unique.
     n_parents, H = parents.shape
     ind_flip = to.topk(
-        to.rand((n_parents, H), dtype=dtype_f, device=device),
+        to.rand((n_parents, H), dtype=precision, device=device),
         k=n_children,
         dim=1,
         largest=True,
@@ -246,7 +246,7 @@ def sparseflip(
       of bitflips per children is p_bf*parents.shape[1]
     """
     # Initialization
-    dtype_f, device = to.float64, parents.device
+    precision, device = to.float64, parents.device
     n_parents, H = parents.shape
     s_abs = parents.sum(dim=1)  # is (n_parents)
     children = parents.repeat(1, n_children).view(-1, H)
@@ -254,7 +254,7 @@ def sparseflip(
     crowdedness = sparsity * H
 
     H = float(H)
-    s_abs = s_abs.to(dtype=dtype_f)
+    s_abs = s_abs.to(dtype=precision)
 
     # # Probability to flip a 1 to a 0 and vice versa (Joerg's idea)
     # p_0 = H / ( 2 * ( H - s_abs) + eps) * p_bf,  # is (n_parents,)
@@ -273,12 +273,12 @@ def sparseflip(
     )  # is (n_parents*n_children, H)
     p_0 = p_0[:, None].expand(-1, int(H)).repeat(1, n_children).view(-1, int(H))
     # is (n_parents*n_children, H)
-    p = to.empty(p_0.shape, dtype=dtype_f, device=device)
+    p = to.empty(p_0.shape, dtype=precision, device=device)
     p[children] = p_1[children]
     p[~children] = p_0[~children]
 
     # Determine bits to be flipped and do the bitflip
-    flips = to.rand((n_parents * n_children, int(H)), dtype=dtype_f, device=device) < p
+    flips = to.rand((n_parents * n_children, int(H)), dtype=precision, device=device) < p
     children[flips] = ~children[flips]
 
     return children
@@ -336,7 +336,7 @@ def fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
 def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     # FIXME this a fitness-proportional parent selection __with replacement__
 
-    dtype_f, device = lpj.dtype, candidates.device
+    precision, device = lpj.dtype, candidates.device
     assert (
         candidates.shape[:2] == lpj.shape
     ), "candidates and lpj must \
@@ -354,7 +354,7 @@ def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     # than x subtracting that from the size of the dimension gives the
     # desired index n
     cum_p = to.cumsum(lpj_fitness, dim=-1)  # (x, y, ..., z), same shape as lpj
-    x = to.rand((*cum_p.shape[:-1], n_parents), dtype=dtype_f, device=device)
+    x = to.rand((*cum_p.shape[:-1], n_parents), dtype=precision, device=device)
     # (x, y, ..., n_parents)
 
     # TODO Find simpler solution

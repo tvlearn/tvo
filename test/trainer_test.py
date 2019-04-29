@@ -23,7 +23,13 @@ def setup(request):
         data = TVEMDataLoader(_td, batch_size=N)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
         test_data = TVEMDataLoader(_td, batch_size=N)
-        _varstates_conf = {"N": N, "H": H, "S": S, "dtype": to.float32, "device": tvem.get_device()}
+        _varstates_conf = {
+            "N": N,
+            "H": H,
+            "S": S,
+            "precision": to.float32,
+            "device": tvem.get_device(),
+        }
         var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
         test_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
 
