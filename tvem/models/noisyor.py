@@ -66,10 +66,10 @@ class NoisyOR(TVEMModel):
         assert K.dtype == to.uint8 and Y.dtype == to.uint8
         pi = self.theta["pies"]
         W = self.theta["W"]
-        N, S, H = K.shape
+        batch_size, S, H = K.shape
         D = W.shape[0]
         dev = pi.device
-        logPy = to.empty((N, S), device=dev, dtype=self.precision)
+        logPy = to.empty((batch_size, S), device=dev, dtype=self.precision)
         logPriors = to.matmul(K.type_as(pi), to.log(pi / (1 - pi)))
         # the general routine for eem sometimes require evaluation of lpjs of all-zero states,
         # which is not supported for noisy-OR.
@@ -81,13 +81,13 @@ class NoisyOR(TVEMModel):
         zeroStatesInd = (zeroStatesInd[:, 0], zeroStatesInd[:, 1])
         K[zeroStatesInd] = 1
         # prods_nkd = prod{h}{1-W_dh*K_nkh}
-        prods = to.broadcast_tensors(to.empty(N, S, H, D), W.transpose(0, 1))[1].clone()
-        prod_mask = (~K).unsqueeze(-1).expand(N, S, H, D)
+        prods = to.broadcast_tensors(to.empty(batch_size, S, H, D), W.transpose(0, 1))[1].clone()
+        prod_mask = (~K).unsqueeze(-1).expand(batch_size, S, H, D)
         prods[prod_mask] = 0.0
         prods = to.prod(1 - prods, dim=2)
         # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
         f1 = to.log(1.0 / (prods + self.eps) - 1.0)
-        indeces = Y[:, None, :].expand(N, S, D)
+        indeces = Y[:, None, :].expand(batch_size, S, D)
         f1[~indeces] = 0.0
         logPy[:, :] = to.sum(f1, dim=-1) + to.sum(to.log(prods), dim=2)
         K[zeroStatesInd] = 0
@@ -108,10 +108,10 @@ class NoisyOR(TVEMModel):
         K = states.K[idx]
         Kfloat = K.type_as(lpj).permute(2, 0, 1)  # shape (H,N,S)
         deltaY = (batch.any(dim=1) == 0).type_as(lpj)
-        N = states.K.shape[0]
+        batch_size = states.K.shape[0]
 
         # pi_h = sum{n}{<K_nkh>} / N
-        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1) / N
+        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1) / batch_size
         assert not to.isnan(self.new_pi).any()
 
         # Ws_dhns = 1 - (W_dh * Kfloat_hns)
@@ -143,12 +143,12 @@ class NoisyOR(TVEMModel):
 
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
         pi = self.theta["pies"]
-        N = batch.shape[0]
+        batch_size = batch.shape[0]
         # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
         deltaY = (batch.any(dim=1) == 0).type_as(states.lpj)
         B = -to.max(states.lpj[idx], dim=1, keepdim=True)[0]
         to.clamp(B, -80, 80, out=B)
-        F = N * to.sum(to.log(1 - pi)) + to.sum(
+        F = batch_size * to.sum(to.log(1 - pi)) + to.sum(
             to.log(to.sum(to.exp(states.lpj[idx] + B) + self.eps, dim=1) + to.exp(B[:, 0]) * deltaY)
             - B[:, 0]
         )
