@@ -24,7 +24,7 @@ def generate_bars(
     neg_amp: bool = False,
     bg_amp: float = 0.0,
     add_unit: float = None,
-    dtype: to.dtype = to.float64,
+    precision: to.dtype = to.float64,
 ):
     """ Generate a ground-truth dictionary W suitable for a std. bars test
 
@@ -36,13 +36,13 @@ def generate_bars(
     :param neg_amp: Set probability of amplitudes taking negative values to 50 percent
     :param bg_amp: Background amplitude
     :param add_unit: If not None an additional unit with amplitude add_unit will be inserted
-    :param dtype: torch.dtype of the returned tensor
+    :param precision: torch.dtype of the returned tensor
     :returns: tensor containing the bars dictionary
     """
     R = H // 2
     D = R ** 2
 
-    W = bg_amp * to.ones((R, R, H), dtype=dtype, device=tvem.get_device())
+    W = bg_amp * to.ones((R, R, H), dtype=precision, device=tvem.get_device())
     for i in range(R):
         W[i, :, i] = bar_amp
         W[:, i, R + i] = bar_amp
@@ -110,7 +110,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
     if request.param == "BSC":
 
-        W_gt = generate_bars(H, bar_amp=10.0, dtype=precision)
+        W_gt = generate_bars(H, bar_amp=10.0, precision=precision)
         sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
@@ -129,7 +129,7 @@ def model_and_data(request, hyperparams, estep_conf):
             "S": S,
             "Snew": 0,
             "batch_size": batch_size,
-            "dtype": precision,
+            "precision": precision,
         }
         model = BSC(conf, W_gt, sigma_gt, pies_gt)
 
@@ -143,7 +143,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
     elif request.param == "NoisyOR":
 
-        W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, dtype=precision)
+        W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, precision=precision)
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
         to.manual_seed(999)
