@@ -3,11 +3,13 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import ExpConfig, EEMConfig, Training
+from tvem.exp import ExpConfig, FullEMConfig, Training
 from tvem.models import NoisyOR, BSC
 from tvem.util.parallel import init_processes, broadcast
 from tvem.util import get
 import tvem
+import os
+import glob
 import numpy as np
 import h5py
 import pytest
@@ -70,9 +72,9 @@ def hyperparams():
 
     class BarsParams:
         N = 500
-        H = 10
+        H = 6
         D = (H // 2) ** 2
-        S = 60
+        S = 2 ** H
         batch_size = 10
         precision = to.float32
 
@@ -81,16 +83,7 @@ def hyperparams():
 
 @pytest.fixture(scope="module")
 def estep_conf(request, hyperparams):
-    return EEMConfig(
-        n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=2, crossover=False
-    )
-
-
-def get_eem_new_states(c: EEMConfig):
-    if c.crossover:
-        return c.n_parents * (c.n_parents - 1) * c.n_children * c.n_generations
-    else:
-        return c.n_parents * c.n_children * c.n_generations
+    return FullEMConfig()
 
 
 @pytest.fixture(scope="function", params=("BSC", "NoisyOR"))
@@ -113,6 +106,9 @@ def model_and_data(request, hyperparams, estep_conf):
         sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
+        to.manual_seed(999)
+        if tvem.get_device().type == "cuda":
+            to.cuda.manual_seed_all(999)
         W_init = to.rand((D, H), dtype=precision, device=tvem.get_device())
         broadcast(W_init)
 
@@ -124,7 +120,7 @@ def model_and_data(request, hyperparams, estep_conf):
             "D": D,
             "H": H,
             "S": S,
-            "Snew": get_eem_new_states(estep_conf),
+            "Snew": 0,
             "batch_size": batch_size,
             "dtype": precision,
         }
@@ -147,6 +143,9 @@ def model_and_data(request, hyperparams, estep_conf):
         W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, dtype=precision)
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
+        to.manual_seed(999)
+        if tvem.get_device().type == "cuda":
+            to.cuda.manual_seed_all(999)
         W_init = to.rand((D, H), dtype=precision, device=tvem.get_device())
         broadcast(W_init)
         pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
@@ -175,7 +174,48 @@ def exp_conf(hyperparams):
     return ExpConfig(batch_size=hyperparams.batch_size, precision=hyperparams.precision)
 
 
+def check_file(input_file):
+    rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    if rank != 0:
+        return
+
+    ofname = input_file.replace("data", "exp")
+    output_file_mpi = ofname.replace(".h5", "_mpi.h5")
+    output_file_seq_cpu = ofname.replace(".h5", "_seq_cpu.h5")
+    output_file_seq_cuda = ofname.replace(".h5", "_seq_cuda.h5")
+
+    if (
+        os.path.exists(output_file_mpi)
+        and os.path.exists(output_file_seq_cpu)
+        and os.path.exists(output_file_seq_cuda)
+    ):
+        f = h5py.File(output_file_mpi, "r")
+        F_mpi = to.tensor(f["train_F"])
+        f.close()
+        f = h5py.File(output_file_seq_cpu, "r")
+        F_seq_cpu = to.tensor(f["train_F"])
+        f.close()
+        f = h5py.File(output_file_seq_cuda, "r")
+        F_seq_cuda = to.tensor(f["train_F"])
+        f.close()
+        assert (F_mpi == F_seq_cpu).all() and (F_seq_cpu == F_seq_cuda).all()
+        # for p in glob.iglob(os.path.join('.', '*.h5')):
+        #     os.remove(p)
+    else:
+        return
+
+
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
+    model, input_file = model_and_data
+
+    if tvem.get_run_policy() == "mpi":
+        suffix = "mpi"
+    elif tvem.get_run_policy() == "seq":
+        suffix = "seq_%s" % tvem.get_device().type
+    exp_conf.output = input_file.replace("data", "exp").replace(".h5", "_%s.h5" % suffix)
+
     model, input_file = model_and_data
     exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
     exp.run(10)
+
+    check_file(input_file)
