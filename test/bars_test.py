@@ -114,7 +114,7 @@ def model_and_data(request, hyperparams, estep_conf):
         sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
-        to.manual_seed(999)        
+        to.manual_seed(999)
         W_init = to.rand((D, H), dtype=precision)
         W_init = W_init.to(device=tvem.get_device())
         broadcast(W_init)
@@ -146,7 +146,7 @@ def model_and_data(request, hyperparams, estep_conf):
         W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, dtype=precision)
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
-        to.manual_seed(999)        
+        to.manual_seed(999)
         W_init = to.rand((D, H), dtype=precision)
         W_init = W_init.to(device=tvem.get_device())
         broadcast(W_init)
