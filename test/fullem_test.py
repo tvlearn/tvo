@@ -18,8 +18,8 @@ def count_active_units(data, states):
 def setup(request):
     class Setup:
         N, H = 10, 8
-        dtype = to.float32
-        var_states = FullEM({"N": N, "H": H, "dtype": dtype})
+        precision = to.float32
+        var_states = FullEM({"N": N, "H": H, "precision": precision})
 
     return Setup
 

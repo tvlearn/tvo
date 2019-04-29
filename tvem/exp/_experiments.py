@@ -20,17 +20,17 @@ import torch.distributed as dist
 
 
 def _make_var_states(
-    conf: EStepConfig, N: int, H: int, dtype: to.dtype
+    conf: EStepConfig, N: int, H: int, precision: to.dtype
 ) -> Union[EEMVariationalStates, FullEM]:
     if isinstance(conf, FullEMConfig):
-        return FullEM({"N": N, "H": H, "dtype": dtype})
+        return FullEM({"N": N, "H": H, "precision": precision})
     elif isinstance(conf, EEMConfig):
-        return _make_EEM_var_states(conf, N, H, dtype)
+        return _make_EEM_var_states(conf, N, H, precision)
     else:  # pragma: no cover
         raise NotImplementedError()
 
 
-def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
+def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
     selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
     mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
     if conf.crossover:
@@ -44,7 +44,7 @@ def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, dtype: to.dtype):
         "S": conf.n_states,
         "N": N,
         "H": H,
-        "dtype": dtype,
+        "precision": precision,
     }
     return EEMVariationalStates(eem_conf)
 
@@ -116,7 +116,7 @@ class _TrainingAndOrValidation(Experiment):
 
         It performs training and/or validation/testings depending on what input is provided.
         """
-        dtype = conf.precision
+        precision = conf.precision
         H = sum(model.shape[1:])
         self.model = model
         self.warmup_Esteps = conf.warmup_Esteps
@@ -127,7 +127,7 @@ class _TrainingAndOrValidation(Experiment):
         self.train_states = None
         if train_dataset is not None:
             if train_dataset.dtype is not to.uint8:
-                train_dataset = train_dataset.to(dtype=dtype)
+                train_dataset = train_dataset.to(dtype=precision)
             train_dataset = train_dataset.to(device=tvem.get_device())
             self.train_data = TVEMDataLoader(
                 train_dataset,
@@ -136,7 +136,7 @@ class _TrainingAndOrValidation(Experiment):
                 drop_last=conf.drop_last,
             )
             N = train_dataset.shape[0]
-            self.train_states = _make_var_states(estep_conf, N, H, dtype)
+            self.train_states = _make_var_states(estep_conf, N, H, precision)
             assert self.train_states.precision is self.model.precision
             if train_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.train_data.precision
@@ -145,7 +145,7 @@ class _TrainingAndOrValidation(Experiment):
         self.test_states = None
         if test_dataset is not None:
             if test_dataset.dtype is not to.uint8:
-                test_dataset = test_dataset.to(dtype=dtype)
+                test_dataset = test_dataset.to(dtype=precision)
             test_dataset = test_dataset.to(device=tvem.get_device())
             self.test_data = TVEMDataLoader(
                 test_dataset,
@@ -154,7 +154,7 @@ class _TrainingAndOrValidation(Experiment):
                 drop_last=conf.drop_last,
             )
             N = test_dataset.shape[0]
-            self.test_states = _make_var_states(estep_conf, N, H, dtype)
+            self.test_states = _make_var_states(estep_conf, N, H, precision)
             assert self.test_states.precision is self.model.precision
             if test_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.test_data.precision
