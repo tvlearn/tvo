@@ -43,6 +43,7 @@ class FullEM(TVEMVariationalStates):
         for c in required_keys:
             assert c in conf and conf[c] is not None
         N, H = get(conf, *required_keys)
+        conf["S"] = 2 ** H
 
         super().__init__(conf, state_matrix(H)[None, :, :].expand(N, -1, -1))
 
