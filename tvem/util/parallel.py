@@ -254,7 +254,6 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]
                 chunks[comm_size - 1] = chunks[comm_size - 1][
                     : (local_length_ - empty_length)
                 ]  # remove dummy rows again
-                print(local_length)
                 data = torch.cat(chunks)
                 tensors.append(data)
 
