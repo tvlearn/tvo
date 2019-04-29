@@ -44,7 +44,7 @@ def setup(request):
         N, D, H = 2, 1, 2
         pi_init = to.full((H,), 0.5)
         W_init = to.full((D, H), 0.5)
-        m = NoisyOR(H, D, W_init, pi_init, precision=to.float32)
+        m = NoisyOR(N, H, D, W_init, pi_init, precision=to.float32)
         all_s = AllStatesExceptZero(N, H)
         data = to.tensor([[0], [1]], dtype=to.uint8, device=_device)
         # p(s) = 1/4 p(y=1|0,0) = 0, p(y=1|0,1) = p(y=1|1,0) = 1/2, p(y=1|1,1) = 3/4

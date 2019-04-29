@@ -17,6 +17,7 @@ class NoisyOR(TVEMModel):
 
     def __init__(
         self,
+        N: int,
         H: int,
         D: int,
         W_init: Tensor = None,
@@ -25,6 +26,7 @@ class NoisyOR(TVEMModel):
     ):
         """Shallow NoisyOR model.
 
+        :param N: Total number of datapoints in the dataset.
         :param H: Number of hidden units.
         :param D: Number of observables.
         :param W_init: Tensor with shape (D,H), initializes NoisyOR weights.
@@ -58,6 +60,7 @@ class NoisyOR(TVEMModel):
         self.new_pi = to.zeros(H, device=device, dtype=precision)
         self.Btilde = to.zeros(D, H, device=device, dtype=precision)
         self.Ctilde = to.zeros(D, H, device=device, dtype=precision)
+        self.N = N
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for NoisyOR."""
@@ -108,10 +111,10 @@ class NoisyOR(TVEMModel):
         K = states.K[idx]
         Kfloat = K.type_as(lpj).permute(2, 0, 1)  # shape (H,N,S)
         deltaY = (batch.any(dim=1) == 0).type_as(lpj)
-        batch_size = states.K.shape[0]
 
         # pi_h = sum{n}{<K_nkh>} / N
-        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1) / batch_size
+        # (division by N has to wait until after the mpi all_reduce)
+        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1)
         assert not to.isnan(self.new_pi).any()
 
         # Ws_dhns = 1 - (W_dh * Kfloat_hns)
@@ -130,7 +133,7 @@ class NoisyOR(TVEMModel):
 
     def update_param_epoch(self) -> None:
         all_reduce(self.new_pi)
-        self.theta["pies"][:] = self.new_pi
+        self.theta["pies"][:] = self.new_pi / self.N
         to.clamp(self.theta["pies"], self.eps, 1 - self.eps, out=self.theta["pies"])
         self.new_pi[:] = 0.0
 

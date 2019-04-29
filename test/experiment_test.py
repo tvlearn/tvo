@@ -107,7 +107,7 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
     """
     N, S, D, H = get(hyperparams.__dict__, "N", "S", "D", "H")
     if request.param == "NoisyOR":
-        return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
+        return NoisyOR(N=N, H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == "BSC":
         conf = {
             "N": N,
