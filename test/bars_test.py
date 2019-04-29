@@ -9,7 +9,6 @@ from tvem.util.parallel import init_processes, broadcast
 from tvem.util import get
 import tvem
 import os
-import glob
 import numpy as np
 import h5py
 import pytest
@@ -199,6 +198,8 @@ def check_file(input_file):
         F_seq_cuda = to.tensor(f["train_F"])
         f.close()
         assert (F_mpi == F_seq_cpu).all() and (F_seq_cpu == F_seq_cuda).all()
+        # import glob
+
         # for p in glob.iglob(os.path.join('.', '*.h5')):
         #     os.remove(p)
     else:
