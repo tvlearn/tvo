@@ -114,10 +114,9 @@ def model_and_data(request, hyperparams, estep_conf):
         sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
-        to.manual_seed(999)
-        if tvem.get_device().type == "cuda":
-            to.cuda.manual_seed_all(999)
-        W_init = to.rand((D, H), dtype=precision, device=tvem.get_device())
+        to.manual_seed(999)        
+        W_init = to.rand((D, H), dtype=precision)
+        W_init = W_init.to(device=tvem.get_device())
         broadcast(W_init)
 
         sigma_init = to.tensor([1.0], dtype=precision, device=tvem.get_device())
@@ -147,10 +146,9 @@ def model_and_data(request, hyperparams, estep_conf):
         W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, dtype=precision)
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
-        to.manual_seed(999)
-        if tvem.get_device().type == "cuda":
-            to.cuda.manual_seed_all(999)
-        W_init = to.rand((D, H), dtype=precision, device=tvem.get_device())
+        to.manual_seed(999)        
+        W_init = to.rand((D, H), dtype=precision)
+        W_init = W_init.to(device=tvem.get_device())
         broadcast(W_init)
         pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
 
