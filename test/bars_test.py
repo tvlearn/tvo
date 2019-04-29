@@ -85,6 +85,16 @@ def estep_conf(request, hyperparams):
     return FullEMConfig()
 
 
+def write_dataset(fname, N, D, dtype, model):
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    if rank == 0:
+        if not os.path.exists(fname):
+            f = h5py.File(fname, mode="w")
+            data = f.create_dataset("data", (N, D), dtype=dtype)
+            data[:] = model.generate_data(N)["data"].cpu()
+            f.close()
+
+
 @pytest.fixture(scope="function", params=("BSC", "NoisyOR"))
 def model_and_data(request, hyperparams, estep_conf):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
@@ -93,7 +103,6 @@ def model_and_data(request, hyperparams, estep_conf):
     """
     if tvem.get_run_policy() == "mpi":
         init_processes()
-    rank = dist.get_rank() if dist.is_initialized() else 0
 
     precision, N, S, D, H, batch_size = get(
         hyperparams.__dict__, "precision", "N", "S", "D", "H", "batch_size"
@@ -127,11 +136,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
         fname = "bars_test_data_bsc.h5"
 
-        if rank == 0:
-            f = h5py.File(fname, mode="w")
-            data = f.create_dataset("data", (N, D), dtype=np.float32)
-            data[:] = model.generate_data(N)["data"].cpu()
-            f.close()
+        write_dataset(fname, N, D, np.float32, model)
 
         model.theta["W"] = W_init
         model.theta["sigma"] = sigma_init
@@ -153,11 +158,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
         fname = "bars_test_data_nor.h5"
 
-        if rank == 0:
-            f = h5py.File(fname, mode="w")
-            data = f.create_dataset("data", (N, D), dtype=np.uint8)
-            data[:] = model.generate_data(N)["data"].cpu()
-            f.close()
+        write_dataset(fname, N, D, np.uint8, model)
 
         model.theta["W"] = W_init
         model.theta["pies"] = pies_init
@@ -182,6 +183,7 @@ def check_file(input_file):
     output_file_mpi = ofname.replace(".h5", "_mpi.h5")
     output_file_seq_cpu = ofname.replace(".h5", "_seq_cpu.h5")
     output_file_seq_cuda = ofname.replace(".h5", "_seq_cuda.h5")
+    eps = 1e-5  # to tolerate a bit of noise in floating point calculations
 
     if (
         os.path.exists(output_file_mpi)
@@ -197,10 +199,14 @@ def check_file(input_file):
         f = h5py.File(output_file_seq_cuda, "r")
         F_seq_cuda = to.tensor(f["train_F"])
         f.close()
-        assert (F_mpi == F_seq_cpu).all() and (F_seq_cpu == F_seq_cuda).all()
+        assert np.all(np.diff(F_mpi) >= -eps)
+        assert np.all(np.diff(F_seq_cpu) >= -eps)
+        assert np.all(np.diff(F_seq_cuda) >= -eps)
+        assert to.allclose(F_mpi, F_seq_cpu)
+        assert to.allclose(F_seq_cpu, F_seq_cuda)
         # import glob
 
-        # for p in glob.iglob(os.path.join('.', '*.h5')):
+        # for p in glob.glob('*.h5'):
         #     os.remove(p)
     else:
         return
