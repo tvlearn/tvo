@@ -19,7 +19,7 @@ def setup(request):
     class Setup:
         N, H = 10, 8
         dtype = to.float32
-        var_states = FullEM({"N": N, "H": H, "S": 2 ** H, "dtype": dtype})
+        var_states = FullEM({"N": N, "H": H, "dtype": dtype})
 
     return Setup
 

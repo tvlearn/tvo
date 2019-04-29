@@ -23,7 +23,7 @@ def _make_var_states(
     conf: EStepConfig, N: int, H: int, dtype: to.dtype
 ) -> Union[EEMVariationalStates, FullEM]:
     if isinstance(conf, FullEMConfig):
-        return FullEM({"N": N, "H": H, "S": 2 ** H, "dtype": dtype})
+        return FullEM({"N": N, "H": H, "dtype": dtype})
     elif isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, dtype)
     else:  # pragma: no cover
