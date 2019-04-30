@@ -204,7 +204,7 @@ def check_file(input_file):
         assert to.allclose(F_seq_cpu, F_seq_cuda)
         import glob
 
-        for p in glob.glob("*.h5") + glob.glob("*.old") + glob.glob("*.h5.old"):
+        for p in glob.glob("*.h5") + glob.glob("*.old"):
             os.remove(p)
     else:
         return
