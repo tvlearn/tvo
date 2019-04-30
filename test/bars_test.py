@@ -202,10 +202,10 @@ def check_file(input_file):
         assert np.all(np.diff(F_seq_cuda) >= -eps)
         assert to.allclose(F_mpi, F_seq_cpu)
         assert to.allclose(F_seq_cpu, F_seq_cuda)
-        # import glob
+        import glob
 
-        # for p in glob.glob('*.h5'):
-        #     os.remove(p)
+        for p in glob.glob("*.h5") + glob.glob("*.old") + glob.glob("*.h5.old"):
+            os.remove(p)
     else:
         return
 
