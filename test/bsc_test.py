@@ -34,7 +34,7 @@ def setup(request):
             "precision": precision,
         }
         m = BSC(conf, W_init, sigma_init, pi_init)
-        conf = {"N": N, "H": H, "S": 2 ** H, "precision": precision}
+        conf = {"N": N, "H": H, "precision": precision}
         all_s = FullEM(conf)
         all_s.lpj = to.zeros_like(all_s.lpj)
         data = to.tensor([[0], [1]], dtype=precision, device=_device)
