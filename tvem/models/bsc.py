@@ -176,7 +176,7 @@ class BSC(TVEMModel):
         conf = self.conf
         tmp = self.tmp
 
-        D, H = get(conf, *("D", "H"))
+        D, H = get(conf, "D", "H")
         fenergy_const = tmp["fenergy_const"]
         lpj = states.lpj[idx]
         batch_size = lpj.shape[0]
@@ -250,8 +250,8 @@ class BSC(TVEMModel):
         tmp = self.tmp
         policy = self.policy
 
-        N, H = get(conf, *("N", "H"))
-        my_pies, my_Wp, my_Wq, my_sigma = get(tmp, *("my_pies", "my_Wp", "my_Wq", "my_sigma"))
+        N, H = get(conf, "N", "H")
+        my_pies, my_Wp, my_Wq, my_sigma = get(tmp, "my_pies", "my_Wp", "my_Wq", "my_sigma")
 
         theta_new = {}
 
