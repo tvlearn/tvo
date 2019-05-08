@@ -10,7 +10,7 @@ about:
   doc_url: https://mloldenburg.gitlab.io/tvem
   description: |
    Library for truncated variational expectation maximization.
-   Install with `conda -c conda-forge -c pytorch -c mloldenburg tvem`
+   Install with `conda install -c conda-forge -c pytorch -c mloldenburg tvem`
 
 source:
   path: .
