@@ -250,7 +250,7 @@ class BSC(TVEMModel):
         tmp = self.tmp
         policy = self.policy
 
-        N, H = get(conf, "N", "H")
+        N, D = get(conf, "N", "D")
         my_pies, my_Wp, my_Wq, my_sigma = get(tmp, "my_pies", "my_Wp", "my_Wq", "my_sigma")
 
         theta_new = {}
@@ -272,7 +272,7 @@ class BSC(TVEMModel):
         theta_new["pies"] = my_pies / N
 
         # Calculate updated sigma
-        theta_new["sigma"] = to.sqrt(my_sigma / N / ((H / 2) ** 2))
+        theta_new["sigma"] = to.sqrt(my_sigma / N / D)
 
         policy["W"][0] = Wold_noisy
         policy["pies"][0] = theta["pies"]
