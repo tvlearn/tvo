@@ -122,7 +122,9 @@ class NoisyOR(TVEMModel):
         Ws_prod = to.prod(Ws, dim=1, keepdim=True)
         B = Kfloat / ((Ws * (1 - Ws_prod)) + self.eps)  # shape (D,H,N,S)
         self.Btilde.add_(
-            to.einsum("ijk,ki->ij", self._mean_posterior(B, lpj, deltaY), batch.type_as(lpj) - 1)
+            (self._mean_posterior(B, lpj, deltaY) * (batch.type_as(lpj) - 1).t().unsqueeze(1)).sum(
+                dim=2
+            )
         )
         C = Ws_prod * B / Ws
         self.Ctilde.add_(to.sum(self._mean_posterior(C, lpj, deltaY), dim=2))
@@ -195,7 +197,7 @@ class NoisyOR(TVEMModel):
         # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
         explpj = to.exp(lpj + B)
         denominator = to.sum(explpj, dim=1) + deltaY.type_as(B) * to.exp(B[:, 0])
-        means = to.einsum("...ij,ij->...i", g.type_as(lpj), explpj) / (denominator + NoisyOR.eps)
+        means = (g.type_as(lpj) * explpj).sum(dim=-1) / (denominator + NoisyOR.eps)
         assert not (to.isnan(means).any() or to.isinf(means).any())
         return means
 

@@ -166,8 +166,8 @@ class BSC(TVEMModel):
         batch_Wbar = sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :]
         tmp["indS_filled"] += S
         # is (batch_size,S)
-        lpj = to.mul(to.sum(to.pow(batch_Wbar - data[:, None, :], 2), dim=2), pre1) + to.einsum(
-            "ijk,k->ij", statesfloat, pil_bar
+        lpj = to.mul(to.sum(to.pow(batch_Wbar - data[:, None, :], 2), dim=2), pre1) + to.matmul(
+            statesfloat, pil_bar
         )
         return lpj.to(device=states.device)
 
@@ -226,12 +226,10 @@ class BSC(TVEMModel):
         batch_Wbar = sorted_by_lpj["batch_Wbar"]
 
         batch_s_pjc[:batch_size, :] = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
-        batch_Wp[:batch_size, :, :] = to.einsum(
-            "nd,nh->ndh", (batch, batch_s_pjc[:batch_size, :])
+        batch_Wp[:batch_size, :, :] = batch.unsqueeze(2) * batch_s_pjc[:batch_size].unsqueeze(
+            1
         )  # is (batch_size,D,H)
-        batch_Wq[:batch_size, :, :] = mean_posterior(
-            to.einsum("ijk,ijl->ijkl", (Kfloat, Kfloat)), lpj
-        )
+        batch_Wq[:batch_size, :, :] = mean_posterior(Kfloat.unsqueeze(3) * Kfloat.unsqueeze(2), lpj)
         # is (batch_size,H,H)
         batch_sigma[:batch_size] = mean_posterior(
             to.sum((batch[:, None, :] - batch_Wbar[:batch_size, :S, :]) ** 2, dim=2), lpj
