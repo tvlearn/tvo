@@ -84,7 +84,7 @@ class NoisyOR(TVEMModel):
         zeroStatesInd = (zeroStatesInd[:, 0], zeroStatesInd[:, 1])
         K[zeroStatesInd] = 1
         # prods_nsd = prod{h}{1-W_dh*K_nkh}
-        prods = (W*K.type_as(W).unsqueeze(2)).neg_().add_(1).prod(dim=-1)
+        prods = (W * K.type_as(W).unsqueeze(2)).neg_().add_(1).prod(dim=-1)
         # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
         f1 = to.log(1.0 / (prods + self.eps) - 1.0)
         indeces = Y[:, None, :].expand(batch_size, S, D)
@@ -115,15 +115,15 @@ class NoisyOR(TVEMModel):
         assert not to.isnan(self.new_pi).any()
 
         # Ws_dhns = 1 - (W_dh * Kfloat_hns)
-        Ws = 1 - self.theta["W"][:, :, None, None] * Kfloat[None, :, :, :]
+        Ws = (self.theta["W"][:, :, None, None] * Kfloat[None, :, :, :]).neg_().add_(1)
         Ws_prod = to.prod(Ws, dim=1, keepdim=True)
-        B = Kfloat / ((Ws * (1 - Ws_prod)) + self.eps)  # shape (D,H,N,S)
+        B = Kfloat / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # shape (D,H,N,S)
         self.Btilde.add_(
             (self._mean_posterior(B, lpj, deltaY) * (batch.type_as(lpj) - 1).t().unsqueeze(1)).sum(
                 dim=2
             )
         )
-        C = Ws_prod * B / Ws
+        C = B.mul_(Ws_prod).div_(Ws)
         self.Ctilde.add_(to.sum(self._mean_posterior(C, lpj, deltaY), dim=2))
         assert not to.isnan(self.Ctilde).any()
         assert not to.isnan(self.Btilde).any()
@@ -188,13 +188,13 @@ class NoisyOR(TVEMModel):
         """
 
         # Evaluate constants B_n by which we can translate lpj
-        B = -to.max(lpj, dim=1, keepdim=True)[0]
+        B = -to.max(lpj, dim=1)[0]
         to.clamp(B, -80, 80, out=B)
 
         # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
-        explpj = to.exp(lpj + B)
-        denominator = to.sum(explpj, dim=1) + deltaY.type_as(B) * to.exp(B[:, 0])
-        means = (g.type_as(lpj) * explpj).sum(dim=-1) / (denominator + NoisyOR.eps)
+        explpj = (lpj + B.unsqueeze(1)).exp_()
+        denominator = to.sum(explpj, dim=1) + deltaY.type_as(B).mul_(B.exp_())
+        means = (g.type_as(lpj) * explpj).sum(dim=-1).div_(denominator.add_(NoisyOR.eps))
         assert not (to.isnan(means).any() or to.isinf(means).any())
         return means
 
