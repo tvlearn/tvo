@@ -253,11 +253,9 @@ class Training(_TrainingAndOrValidation):
         :param train_data_file: Path to an HDF5 file containing the training dataset.
                                 Datasets with name "train_data" and "data" will be
                                 searched in the file, in this order.
-        :param n_train_states: Number of TVEM variational states to use for training.
         :param val_data_file: Path to an HDF5 file containing the training dataset.
                               Datasets with name "val_data" and "data" will be searched in the file,
                               in this order.
-        :param n_val_states: Number of TVEM variational states to use for validation.
 
         On the validation dataset, Training only performs E-steps without updating
         the model parameters.
@@ -283,7 +281,6 @@ class Testing(_TrainingAndOrValidation):
         :param model: TVEMModel to test
         :param data_file: Path to an HDF5 file containing the training dataset. Datasets with name
                           "test_data" and "data" will be searched in the file, in this order.
-        :param n_states: Number of TVEM variational states to use for testing.
 
         Only E-steps are run. Model parameters are not updated.
         """
