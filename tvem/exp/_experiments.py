@@ -17,6 +17,7 @@ import h5py
 from typing import Tuple, Dict, Iterable, Union
 import torch as to
 import torch.distributed as dist
+import time
 
 
 def _make_var_states(
@@ -183,14 +184,19 @@ class _TrainingAndOrValidation(Experiment):
         # EM steps
         for e in range(epochs):
             pprint(f"epoch {e}")
+            start_t = time.time()
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
-            self._log_epoch(logger, d)
+            end_t = time.time()
+            self._log_epoch(logger, d, epoch_runtime=end_t - start_t)
 
-    def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float]):
+    def _log_epoch(
+        self, logger: H5Logger, epoch_results: Dict[str, float], epoch_runtime: float = None
+    ):
         """Log F, subs, model.theta, states.K and states.lpj to file.
 
         :param logger: the logger for this run
         :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
+        :param epoch_runtime: wall-clock duration of the epoch
         """
         for data_kind in "train", "test":
             if data_kind + "_F" not in epoch_results:
@@ -214,6 +220,9 @@ class _TrainingAndOrValidation(Experiment):
                 f"{log_kind}_lpj": gather_from_processes(states.lpj),
             }
             logger.set(**states_and_lpj_dict)
+
+        if epoch_runtime is not None:
+            pprint(f"\ttotal epoch runtime: {epoch_runtime:<5.2f} s")
 
         logger.append(theta=self.model.theta)
         logger.write()
