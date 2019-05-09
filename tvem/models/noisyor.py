@@ -83,11 +83,8 @@ class NoisyOR(TVEMModel):
         # https://discuss.pytorch.org/t/use-torch-nonzero-as-index/33218
         zeroStatesInd = (zeroStatesInd[:, 0], zeroStatesInd[:, 1])
         K[zeroStatesInd] = 1
-        # prods_nkd = prod{h}{1-W_dh*K_nkh}
-        prods = to.broadcast_tensors(to.empty(batch_size, S, H, D), W.transpose(0, 1))[1].clone()
-        prod_mask = (~K).unsqueeze(-1).expand(batch_size, S, H, D)
-        prods[prod_mask] = 0.0
-        prods = to.prod(1 - prods, dim=2)
+        # prods_nsd = prod{h}{1-W_dh*K_nkh}
+        prods = (W*K.type_as(W).unsqueeze(2)).neg_().add_(1).prod(dim=-1)
         # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
         f1 = to.log(1.0 / (prods + self.eps) - 1.0)
         indeces = Y[:, None, :].expand(batch_size, S, D)
