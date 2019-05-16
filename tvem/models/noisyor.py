@@ -193,7 +193,7 @@ class NoisyOR(TVEMModel):
 
         # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
         explpj = (lpj + B.unsqueeze(1)).exp_()
-        denominator = to.sum(explpj, dim=1) + deltaY.type_as(B).mul_(B.exp_())
+        denominator = to.sum(explpj, dim=1) + deltaY.type_as(B).mul(B.exp_())
         means = (g.type_as(lpj) * explpj).sum(dim=-1).div_(denominator.add_(NoisyOR.eps))
         assert not (to.isnan(means).any() or to.isinf(means).any())
         return means
