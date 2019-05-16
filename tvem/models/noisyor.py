@@ -72,13 +72,12 @@ class NoisyOR(TVEMModel):
         batch_size, S, H = K.shape
         D = W.shape[0]
         dev = pi.device
-        logPy = to.empty((batch_size, S), device=dev, dtype=self.precision)
+
         logPriors = to.matmul(K.type_as(pi), to.log(pi / (1 - pi)))
-        # the general routine for eem sometimes require evaluation of lpjs of all-zero states,
-        # which is not supported for noisy-OR.
-        # we instead manually set the lpjs of all-zero states to low values to decrease the
-        # probability they will be selected as new variational states.
-        # in case they are nevertheless selected by eem, they are discarded by noisy-OR.
+
+        logPy = to.empty((batch_size, S), device=dev, dtype=self.precision)
+        # We will manually set the lpjs of all-zero states to the appropriate value.
+        # For now, transform all-zero states in all-one states, to avoid computation of log(0).
         zeroStatesInd = to.nonzero((K == 0).all(dim=2))
         # https://discuss.pytorch.org/t/use-torch-nonzero-as-index/33218
         zeroStatesInd = (zeroStatesInd[:, 0], zeroStatesInd[:, 1])
@@ -91,11 +90,13 @@ class NoisyOR(TVEMModel):
         f1[~indeces] = 0.0
         logPy[:, :] = to.sum(f1, dim=-1) + to.sum(to.log(prods), dim=2)
         K[zeroStatesInd] = 0
-        # return lpj_nk
+
         lpj = logPriors + logPy
-        lpj[zeroStatesInd] = -1e30  # arbitrary very low value
+        # for all-zero states, set lpj to arbitrary very low value if y!=0, 0 otherwise
+        # in the end we want exp(lpj(y,s=0)) = 1 if y=0, 0 otherwise
+        lpj[zeroStatesInd] = -1e30 * data[zeroStatesInd[0]].any(dim=1).type_as(lpj)
         assert not to.isnan(lpj).any(), "some NoisyOR lpj values are nan!"
-        return lpj.to(device=states.device)
+        return lpj.to(device=states.device)  # (N, S)
 
     def update_param_batch(
         self,
@@ -107,11 +108,10 @@ class NoisyOR(TVEMModel):
         lpj = states.lpj[idx]
         K = states.K[idx]
         Kfloat = K.type_as(lpj).permute(2, 0, 1)  # shape (H,N,S)
-        deltaY = (batch.any(dim=1) == 0).type_as(lpj)
 
         # pi_h = sum{n}{<K_hns>} / N
         # (division by N has to wait until after the mpi all_reduce)
-        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1)
+        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj), dim=1)
         assert not to.isnan(self.new_pi).any()
 
         # Ws_dhns = 1 - (W_dh * Kfloat_hns)
@@ -119,12 +119,10 @@ class NoisyOR(TVEMModel):
         Ws_prod = to.prod(Ws, dim=1, keepdim=True)
         B = Kfloat / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # shape (D,H,N,S)
         self.Btilde.add_(
-            (self._mean_posterior(B, lpj, deltaY) * (batch.type_as(lpj) - 1).t().unsqueeze(1)).sum(
-                dim=2
-            )
+            (self._mean_posterior(B, lpj) * (batch.type_as(lpj) - 1).t().unsqueeze(1)).sum(dim=2)
         )
         C = B.mul_(Ws_prod).div_(Ws)
-        self.Ctilde.add_(to.sum(self._mean_posterior(C, lpj, deltaY), dim=2))
+        self.Ctilde.add_(to.sum(self._mean_posterior(C, lpj), dim=2))
         assert not to.isnan(self.Ctilde).any()
         assert not to.isnan(self.Btilde).any()
 
@@ -146,14 +144,7 @@ class NoisyOR(TVEMModel):
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
         pi = self.theta["pies"]
         batch_size = batch.shape[0]
-        # deltaY_n is 1 if Y_nd == 0 for each d, 0 otherwise (shape=(N))
-        deltaY = (batch.any(dim=1) == 0).type_as(states.lpj)
-        B = -to.max(states.lpj[idx], dim=1, keepdim=True)[0]
-        to.clamp(B, -80, 80, out=B)
-        F = batch_size * to.sum(to.log(1 - pi)) + to.sum(
-            to.log(to.sum(to.exp(states.lpj[idx] + B) + self.eps, dim=1) + to.exp(B[:, 0]) * deltaY)
-            - B[:, 0]
-        )
+        F = batch_size * to.sum(to.log(1 - pi)) + to.logsumexp(states.lpj[idx], dim=1).sum(dim=0)
         assert not (to.isnan(F) or to.isinf(F)), f"free energy is invalid!"
         return F.item()
 
@@ -172,8 +163,9 @@ class NoisyOR(TVEMModel):
         py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
         return to.rand_like(py) < py
 
+    # TODO use the generic mean_posterior method
     @staticmethod
-    def _mean_posterior(g: Tensor, lpj: Tensor, deltaY: Tensor):
+    def _mean_posterior(g: Tensor, lpj: Tensor):
         """Evaluate the mean of array g over the posterior probability distribution.
 
         The array is assumed to have shape (...,N,K) where N is the number of
@@ -182,19 +174,16 @@ class NoisyOR(TVEMModel):
 
         The array returned has shape (...,N). Each component is the average of
         g[...,n,k], over k, weighted by lpj[k,n].
-
-
-        N.B.: g, seen as a function of data-point and state g(y,s), must satisfy g(y=0, s=0) == 0.
         """
 
         # Evaluate constants B_n by which we can translate lpj
-        B = -to.max(lpj, dim=1)[0]
-        to.clamp(B, -80, 80, out=B)
+        # For each n, we want the maximum exponent evaluated to be 0
+        B = to.max(lpj, dim=1)[0]
 
         # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
-        explpj = (lpj + B.unsqueeze(1)).exp_()
-        denominator = to.sum(explpj, dim=1) + deltaY.type_as(B).mul(B.exp_())
-        means = (g.type_as(lpj) * explpj).sum(dim=-1).div_(denominator.add_(NoisyOR.eps))
+        explpj = (lpj - B.unsqueeze(1)).exp_()
+        means = (g.type_as(lpj) * explpj).sum(dim=-1).div_(explpj.sum(dim=1))
+        assert means.shape == g.shape[:-1]
         assert not (to.isnan(means).any() or to.isinf(means).any())
         return means
 
