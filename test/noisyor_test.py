@@ -6,33 +6,9 @@ import numpy as np
 import torch as to
 import pytest
 from tvem.models import NoisyOR
-from tvem.variational import TVEMVariationalStates
+from tvem.variational import FullEM
 import math
 import tvem
-
-
-class AllStatesExceptZero(TVEMVariationalStates):
-    """All possible latent states except the all-zero one, which NoisyOR deals with separately."""
-
-    def __init__(self, N, H):
-        conf = {"N": N, "H": H, "S": 2 ** H - 1, "precision": to.float32}
-        super().__init__(conf, self._generate_all_states(N, H))
-
-    def update(self, idx, batch, lpj_fn, sort_by_lpj):
-        self.lpj = lpj_fn(batch, self.K[idx])
-        return 0
-
-    def _generate_all_states(self, N, H):
-        all_states = []
-        for i in range(1, 2 ** H):
-            i_as_binary_string = f"{i:0{H}b}"
-            s = tuple(map(int, i_as_binary_string))
-            all_states.append(s)
-        return (
-            to.tensor(all_states, dtype=to.uint8, device=tvem.get_device())
-            .unsqueeze(0)
-            .expand(N, -1, -1)
-        )
 
 
 @pytest.fixture(
@@ -45,15 +21,15 @@ def setup(request):
         pi_init = to.full((H,), 0.5)
         W_init = to.full((D, H), 0.5)
         m = NoisyOR(N, H, D, W_init, pi_init, precision=to.float32)
-        all_s = AllStatesExceptZero(N, H)
+        all_s = FullEM({"N": N, "H": H, "precision": m.precision})
         data = to.tensor([[0], [1]], dtype=to.uint8, device=_device)
         # p(s) = 1/4 p(y=1|0,0) = 0, p(y=1|0,1) = p(y=1|1,0) = 1/2, p(y=1|1,1) = 3/4
         # free_energy = np.log((1/4)*(0 + 1/2 + 1/2 + 3/4)) + np.log((1/4)*(1 + 1/2 + 1/2 + 1/4))
         true_free_energy = -1.4020427180880297
         true_lpj = to.tensor(
             [
-                [np.log(1 / 2), np.log(1 / 2), np.log(1 / 4)],
-                [np.log(1 / 2), np.log(1 / 2), np.log(3 / 4)],
+                [0, np.log(1 / 2), np.log(1 / 2), np.log(1 / 4)],
+                [-1e30, np.log(1 / 2), np.log(1 / 2), np.log(3 / 4)],
             ],
             device=_device,
         )
@@ -110,7 +86,6 @@ def test_mean_posterior(setup):
     states = setup.all_s
     N, S, _ = states.K.shape
     states.lpj[:] = m.log_pseudo_joint(setup.data, states.K)
-    deltaY = (setup.data.any(dim=1) == 0).to(states.lpj)
-    means = m._mean_posterior(to.ones((N, S)), states.lpj, deltaY)
+    means = m._mean_posterior(to.ones((N, S)), states.lpj)
     assert means.shape == (N,)
-    assert to.allclose(means, to.tensor((5 / 9, 1.0), device=tvem.get_device()))
+    assert to.allclose(means, to.ones((N,), device=tvem.get_device()))
