@@ -109,7 +109,7 @@ class NoisyOR(TVEMModel):
         Kfloat = K.type_as(lpj).permute(2, 0, 1)  # shape (H,N,S)
         deltaY = (batch.any(dim=1) == 0).type_as(lpj)
 
-        # pi_h = sum{n}{<K_nkh>} / N
+        # pi_h = sum{n}{<K_hns>} / N
         # (division by N has to wait until after the mpi all_reduce)
         self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj, deltaY), dim=1)
         assert not to.isnan(self.new_pi).any()
