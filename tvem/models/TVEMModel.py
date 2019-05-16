@@ -111,14 +111,13 @@ class TVEMModel(ABC):
         return {"data": self.generate_from_hidden(S), "hidden_state": S}
 
     @abstractmethod
-    def generate_from_hidden(self, hidden_state: Tensor) -> Dict[str, Tensor]:
+    def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Generate N random datapoints from this model.
 
         :param hidden_state: Tensor with shape (N,H) where H is the number of units in the
             first latent layer.
-
-        Data points are stored in the returned Dictionary in key 'Y' and have shape (N,D) where
-        D is the number of observables for this model.
+        :returns: Tensor with shape (N, D) containing the generated datapoints, where D is
+                  the number of observables for this model.
         """
         pass  # pragma: no cover
 
