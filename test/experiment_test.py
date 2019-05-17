@@ -77,7 +77,6 @@ def input_files(hyperparams):
         os.remove(binary_fname)
         os.remove(continuous_fname)
         os.remove("tvem_exp.h5")  # default experiment output file
-        os.remove("tvem_exp.h5.old")  # backup of default experiment output
 
 
 @pytest.fixture(scope="module", params=(True, False), ids=("cross", "nocross"))

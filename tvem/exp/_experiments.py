@@ -18,6 +18,8 @@ from typing import Tuple, Dict, Iterable, Union
 import torch as to
 import torch.distributed as dist
 import time
+from pathlib import Path
+import os
 
 
 def _make_var_states(
@@ -188,6 +190,12 @@ class _TrainingAndOrValidation(Experiment):
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
             end_t = time.time()
             self._log_epoch(logger, d, epoch_runtime=end_t - start_t)
+
+        # remove leftover ".old" logfiles produced by the logger
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        leftover_logfile = self.out_fname + ".old"
+        if rank == 0 and Path(leftover_logfile).is_file():
+            os.remove(leftover_logfile)
 
     def _log_epoch(
         self, logger: H5Logger, epoch_results: Dict[str, float], epoch_runtime: float = None
