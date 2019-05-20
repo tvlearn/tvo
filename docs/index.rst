@@ -11,7 +11,7 @@ TVEM user guide
    tvem.exp
    tvem.models
    tvem.variational
-   tvem.util
-   tvem.util.parallel
+   tvem.utils
+   tvem.utils.parallel
    tvem.trainer
    tvem.prepost

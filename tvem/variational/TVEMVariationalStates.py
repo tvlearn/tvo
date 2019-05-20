@@ -8,8 +8,8 @@ from torch import Tensor
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Any
 
-from tvem.variational._util import generate_unique_states
-from tvem.util import get
+from tvem.variational._utils import generate_unique_states
+from tvem.utils import get
 import tvem
 
 

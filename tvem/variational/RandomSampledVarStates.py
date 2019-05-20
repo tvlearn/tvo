@@ -7,7 +7,7 @@ import torch as to
 from typing import Callable, Dict, Any
 from torch import Tensor
 
-from ._util import update_states_for_batch
+from ._utils import update_states_for_batch
 from .TVEMVariationalStates import TVEMVariationalStates
 
 

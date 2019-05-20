@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.util.data import H5Logger
+from tvem.utils.data import H5Logger
 import torch as to
 import torch.distributed as dist
 import pytest

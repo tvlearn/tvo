@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.util.parallel import (
+from tvem.utils.parallel import (
     init_processes,
     scatter_to_processes,
     gather_from_processes,

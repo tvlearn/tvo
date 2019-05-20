@@ -8,7 +8,7 @@ from torch import Tensor
 from itertools import combinations
 from typing import Callable, Dict, Any
 
-from tvem.util import get
+from tvem.utils import get
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 import tvem
 

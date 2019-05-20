@@ -5,7 +5,7 @@
 
 from .TVEMModel import TVEMModel
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from tvem.util.parallel import all_reduce
+from tvem.utils.parallel import all_reduce
 from torch import Tensor
 import torch as to
 from typing import Dict, Optional, Tuple

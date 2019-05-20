@@ -6,7 +6,7 @@ import tvem
 from tvem.trainer import Trainer
 from tvem.models import NoisyOR
 from tvem.variational import RandomSampledVarStates
-from tvem.util.data import TVEMDataLoader
+from tvem.utils.data import TVEMDataLoader
 
 import pytest
 import torch as to

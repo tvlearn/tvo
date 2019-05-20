@@ -4,8 +4,8 @@
 
 from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
-from tvem.util.data import TVEMDataLoader
-from tvem.util.parallel import all_reduce
+from tvem.utils.data import TVEMDataLoader
+from tvem.utils.parallel import all_reduce
 from typing import Dict, Any
 import torch as to
 

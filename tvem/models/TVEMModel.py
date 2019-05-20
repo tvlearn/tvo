@@ -10,8 +10,8 @@ import torch.distributed as dist
 from tvem.variational import TVEMVariationalStates  # type: ignore
 from typing import Dict, Optional, Tuple, List
 import tvem
-from tvem.util.parallel import broadcast
-from tvem.util.sanity import fix_infinite, fix_bounds
+from tvem.utils.parallel import broadcast
+from tvem.utils.sanity import fix_infinite, fix_bounds
 
 
 class TVEMModel(ABC):

@@ -4,11 +4,11 @@
 
 from abc import ABC, abstractmethod
 from tvem.variational import FullEM, EEMVariationalStates
-from tvem.util.data import TVEMDataLoader, H5Logger
+from tvem.utils.data import TVEMDataLoader, H5Logger
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
-from tvem.util.parallel import pprint, init_processes, scatter_to_processes, gather_from_processes
-from tvem.util import get
+from tvem.utils.parallel import pprint, init_processes, scatter_to_processes, gather_from_processes
+from tvem.utils import get
 from tvem.exp._EStepConfig import FullEMConfig, EEMConfig, EStepConfig
 import tvem
 

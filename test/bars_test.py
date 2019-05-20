@@ -5,8 +5,8 @@
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, FullEMConfig, Training
 from tvem.models import NoisyOR, BSC
-from tvem.util.parallel import init_processes, broadcast
-from tvem.util import get
+from tvem.utils.parallel import init_processes, broadcast
+from tvem.utils import get
 import tvem
 import os
 import numpy as np
