@@ -7,7 +7,7 @@ import unittest
 
 import torch as to
 
-from tvem.variational.TVEMVariationalStates import (
+from tvem.variational._util import (
     unique_ind,
     generate_unique_states,
     update_states_for_batch,

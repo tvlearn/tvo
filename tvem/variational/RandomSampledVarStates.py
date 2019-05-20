@@ -7,7 +7,8 @@ import torch as to
 from typing import Callable, Dict, Any
 from torch import Tensor
 
-from .TVEMVariationalStates import TVEMVariationalStates, update_states_for_batch
+from ._util import update_states_for_batch
+from .TVEMVariationalStates import TVEMVariationalStates
 
 
 class RandomSampledVarStates(TVEMVariationalStates):

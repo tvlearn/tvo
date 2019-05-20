@@ -11,7 +11,8 @@ from typing import Dict, Tuple
 import tvem
 from tvem.util import get
 from tvem.util.parallel import pprint, all_reduce
-from tvem.variational.TVEMVariationalStates import TVEMVariationalStates, mean_posterior
+from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
+from tvem.variational._util import mean_posterior
 from tvem.models.TVEMModel import TVEMModel, fix_theta
 
 

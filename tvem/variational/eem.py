@@ -11,11 +11,8 @@ from torch import Tensor
 
 import tvem
 from tvem.util import get
-from tvem.variational.TVEMVariationalStates import (
-    update_states_for_batch,
-    set_redundant_lpj_to_low,
-    TVEMVariationalStates,
-)
+from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
+from tvem.variational._util import update_states_for_batch, set_redundant_lpj_to_low
 
 
 class EEMVariationalStates(TVEMVariationalStates):
