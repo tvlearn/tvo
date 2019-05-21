@@ -5,10 +5,10 @@
 from abc import ABC, abstractmethod
 from tvem.utils.data import TVEMDataLoader, H5Logger
 from tvem.models import TVEMModel
-from tvem.trainer import Trainer
 from tvem.utils.parallel import pprint, init_processes, gather_from_processes
 from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
 from tvem.utils import get
+from tvem.trainer import Trainer
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
 from tvem.variational import TVEMVariationalStates
@@ -95,7 +95,12 @@ class _TrainingAndOrValidation(Experiment):
         :param epochs: Number of epochs to train for
         """
         trainer = Trainer(
-            self.model, self.train_data, self.train_states, self.test_data, self.test_states
+            self.model,
+            self.train_data,
+            self.train_states,
+            self.test_data,
+            self.test_states,
+            rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
         )
         logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 

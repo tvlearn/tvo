@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from typing import Iterable
+from typing import Iterable, Sequence
 
 
 class ExpConfig:
@@ -16,6 +16,7 @@ class ExpConfig:
         warmup_Esteps: int = 0,
         output: str = "tvem_exp.h5",
         log_blacklist: Iterable[str] = [],
+        rollback_if_F_decreases: Sequence[str] = [],
     ):
         """Configuration object for Experiment classes.
 
@@ -41,6 +42,16 @@ class ExpConfig:
                               - "theta": a group containing logs of whatever model.theta contains
                               If one of these names appears in `log_blacklist`, the corresponing
                               quantity will not be logged.
+        :param rollback_if_F_decreases: names of model parameters (corresponding to those in
+                                        TVEMModel.theta) that should be rolled back (i.e. not
+                                        updated) if the free energy value before and after
+                                        `model.update_param_epoch` decreases for a given epoch.
+                                        This is only useful for models that perform the actual
+                                        update of those parameters in `update_param_epoch` and not
+                                        in `update_param_batch`.
+                                        BSC and NoisyOR are such models. This feature is useful,
+                                        for example, to prevent NoisyOR's M-step equation from
+                                        oscillating away from the fixed point (i.e. the optimum).
         """
         assert precision in (to.float32, to.float64), "Precision must be one of torch.float{32,64}"
         self.batch_size = batch_size
@@ -50,3 +61,4 @@ class ExpConfig:
         self.warmup_Esteps = warmup_Esteps
         self.output = output
         self.log_blacklist = log_blacklist
+        self.rollback_if_F_decreases = rollback_if_F_decreases

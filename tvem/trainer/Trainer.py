@@ -6,7 +6,7 @@ from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 from tvem.utils.data import TVEMDataLoader
 from tvem.utils.parallel import all_reduce
-from typing import Dict, Any
+from typing import Dict, Any, Sequence
 import torch as to
 
 
@@ -18,6 +18,7 @@ class Trainer:
         train_states: TVEMVariationalStates = None,
         test_data: TVEMDataLoader = None,
         test_states: TVEMVariationalStates = None,
+        rollback_if_F_decreases: Sequence[str] = [],
     ):
         """Train and/or test a given TVEMModel.
 
@@ -26,6 +27,7 @@ class Trainer:
         :param train_states: TVEMVariationalStates with shape (N,S,H)
         :param test_data: validation or test dataset. The contained dataset should have shape (M,D)
         :param test_states: TVEMVariationalStates with shape (M,Z,H)
+        :param rollback_if_F_decreases: see ExpConfig docs
 
         Both train_data and train_states must be provided, or neither.
         The same holds for test_data and test_states.
@@ -56,6 +58,7 @@ class Trainer:
             self.N_test = to.tensor(len(test_data.dataset))
             all_reduce(self.N_test)
             self.N_test = self.N_test.item()
+        self._to_rollback = rollback_if_F_decreases
 
     @staticmethod
     def _do_e_step(data: TVEMDataLoader, states: TVEMVariationalStates, model: TVEMModel, N: int):
@@ -125,7 +128,10 @@ class Trainer:
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
                 F += batch_F
-            model.update_param_epoch()
+            if len(self._to_rollback) > 0:
+                self._update_parameters_with_rollback()
+            else:
+                model.update_param_epoch()
             all_reduce(F)
             all_reduce(subs)
             ret_dict["train_F"] = F.item() / self.N_train
@@ -138,3 +144,23 @@ class Trainer:
             ret_dict["test_F"], ret_dict["test_subs"] = res
 
         return ret_dict
+
+    def _update_parameters_with_rollback(self) -> None:
+        m = self.model
+
+        assert self.train_data is not None and self.train_states is not None  # to make mypy happy
+        all_data = self.train_data.dataset.tensors[1]
+        states = self.train_states
+
+        old_params = {p: m.theta[p].clone() for p in self._to_rollback}
+        old_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        all_reduce(old_F)
+        old_lpj = states.lpj.clone()
+        m.update_param_epoch()
+        states.lpj[:] = m.log_pseudo_joint(all_data, states.K)
+        new_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        all_reduce(new_F)
+        if new_F < old_F:
+            for p in self._to_rollback:
+                m.theta[p][:] = old_params[p]
+            states.lpj[:] = old_lpj
