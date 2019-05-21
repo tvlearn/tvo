@@ -18,7 +18,7 @@ test:
     # static checkers
     - black --check -q . || { black --diff -q . && false; }
     - pylama
-    - mypy --ignore-missing-imports tvem test
+    - mypy --no-site-packages tvem test
     # CPU tests
     - pytest --cov=tvem -v test
     # GPU tests
