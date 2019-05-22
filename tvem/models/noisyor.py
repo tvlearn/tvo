@@ -5,6 +5,7 @@
 
 from .TVEMModel import TVEMModel
 from tvem.variational import TVEMVariationalStates  # type: ignore
+from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce
 from torch import Tensor
 import torch as to
@@ -107,22 +108,22 @@ class NoisyOR(TVEMModel):
     ) -> Optional[float]:
         lpj = states.lpj[idx]
         K = states.K[idx]
-        Kfloat = K.type_as(lpj).permute(2, 0, 1)  # shape (H,N,S)
+        Kfloat = K.type_as(lpj)  # shape (N,S,H)
 
         # pi_h = sum{n}{<K_hns>} / N
         # (division by N has to wait until after the mpi all_reduce)
-        self.new_pi += to.sum(self._mean_posterior(Kfloat, lpj), dim=1)
+        self.new_pi += to.sum(mean_posterior(Kfloat, lpj), dim=0)
         assert not to.isnan(self.new_pi).any()
 
-        # Ws_dhns = 1 - (W_dh * Kfloat_hns)
-        Ws = (self.theta["W"][:, :, None, None] * Kfloat[None, :, :, :]).neg_().add_(1)
-        Ws_prod = to.prod(Ws, dim=1, keepdim=True)
-        B = Kfloat / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # shape (D,H,N,S)
+        # Ws_nsdh = 1 - (W_dh * Kfloat_nsh)
+        Ws = (self.theta["W"][None, None, :, :] * Kfloat[:, :, None, :]).neg_().add_(1)  # (N,S,D,H)
+        Ws_prod = to.prod(Ws, dim=3, keepdim=True)  # (N,S,D,1)
+        B = Kfloat.unsqueeze(2) / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # (N,S,D,H)
         self.Btilde.add_(
-            (self._mean_posterior(B, lpj) * (batch.type_as(lpj) - 1).t().unsqueeze(1)).sum(dim=2)
+            (mean_posterior(B, lpj) * (batch.type_as(lpj) - 1).unsqueeze(2)).sum(dim=0)
         )
         C = B.mul_(Ws_prod).div_(Ws)
-        self.Ctilde.add_(to.sum(self._mean_posterior(C, lpj), dim=2))
+        self.Ctilde.add_(to.sum(mean_posterior(C, lpj), dim=0))
         assert not to.isnan(self.Ctilde).any()
         assert not to.isnan(self.Btilde).any()
 
@@ -162,30 +163,6 @@ class NoisyOR(TVEMModel):
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)
         py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
         return to.rand_like(py) < py
-
-    # TODO use the generic mean_posterior method
-    @staticmethod
-    def _mean_posterior(g: Tensor, lpj: Tensor):
-        """Evaluate the mean of array g over the posterior probability distribution.
-
-        The array is assumed to have shape (...,N,K) where N is the number of
-        data-points and K is the number of configurations considered by TVEM
-        (nConfs).
-
-        The array returned has shape (...,N). Each component is the average of
-        g[...,n,k], over k, weighted by lpj[k,n].
-        """
-
-        # Evaluate constants B_n by which we can translate lpj
-        # For each n, we want the maximum exponent evaluated to be 0
-        B = to.max(lpj, dim=1)[0]
-
-        # sum{k}{g_ink*exp(lpj_nk + B)} / (sum{k}{exp(lpj_nk + B)}
-        explpj = (lpj - B.unsqueeze(1)).exp_()
-        means = (g.type_as(lpj) * explpj).sum(dim=-1).div_(explpj.sum(dim=1))
-        assert means.shape == g.shape[:-1]
-        assert not (to.isnan(means).any() or to.isinf(means).any())
-        return means
 
     @property
     def shape(self) -> Tuple[int, ...]:
