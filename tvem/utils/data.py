@@ -11,7 +11,7 @@ from os import path, rename
 
 
 class TVEMDataLoader(DataLoader):
-    def __init__(self, data: to.Tensor, *args, **kwargs):
+    def __init__(self, *data: to.Tensor, **kwargs):
         """TVEM DataLoader class. Derived from torch.utils.data.DataLoader.
 
         TVEMDataLoader is constructed exactly the same way as pytorch's DataLoader,
@@ -22,13 +22,12 @@ class TVEMDataLoader(DataLoader):
         tensor in the input Tensor.
 
         :param data: Tensor containing the input dataset. Must have exactly two dimensions (N,D).
-        :param args: forwarded to pytorch's DataLoader.
         :param kwargs: forwarded to pytorch's DataLoader.
         """
-        N = data.shape[0]
-        if data.dtype is not to.uint8:
-            self.precision = data.dtype
-        super().__init__(TensorDataset(to.arange(N), data), *args, **kwargs)
+        N = data[0].shape[0]
+        if data[0].dtype is not to.uint8:
+            self.precision = data[0].dtype
+        super().__init__(TensorDataset(to.arange(N), *data), **kwargs)
 
 
 class H5Logger:
