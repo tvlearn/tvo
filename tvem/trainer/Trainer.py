@@ -58,7 +58,7 @@ class Trainer:
             self.N_test = self.N_test.item()
 
     @staticmethod
-    def _do_e_step(data, states, model, N):
+    def _do_e_step(data: TVEMDataLoader, states: TVEMVariationalStates, model: TVEMModel, N: int):
         F = to.tensor(0.0)
         subs = to.tensor(0)
         model.init_epoch()
