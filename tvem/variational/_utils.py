@@ -134,16 +134,45 @@ def _lpj2pjc(lpj: to.Tensor):
     :returns: probability tensor
     """
     up_lpg_bound = 0.0
-    shft = up_lpg_bound - lpj.max(dim=1)[0]
+    shft = up_lpg_bound - lpj.max(dim=1)[0]  # TODO could use keepdim
     tmp = to.exp(lpj + shft[:, None])
     return tmp / tmp.sum(dim=1)[:, None]
 
 
-def mean_posterior(g: to.Tensor, lpj: to.Tensor, equation: str = "ns...,ns->n..."):
+def _mean_post_einsum(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
     """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
 
-    :param g: Values of g(s) with shape (N,S,...). For other shapes equation must be specified.
-    :param lpj: Log-pseudo-joint with shape (N,S). For other shapes equation must be specified.
-    :param equation: Einsum equation according to shapes of g, lpj.
+    :param g: Values of g(s) with shape (N,S,...).
+    :param lpj: Log-pseudo-joint with shape (N,S).
+    :returns: tensor with shape (N,...).
     """
-    return to.einsum(equation, (g, _lpj2pjc(lpj)))
+    return to.einsum("ns...,ns->n...", (g, _lpj2pjc(lpj)))
+
+
+def _mean_post_mul(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
+    """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
+
+    :param g: Values of g(s) with shape (N,S,...).
+    :param lpj: Log-pseudo-joint with shape (N,S).
+    :returns: tensor with shape (N,...).
+    """
+    # reshape lpj from (N,S) to (N,S,1,...), to match dimensionality of g
+    lpj = lpj.view(*lpj.shape, *(1 for _ in range(g.ndimension() - 2)))
+    return _lpj2pjc(lpj).mul(g).sum(dim=1)
+
+
+def mean_posterior(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
+    """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
+
+    :param g: Values of g(s) with shape (N,S,...).
+    :param lpj: Log-pseudo-joint with shape (N,S).
+    :returns: tensor with shape (N,...).
+    """
+    if tvem.get_device().type == "cpu":
+        means = _mean_post_einsum(g, lpj)
+    else:
+        means = _mean_post_mul(g, lpj)
+
+    assert means.shape == (g.shape[0], *g.shape[2:])
+    assert not to.isnan(means).any() and not to.isinf(means).any()
+    return means

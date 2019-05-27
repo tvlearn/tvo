@@ -111,21 +111,21 @@ class NoisyOR(TVEMModel):
     ) -> Optional[float]:
         lpj = states.lpj[idx]
         K = states.K[idx]
-        Kfloat = K.type_as(lpj)  # shape (N,S,H)
+        Kfloat = K.type_as(lpj)
 
         # pi_h = sum{n}{<K_hns>} / N
         # (division by N has to wait until after the mpi all_reduce)
-        self.new_pi += to.sum(mean_posterior(Kfloat, lpj), dim=0)
+        self.new_pi += mean_posterior(Kfloat, lpj).sum(dim=0)
         assert not to.isnan(self.new_pi).any()
 
         # Ws_nsdh = 1 - (W_dh * Kfloat_nsh)
-        Ws = (self.theta["W"][None, None, :, :] * Kfloat[:, :, None, :]).neg_().add_(1)  # (N,S,D,H)
-        Ws_prod = to.prod(Ws, dim=3, keepdim=True)  # (N,S,D,1)
+        Ws = (self.theta["W"][None, None, :, :] * Kfloat[:, :, None, :]).neg_().add_(1)
+        Ws_prod = to.prod(Ws, dim=3, keepdim=True)
         B = Kfloat.unsqueeze(2) / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # (N,S,D,H)
         self.Btilde.add_(
             (mean_posterior(B, lpj) * (batch.type_as(lpj) - 1).unsqueeze(2)).sum(dim=0)
         )
-        C = B.mul_(Ws_prod).div_(Ws)
+        C = B.mul_(Ws_prod).div_(Ws)  # (N,S,D,H)
         self.Ctilde.add_(to.sum(mean_posterior(C, lpj), dim=0))
         assert not to.isnan(self.Ctilde).any()
         assert not to.isnan(self.Btilde).any()
