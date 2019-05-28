@@ -14,7 +14,7 @@ def setup(request):
     class Setup:
         N, D = 10, 4
         batch_size = 2
-        set1, set2 = to.rand((N, D)), to.rand((N, D))
+        set1, set2 = to.rand(N, D), to.rand(N, D)
 
     return Setup
 
