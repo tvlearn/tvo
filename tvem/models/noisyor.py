@@ -85,8 +85,9 @@ class NoisyOR(TVEMModel):
         K[zeroStatesInd] = 1
         # prods_nsd = prod{h}{1-W_dh*K_nkh}
         prods = (W * K.type_as(W).unsqueeze(2)).neg_().add_(1).prod(dim=-1)
+        to.clamp(prods, self.eps, 1 - self.eps, out=prods)
         # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
-        f1 = to.log(1.0 / (prods + self.eps) - 1.0)
+        f1 = to.log(1.0 / prods - 1.0)
         indeces = Y[:, None, :].expand(batch_size, S, D)
         f1[~indeces] = 0.0
         logPy[:, :] = to.sum(f1, dim=-1) + to.sum(to.log(prods), dim=2)
@@ -96,7 +97,9 @@ class NoisyOR(TVEMModel):
         # for all-zero states, set lpj to arbitrary very low value if y!=0, 0 otherwise
         # in the end we want exp(lpj(y,s=0)) = 1 if y=0, 0 otherwise
         lpj[zeroStatesInd] = -1e30 * data[zeroStatesInd[0]].any(dim=1).type_as(lpj)
-        assert not to.isnan(lpj).any(), "some NoisyOR lpj values are nan!"
+        assert (
+            not to.isnan(lpj).any() and not to.isinf(lpj).any()
+        ), "some NoisyOR lpj values are invalid!"
         return lpj.to(device=states.device)  # (N, S)
 
     def update_param_batch(
