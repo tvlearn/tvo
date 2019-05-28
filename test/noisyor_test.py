@@ -12,7 +12,7 @@ import tvem
 
 
 @pytest.fixture(
-    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+    scope="function", params=pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)
 )
 def setup(request):
     class Setup:
