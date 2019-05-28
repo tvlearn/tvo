@@ -5,11 +5,12 @@
 import tvem
 from tvem.trainer import Trainer
 from tvem.models import NoisyOR
-from tvem.variational import RandomSampledVarStates
+from tvem.variational import RandomSampledVarStates, FullEM
 from tvem.utils.data import TVEMDataLoader
 
 import pytest
 import torch as to
+import numpy as np
 
 
 @pytest.fixture(
@@ -74,3 +75,31 @@ def test_estep(setup):
     d1 = trainer.e_step()
     d2 = trainer.e_step()
     assert d1["test_F"] < d2["test_F"]
+
+
+@pytest.mark.gpu
+def test_rollback():
+    eps = 1e-6
+    N, H, D = 10, 4, 32
+    data = to.rand(N, D, device=tvem.get_device()) < 0.8  # noisy data
+    dataloader = TVEMDataLoader(data, batch_size=N)
+
+    # make two identical copies of the model: we'll train twice with same initial conditions
+    # parameters are initialized stochastically. here we choose a seed for which we know the
+    # unconstrained M-step will decrease free energies.
+    to.manual_seed(123)
+    m1 = NoisyOR(N, H, D, precision=to.float64)
+    m2 = NoisyOR(N, H, D, precision=m1.precision, W_init=m1.theta["W"], pi_init=m1.theta["pies"])
+
+    # use FullEM so training is deterministic
+    states = FullEM(N, H, m1.precision)
+
+    # without rollback, we get decreasing free energies
+    trainer = Trainer(m1, dataloader, states)
+    F = [trainer.em_step()["train_F"] for _ in range(50)]
+    assert np.any(np.diff(F) < -eps)
+
+    # with rollback, F always increases
+    trainer = Trainer(m2, dataloader, states, rollback_if_F_decreases=["W"])
+    F = [trainer.em_step()["train_F"] for _ in range(50)]
+    assert np.any(np.diff(F) >= -eps)
