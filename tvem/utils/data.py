@@ -25,6 +25,8 @@ class TVEMDataLoader(DataLoader):
         :param kwargs: forwarded to pytorch's DataLoader.
         """
         N = data[0].shape[0]
+        for d in data:
+            assert d.shape[0] == N, "Dimension mismatch in data sets."
         if data[0].dtype is not to.uint8:
             self.precision = data[0].dtype
         super().__init__(TensorDataset(to.arange(N), *data), **kwargs)
