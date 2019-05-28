@@ -21,12 +21,12 @@ def setup(request):
 
 def test_one_dataset(setup):
     DataLoader = TVEMDataLoader(setup.set1, batch_size=setup.batch_size)
-    assert (DataLoader.dataset.tensors[0] == to.arange(setup.N)).all()
-    assert (DataLoader.dataset.tensors[1] == setup.set1).all()
+    assert DataLoader.dataset.tensors[0].equal(to.arange(setup.N))
+    assert to.allclose(DataLoader.dataset.tensors[1], setup.set1)
 
 
 def test_two_datasets(setup):
     DataLoader = TVEMDataLoader(setup.set1, setup.set2, batch_size=setup.batch_size)
-    assert (DataLoader.dataset.tensors[0] == to.arange(setup.N)).all()
-    assert (DataLoader.dataset.tensors[1] == setup.set1).all()
-    assert (DataLoader.dataset.tensors[2] == setup.set2).all()
+    assert DataLoader.dataset.tensors[0].equal(to.arange(setup.N))
+    assert to.allclose(DataLoader.dataset.tensors[1], setup.set1)
+    assert to.allclose(DataLoader.dataset.tensors[2], setup.set2)
