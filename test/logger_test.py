@@ -5,13 +5,21 @@
 from tvem.utils.data import H5Logger
 import torch as to
 import torch.distributed as dist
+from tvem.utils.parallel import init_processes
+import tvem
 import pytest
 import h5py
 import os
 
 
+@pytest.fixture(scope="module")
+def init_mpi_if_needed():
+    if tvem.get_run_policy() == "mpi":
+        init_processes()
+
+
 @pytest.fixture(scope="function")
-def file_and_logger():
+def file_and_logger(init_mpi_if_needed):
     fname = "logger_test_output.h5"
 
     yield fname, H5Logger(fname)
