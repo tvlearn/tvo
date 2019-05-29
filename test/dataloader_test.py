@@ -9,7 +9,9 @@ from tvem.utils.data import TVEMDataLoader
 import tvem
 
 
-@pytest.fixture(scope="module", params=pytest.param(tvem.get_device().type, marks=pytest.mark.gpu))
+@pytest.fixture(
+    scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+)
 def setup(request):
     class Setup:
         N, D = 10, 4
