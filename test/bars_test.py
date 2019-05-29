@@ -59,7 +59,7 @@ def generate_bars(
     return W.view((D, H))
 
 
-@pytest.fixture(scope="module", params=gpu_and_mpi_marks)
+@pytest.fixture(scope="module", params=(gpu_and_mpi_marks,))
 def add_gpu_and_mpi_marks():
     """No-op fixture, use it to add the 'gpu' and 'mpi' marks to a test or fixture."""
     pass

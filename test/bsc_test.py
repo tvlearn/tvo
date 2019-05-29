@@ -12,7 +12,9 @@ from tvem.models import BSC
 from tvem.variational import FullEM
 
 
-@pytest.fixture(scope="module", params=pytest.param(tvem.get_device().type, marks=pytest.mark.gpu))
+@pytest.fixture(
+    scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+)
 def setup(request):
     class Setup:
         _device = tvem.get_device()
