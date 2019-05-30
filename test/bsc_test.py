@@ -34,8 +34,7 @@ def setup(request):
             "precision": precision,
         }
         m = BSC(conf, W_init, sigma_init, pi_init)
-        conf = {"N": N, "H": H, "precision": precision}
-        all_s = FullEM(conf)
+        all_s = FullEM(N, H, precision)
         all_s.lpj = to.zeros_like(all_s.lpj)
         data = to.tensor([[0], [1]], dtype=precision, device=_device)
         # lpj = \sum_h s_h \log( \pi_h/(1-\pi_h) )

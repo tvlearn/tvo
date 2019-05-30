@@ -21,7 +21,7 @@ def setup(request):
         pi_init = to.full((H,), 0.5)
         W_init = to.full((D, H), 0.5)
         m = NoisyOR(N, H, D, W_init, pi_init, precision=to.float32)
-        all_s = FullEM({"N": N, "H": H, "precision": m.precision})
+        all_s = FullEM(N, H, m.precision)
         data = to.tensor([[0], [1]], dtype=to.uint8, device=_device)
         # p(s) = 1/4 p(y=1|0,0) = 0, p(y=1|0,1) = p(y=1|1,0) = 1/2, p(y=1|1,1) = 3/4
         # free_energy = np.log((1/4)*(0 + 1/2 + 1/2 + 3/4)) + np.log((1/4)*(1 + 1/2 + 1/2 + 1/4))

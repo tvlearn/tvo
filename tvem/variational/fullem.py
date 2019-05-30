@@ -6,9 +6,8 @@ import torch as to
 
 from torch import Tensor
 from itertools import combinations
-from typing import Callable, Dict, Any
+from typing import Callable, Dict
 
-from tvem.utils import get
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 import tvem
 
@@ -34,17 +33,15 @@ def state_matrix(H: int, device: to.device = None):
 
 
 class FullEM(TVEMVariationalStates):
-    def __init__(self, conf: Dict[str, Any]):
+    def __init__(self, N: int, H: int, precision: to.dtype):
         """Full EM class.
 
-        :param conf: dictionary with hyper-parameters
+        :param N: Number of datapoints
+        :param H: Number of latent variables
+        :param precision: The floating point precision of the lpj values.
+                          Must be one of to.float32 or to.float64
         """
-        required_keys = ("N", "H")
-        for c in required_keys:
-            assert c in conf and conf[c] is not None
-        N, H = get(conf, *required_keys)
-        conf["S"] = 2 ** H
-
+        conf = dict(N=N, S=2 ** H, H=H, precision=precision)
         super().__init__(conf, state_matrix(H)[None, :, :].expand(N, -1, -1))
 
     def update(
