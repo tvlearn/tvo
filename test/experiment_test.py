@@ -146,7 +146,7 @@ def check_file(fname, *prefixes: str):
         if prefix == "test":
             assert np.all(np.diff(F) >= -eps)
         else:
-            warmup_Esteps: int = f["warmup_Esteps"][...]
+            warmup_Esteps: int = f["exp_config"]["warmup_Esteps"][...]
             assert np.all(np.diff(F[:warmup_Esteps]) >= -eps)
             # TODO for models other than NoisyOR without rollback, we can check F always increases
 

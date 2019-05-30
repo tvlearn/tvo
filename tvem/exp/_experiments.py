@@ -14,12 +14,13 @@ from tvem.exp._ExpConfig import ExpConfig
 import tvem
 
 import math
-from typing import Dict
+from typing import Dict, Any
 import torch as to
 import torch.distributed as dist
 import time
 from pathlib import Path
 import os
+from munch import Munch
 
 
 class Experiment(ABC):
@@ -43,18 +44,17 @@ class _TrainingAndOrValidation(Experiment):
 
         It performs training and/or validation/testings depending on what input is provided.
         """
-        precision = conf.precision
         H = sum(model.shape[1:])
         self.model = model
-        self.warmup_Esteps = conf.warmup_Esteps
-        self.out_fname = conf.output
-        self.log_blacklist = conf.log_blacklist
+        self._conf = Munch(vars(conf))
+        self._conf.model = type(model).__name__
+        self._estep_conf = Munch(vars(estep_conf))
 
         self.train_data = None
         self.train_states = None
         if train_dataset is not None:
             if train_dataset.dtype is not to.uint8:
-                train_dataset = train_dataset.to(dtype=precision)
+                train_dataset = train_dataset.to(dtype=conf.precision)
             train_dataset = train_dataset.to(device=tvem.get_device())
             self.train_data = TVEMDataLoader(
                 train_dataset,
@@ -63,7 +63,8 @@ class _TrainingAndOrValidation(Experiment):
                 drop_last=conf.drop_last,
             )
             N = train_dataset.shape[0]
-            self.train_states = _make_var_states(estep_conf, N, H, precision)
+            self.train_states = _make_var_states(estep_conf, N, H, conf.precision)
+            self._estep_conf.estep_type = type(self.train_states).__name__
             assert self.train_states.precision is self.model.precision
             if train_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.train_data.precision
@@ -72,7 +73,7 @@ class _TrainingAndOrValidation(Experiment):
         self.test_states = None
         if test_dataset is not None:
             if test_dataset.dtype is not to.uint8:
-                test_dataset = test_dataset.to(dtype=precision)
+                test_dataset = test_dataset.to(dtype=conf.precision)
             test_dataset = test_dataset.to(device=tvem.get_device())
             self.test_data = TVEMDataLoader(
                 test_dataset,
@@ -81,10 +82,18 @@ class _TrainingAndOrValidation(Experiment):
                 drop_last=conf.drop_last,
             )
             N = test_dataset.shape[0]
-            self.test_states = _make_var_states(estep_conf, N, H, precision)
+            self.test_states = _make_var_states(estep_conf, N, H, conf.precision)
             assert self.test_states.precision is self.model.precision
             if test_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.test_data.precision
+
+    @property
+    def conf(self) -> Dict[str, Any]:
+        return dict(self._conf)
+
+    @property
+    def estep_conf(self) -> Dict[str, Any]:
+        return dict(self._estep_conf)
 
     def run(self, epochs: int):
         """Run training and/or testing.
@@ -94,13 +103,14 @@ class _TrainingAndOrValidation(Experiment):
         trainer = Trainer(
             self.model, self.train_data, self.train_states, self.test_data, self.test_states
         )
-        logger = H5Logger(self.out_fname, blacklist=self.log_blacklist)
-        logger.set(warmup_Esteps=to.tensor(self.warmup_Esteps))
+        logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
+
+        self._log_confs(logger)
 
         # warm-up E-steps
-        if self.warmup_Esteps > 0:
+        if self._conf.warmup_Esteps > 0:
             pprint("Warm-up E-steps")
-        for e in range(self.warmup_Esteps):
+        for e in range(self._conf.warmup_Esteps):
             d = trainer.e_step()
             self._log_epoch(logger, d)
 
@@ -117,9 +127,21 @@ class _TrainingAndOrValidation(Experiment):
 
         # remove leftover ".old" logfiles produced by the logger
         rank = dist.get_rank() if dist.is_initialized() else 0
-        leftover_logfile = self.out_fname + ".old"
+        leftover_logfile = self._conf.output + ".old"
         if rank == 0 and Path(leftover_logfile).is_file():
             os.remove(leftover_logfile)
+
+    def _log_confs(self, logger: H5Logger):
+        """Dump experiment+estep configuration to screen and save it to output file."""
+        pprint("\nExperiment configuration:")
+        for k, v in self.conf.items():
+            pprint(f"\t{k:<20}: {v}")
+        logger.set(exp_config=self.conf)
+        pprint("E-step configuration:")
+        for k, v in self.estep_conf.items():
+            pprint(f"\t{k:<20}: {v}")
+        pprint()
+        logger.set(estep_config=self.estep_conf)
 
     def _log_epoch(
         self, logger: H5Logger, epoch_results: Dict[str, float], epoch_runtime: float = None
@@ -193,6 +215,8 @@ class Training(_TrainingAndOrValidation):
         if val_data_file is not None:
             val_dataset = _get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
 
+        setattr(conf, "train_dataset", train_data_file)
+        setattr(conf, "val_dataset", val_data_file)
         super().__init__(conf, estep_conf, model, train_dataset, val_dataset)
 
 
@@ -211,4 +235,6 @@ class Testing(_TrainingAndOrValidation):
         if tvem.get_run_policy() == "mpi":
             init_processes()
         dataset = _get_h5_dataset_to_processes(data_file, ("test_data", "data"))
+
+        setattr(conf, "test_dataset", data_file)
         super().__init__(conf, estep_conf, model, None, dataset)
