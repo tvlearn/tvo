@@ -14,7 +14,6 @@ import h5py
 import pytest
 import torch as to
 import torch.distributed as dist
-from collections import namedtuple
 from munch import Munch
 
 
@@ -64,8 +63,7 @@ def input_files(hyperparams):
     if tvem.get_run_policy() == "mpi":
         dist.barrier()
 
-    FileNames = namedtuple("FileNames", "binary_data, continuous_data")
-    yield FileNames(binary_data=binary_fname, continuous_data=continuous_fname)
+    yield Munch(binary_data=binary_fname, continuous_data=continuous_fname)
 
     if rank == 0:
         os.remove(binary_fname)

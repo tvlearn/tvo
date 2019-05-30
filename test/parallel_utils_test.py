@@ -13,7 +13,7 @@ import tvem
 import os
 import torch as to
 import pytest
-from collections import namedtuple
+from munch import Munch
 
 
 @pytest.fixture(scope="module")
@@ -25,8 +25,7 @@ def setup(request):
         init_processes()
         rank = to.distributed.get_rank()
         n_procs = to.distributed.get_world_size()
-    Setup = namedtuple("Setup", "rank, n_procs")
-    return Setup(rank, n_procs)
+    return Munch(rank=rank, n_procs=n_procs)
 
 
 @pytest.mark.mpi
