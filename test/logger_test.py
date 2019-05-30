@@ -37,7 +37,7 @@ def check_contents(fname):
 
     f = h5py.File(fname, "r")
     t = f["v"]
-    assert (to.tensor(t) == to.arange(6).reshape(2, 3)).all()
+    assert (to.tensor(t) == to.arange(6).view(2, 3)).all()
     f.close()
 
 
@@ -54,8 +54,8 @@ def test_append(file_and_logger):
 @pytest.mark.mpi
 def test_set(file_and_logger):
     fname, logger = file_and_logger
-    logger.set(v=to.arange(6).reshape(2, 3))
+    logger.set(v=to.arange(6).view(2, 3))
     logger.write()
-    logger.set(v=to.arange(6).reshape(2, 3))
+    logger.set(v=to.arange(6).view(2, 3))
     logger.write()
     check_contents(fname)
