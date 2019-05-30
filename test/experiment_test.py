@@ -148,6 +148,7 @@ def check_file(fname, *prefixes: str):
         else:
             warmup_Esteps: int = f["warmup_Esteps"][...]
             assert np.all(np.diff(F[:warmup_Esteps]) >= -eps)
+            # TODO for models other than NoisyOR without rollback, we can check F always increases
 
         K = f[prefix + "_states"]
         lpj = f[prefix + "_lpj"]
