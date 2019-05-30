@@ -15,6 +15,7 @@ import pytest
 import torch as to
 import torch.distributed as dist
 from collections import namedtuple
+from munch import Munch
 
 
 gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
@@ -29,14 +30,7 @@ def add_gpu_and_mpi_marks():
 @pytest.fixture(scope="module")
 def hyperparams():
     """Return an object containing hyperparametrs N,D,S,H as data members."""
-
-    class HyperParams:
-        N = 10
-        D = 8
-        S = 4
-        H = 10
-
-    return HyperParams
+    return Munch(N=10, D=8, S=4, H=10)
 
 
 @pytest.fixture(scope="module", params=[to.float32, to.float64], ids=["float32", "float64"])
@@ -104,7 +98,7 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
 
     Parametrized fixture, use it to test on several models.
     """
-    N, S, D, H = get(hyperparams.__dict__, "N", "S", "D", "H")
+    N, S, D, H = get(hyperparams, "N", "S", "D", "H")
     if request.param == "NoisyOR":
         return NoisyOR(N=N, H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == "BSC":

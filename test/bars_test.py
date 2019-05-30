@@ -14,6 +14,7 @@ import h5py
 import pytest
 import torch as to
 import torch.distributed as dist
+from munch import Munch
 
 gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
 
@@ -68,16 +69,8 @@ def add_gpu_and_mpi_marks():
 @pytest.fixture(scope="module")
 def hyperparams():
     """Return an object containing hyperparametrs N,D,S,H as data members."""
-
-    class BarsParams:
-        N = 500
-        H = 6
-        D = (H // 2) ** 2
-        S = 2 ** H
-        batch_size = 10
-        precision = to.float32
-
-    return BarsParams
+    H = 6
+    return Munch(N=500, H=H, D=(H // 2) ** 2, S=2 ** H, batch_size=10, precision=to.float32)
 
 
 @pytest.fixture(scope="module")
@@ -105,7 +98,7 @@ def model_and_data(request, hyperparams, estep_conf):
         init_processes()
 
     precision, N, S, D, H, batch_size = get(
-        hyperparams.__dict__, "precision", "N", "S", "D", "H", "batch_size"
+        hyperparams, "precision", "N", "S", "D", "H", "batch_size"
     )
 
     if request.param == "BSC":

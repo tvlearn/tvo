@@ -4,6 +4,7 @@
 
 import torch as to
 import pytest
+from munch import Munch
 
 from tvem.utils.data import TVEMDataLoader
 import tvem
@@ -13,12 +14,8 @@ import tvem
     scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
 )
 def setup(request):
-    class Setup:
-        N, D = 10, 4
-        batch_size = 2
-        set1, set2 = to.rand(N, D), to.rand(N, D)
-
-    return Setup
+    N, D = 10, 4
+    return Munch(N=N, D=D, batch_size=2, set1=to.rand(N, D), set2=to.rand(N, D))
 
 
 def test_one_dataset(setup):

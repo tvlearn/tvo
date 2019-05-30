@@ -6,6 +6,7 @@ import pytest
 import torch as to
 from tvem.variational import FullEM
 import tvem
+from munch import Munch
 
 
 def count_active_units(data, states):
@@ -16,12 +17,9 @@ def count_active_units(data, states):
     scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
 )
 def setup(request):
-    class Setup:
-        N, H = 10, 8
-        precision = to.float32
-        var_states = FullEM(N, H, precision)
-
-    return Setup
+    s = Munch(N=10, H=8, precision=to.float32)
+    s.update(var_states=FullEM(s.N, s.H, s.precision))
+    return s
 
 
 def test_init(setup):
