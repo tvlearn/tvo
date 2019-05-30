@@ -134,9 +134,9 @@ def _lpj2pjc(lpj: to.Tensor):
     :returns: probability tensor
     """
     up_lpg_bound = 0.0
-    shft = up_lpg_bound - lpj.max(dim=1)[0]  # TODO could use keepdim
-    tmp = to.exp(lpj + shft[:, None])
-    return tmp / tmp.sum(dim=1)[:, None]
+    shft = up_lpg_bound - lpj.max(dim=1, keepdim=True)[0]
+    tmp = to.exp(lpj + shft)
+    return tmp.div_(tmp.sum(dim=1, keepdim=True))
 
 
 def _mean_post_einsum(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
