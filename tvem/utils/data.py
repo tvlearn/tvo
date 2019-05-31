@@ -142,7 +142,7 @@ class H5Logger:
     @staticmethod
     def _write_one(f: h5py.Group, key: str, value: Any) -> None:
         if isinstance(value, to.Tensor):
-            f.create_dataset(key, data=value.cpu())
+            f.create_dataset(key, data=value.detach().cpu())
         elif isinstance(value, dict):
             g = f.create_group(key)
             for k, v in value.items():
