@@ -130,7 +130,7 @@ def check_file(fname, *prefixes: str):
         return
 
     f = h5py.File(fname, "r")
-    eps = 1e-5  # to tolerate a bit of noise in floating point calculations
+    eps = 1e-4  # to tolerate a bit of noise in floating point calculations
 
     for prefix in prefixes:
         F = to.tensor(f[prefix + "_F"])
