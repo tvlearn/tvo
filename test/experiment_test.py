@@ -4,7 +4,7 @@
 
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
-from tvem.models import NoisyOR, BSC
+from tvem.models import NoisyOR, BSC, TVAE
 from tvem.utils.parallel import init_processes
 from tvem.utils import get
 import tvem
@@ -90,7 +90,7 @@ def batch_size(request):
     return request.param
 
 
-@pytest.fixture(scope="function", params=("NoisyOR", "BSC"))
+@pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE"))
 def model_and_data(request, hyperparams, input_files, precision, estep_conf, batch_size):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
@@ -110,6 +110,8 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
             "precision": precision,
         }
         return BSC(conf), input_files.continuous_data
+    elif request.param == "TVAE":
+        return TVAE(N=N, shape=(D, H * 2, H), precision=precision), input_files.continuous_data
 
 
 @pytest.fixture(scope="module", params=(0, 3), ids=("nowarmup", "warmup"))
