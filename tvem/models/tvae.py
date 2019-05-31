@@ -9,7 +9,7 @@ from tvem.utils.parallel import all_reduce
 from tvem.utils import get
 import tvem
 import torch as to
-from typing import Tuple, List, Dict, Iterable, Optional
+from typing import Tuple, List, Dict, Iterable, Optional, Sequence
 from math import pi as MATH_PI
 
 
@@ -17,7 +17,7 @@ class TVAE(TVEMModel):
     def __init__(
         self,
         N: int,
-        shape: Iterable[int],
+        shape: Sequence[int],
         precision: to.dtype = to.float32,
         pi_init: to.Tensor = None,
         W_init: Iterable[to.Tensor] = None,
@@ -26,7 +26,7 @@ class TVAE(TVEMModel):
     ):
         """Create a TVAE model.
 
-        :param shape: network shape, from most hidden to observable layer: (H0, H1, ..., D).
+        :param shape: network shape, from observable to most hidden: (D,...,H1,H0)
         :param precision: one of to.float32 or to.float64, indicates the floating point precision
                           of model parameters.
         :param pi_init: optional tensor with initial prior values
@@ -36,12 +36,12 @@ class TVAE(TVEMModel):
         """
         theta = {}
         self.precision = precision
-        self._shape = to.LongTensor(shape)
+        self._net_shape = tuple(reversed(shape))
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
         theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
         theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
-        H0 = self.shape[0]
+        H0 = self._net_shape[0]
         theta["pies"] = self._init_pi(pi_init, H0)
         theta["sigma2"] = self._init_sigma2(sigma2_init)
         super().__init__(theta)
@@ -51,7 +51,7 @@ class TVAE(TVEMModel):
         self._N = N
 
     def _init_W(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
-        shape = self.shape
+        shape = self._net_shape
         if init is None:
             n_layers = len(shape) - 1
             W_shapes = ((shape[l], shape[l + 1]) for l in range(n_layers))
@@ -65,9 +65,9 @@ class TVAE(TVEMModel):
 
     def _init_b(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
         if init is None:
-            B = [self._from_normal((s,)) for s in self.shape[1:]]
+            B = [self._from_normal((s,)) for s in self._net_shape[1:]]
         else:
-            assert all(b.shape == (self.shape[l + 1],) for l, b in enumerate(init))
+            assert all(b.shape == (self._net_shape[l + 1],) for l, b in enumerate(init))
             B = [b.clone() for b in init]
         return [
             b.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for b in B
@@ -115,7 +115,7 @@ class TVAE(TVEMModel):
     def _free_energy_from_logjoints(self, lpj: to.Tensor) -> to.Tensor:
         PI = to.tensor(MATH_PI)
         pi, sigma2 = get(self.theta, "pies", "sigma2")
-        D = self.shape[-1]
+        D = self._net_shape[-1]
         # TODO summands that do not depend on N can be brought outside of the logsumexp
         # logjoints has shape (N, S)
         logjoints = lpj - D / 2 * to.log(2 * PI * sigma2) + to.log(1 - pi).sum()
@@ -132,7 +132,7 @@ class TVAE(TVEMModel):
         return F
 
     def update_param_epoch(self) -> None:
-        N, D = self._N, self.shape[-1]
+        N, D = self._N, self._net_shape[-1]
 
         all_reduce(self._new_pi)
         self.theta["pies"][:] = self._new_pi / N
@@ -164,7 +164,16 @@ class TVAE(TVEMModel):
 
     @property
     def shape(self) -> Tuple[int, ...]:
-        return tuple(self._shape.tolist())
+        """Shape of TVAE model as a bayes net: (D, H0)
+
+        Neural network shape is ignored.
+        """
+        return tuple((self._net_shape[-1], self._net_shape[0]))
+
+    @property
+    def net_shape(self) -> Tuple[int, ...]:
+        """Full TVAE network shape (D, Hn, Hn-1, ..., H0)."""
+        return tuple(reversed(self._net_shape))
 
     def _optimize_nn_params(
         self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates
@@ -206,7 +215,7 @@ class TVAE(TVEMModel):
 
     def _mlp_forward(self, x: to.Tensor) -> to.Tensor:
         """Forward application of TVAE's MLP to the specified input."""
-        assert x.shape[-1] == self.shape[0], "Incompatible shape in _mlp_forward input"
+        assert x.shape[-1] == self._net_shape[0], "Incompatible shape in _mlp_forward input"
 
         # middle layers (relu)
         output = x.to(dtype=self.precision)

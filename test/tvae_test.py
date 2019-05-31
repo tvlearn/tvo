@@ -24,15 +24,15 @@ def add_gpu_mark():
 
 
 def fullem_for(tvae, N):
-    *H, D = tvae.shape
-    return FullEM(N, H[0], tvae.precision)
+    D, H0 = tvae.shape
+    return FullEM(N, H0, tvae.precision)
 
 
 @pytest.fixture(scope="function")
 def simple_tvae(add_gpu_mark):
     N = 2
     H0, H1, D = 2, 3, 1
-    shape = (H0, H1, D)
+    shape = (D, H1, H0)
     W = [to.ones((H0, H1)), to.ones((H1, D))]
     b = [to.zeros((H1)), to.zeros((D))]
     pi = to.full((H0,), 0.2)
@@ -41,7 +41,7 @@ def simple_tvae(add_gpu_mark):
 
 
 def test_mlp_forward(simple_tvae):
-    H0, H1, D = simple_tvae.shape
+    D, H1, H0 = simple_tvae.net_shape
 
     mlp_in = to.zeros((2, H0), device=tvem.get_device())
     mlp_in[1, -1] = 1.0
@@ -66,7 +66,7 @@ def true_lpj(tvae_model, data, states):
     assert all(w.allclose(to.ones(1, device=d)) for w in tvae_model.W)
     assert all(b.allclose(to.zeros(1, device=d)) for b in tvae_model.b)
 
-    H0, H1, D = tvae_model.shape
+    D, H1, H0 = tvae_model.net_shape
     mlp_out = states.K.sum(dim=2, dtype=to.float, keepdim=True).mul_(H1)
     assert mlp_out.allclose(tvae_model._mlp_forward(states.K))
 
@@ -78,7 +78,7 @@ def true_lpj(tvae_model, data, states):
 
 
 def true_free_energy(tvae_model, data, states):
-    H0, H1, D = tvae_model.shape
+    D, H1, H0 = tvae_model.net_shape
     assert D == tvae_model.theta["b_1"].numel()
     assert D == tvae_model.theta["W_1"].shape[1]
     assert H0 == tvae_model.theta["pies"].numel()
@@ -93,7 +93,7 @@ def true_free_energy(tvae_model, data, states):
 
 def test_lpj(simple_tvae):
     N = 2
-    H0, H1, D = simple_tvae.shape
+    D, H1, H0 = simple_tvae.net_shape
     S = 2 ** H0
     states = fullem_for(simple_tvae, N=N)
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
@@ -110,15 +110,16 @@ def test_lpj(simple_tvae):
 
 def test_free_energy(simple_tvae):
     N = 2
-    H0, H1, D = simple_tvae.shape
+    D, H1, H0 = simple_tvae.net_shape
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     states = fullem_for(simple_tvae, N)
     data = to.tensor([[0.0], [1.0]], device=tvem.get_device())
     assert data.shape == (N, D)
 
     states.lpj[:] = simple_tvae.log_pseudo_joint(data, states.K)
-    F = simple_tvae.free_energy(to.arange(data.shape[0]), data, states)
-    assert F == true_free_energy(simple_tvae, data, states)
+    tvae_F = simple_tvae.free_energy(to.arange(data.shape[0]), data, states)
+    true_F = true_free_energy(simple_tvae, data, states)
+    assert math.isclose(tvae_F, true_F)
 
 
 @pytest.fixture(scope="function")
@@ -128,7 +129,7 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
     N, D = 10, 10
 
     H0, H1 = 2, 2
-    shape = (H0, H1, D)
+    shape = (D, H1, H0)
     assert H0 == H1
     W = [to.eye(H1, dtype=precision, device=d), to.rand(H1, D, dtype=precision, device=d)]
     b = [to.zeros((H1), dtype=precision, device=d), to.zeros((D), dtype=precision, device=d)]
@@ -174,7 +175,7 @@ def test_same_as_bsc(tvae_and_corresponding_bsc):
 @pytest.fixture(scope="module")
 def train_setup():
     N, D = 100, 25
-    return Munch(N=N, D=D, shape=(10, 10, D), data=to.rand(N, D, device=tvem.get_device()))
+    return Munch(N=N, D=D, shape=(D, 10, 10), data=to.rand(N, D, device=tvem.get_device()))
 
 
 @pytest.fixture(scope="function")
@@ -238,7 +239,7 @@ def test_gradients_independent_of_estep(train_setup, tvae):
 
 def test_generate_from_hidden(tvae):
     N = 1
-    H0, *_, D = tvae.shape
+    D, H0 = tvae.shape
     S = to.zeros(N, H0, dtype=to.uint8, device=tvem.get_device())
     data = tvae.generate_from_hidden(S)
     assert data.shape == (N, D)
@@ -246,7 +247,7 @@ def test_generate_from_hidden(tvae):
 
 def test_generate_data(tvae):
     N = 3
-    H0, *_, D = tvae.shape
+    D, H0 = tvae.shape
     d = tvae.generate_data(N)
     assert d["data"].shape == (N, D)
     assert d["hidden_state"].shape == (N, H0)
