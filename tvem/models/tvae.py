@@ -46,8 +46,8 @@ class TVAE(TVEMModel):
         theta["sigma2"] = self._init_sigma2(sigma2_init)
         super().__init__(theta)
 
-        self._new_pi = to.zeros(H0)
-        self._new_sigma2 = to.zeros(1)
+        self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
+        self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
         self._N = N
 
     def _init_W(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:

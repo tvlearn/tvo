@@ -6,6 +6,7 @@ import torch as to
 from tvem.models import TVAE, BSC
 from tvem.variational import FullEM
 from tvem.utils import get
+from tvem.utils.parallel import init_processes
 import tvem
 from math import pi as MATH_PI
 import math
@@ -14,13 +15,21 @@ from munch import Munch
 from copy import deepcopy
 
 
+@pytest.fixture(
+    scope="module", params=[pytest.param(tvem.get_device().type, marks=[pytest.mark.gpu])]
+)
+def add_gpu_mark():
+    """No-op fixture, use it to add the 'gpu' mark to a test or fixture."""
+    pass
+
+
 def fullem_for(tvae, N):
     *H, D = tvae.shape
     return FullEM(N, H[0], tvae.precision)
 
 
 @pytest.fixture(scope="function")
-def simple_tvae():
+def simple_tvae(add_gpu_mark):
     N = 2
     H0, H1, D = 2, 3, 1
     shape = (H0, H1, D)
@@ -34,7 +43,7 @@ def simple_tvae():
 def test_mlp_forward(simple_tvae):
     H0, H1, D = simple_tvae.shape
 
-    mlp_in = to.zeros((2, H0))
+    mlp_in = to.zeros((2, H0), device=tvem.get_device())
     mlp_in[1, -1] = 1.0
     # assuming all W==1, all b==0 and ReLU activation
     expected_output = H1 * to.relu(mlp_in.sum(dim=1, keepdim=True))
@@ -42,7 +51,7 @@ def test_mlp_forward(simple_tvae):
     out = simple_tvae._mlp_forward(mlp_in)
     assert to.allclose(out, expected_output)
 
-    mlp_in = to.rand(100, H0)
+    mlp_in = to.rand(100, H0, device=tvem.get_device())
     expected_output = H1 * mlp_in.sum(dim=1, keepdim=True)
     out = simple_tvae._mlp_forward(mlp_in)
     assert to.allclose(out, expected_output)
@@ -51,10 +60,11 @@ def test_mlp_forward(simple_tvae):
 def true_lpj(tvae_model, data, states):
     # true lpj calculations make certain simplifying assumptions on tvae
     # parameters. check they are satisfied.
+    d = tvem.get_device()
     pi, sigma2 = get(tvae_model.theta, "pies", "sigma2")
     assert all(math.isclose(pi[0], p) for p in pi)
-    assert all(w.allclose(to.ones(1)) for w in tvae_model.W)
-    assert all(b.allclose(to.zeros(1)) for b in tvae_model.b)
+    assert all(w.allclose(to.ones(1, device=d)) for w in tvae_model.W)
+    assert all(b.allclose(to.zeros(1, device=d)) for b in tvae_model.b)
 
     H0, H1, D = tvae_model.shape
     mlp_out = states.K.sum(dim=2, dtype=to.float, keepdim=True).mul_(H1)
@@ -88,7 +98,7 @@ def test_lpj(simple_tvae):
     states = fullem_for(simple_tvae, N=N)
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     assert states.K.shape == (N, S, H0)
-    data = to.tensor([[0.0], [1.0]])
+    data = to.tensor([[0.0], [1.0]], device=tvem.get_device())
     assert data.shape == (N, D)
 
     lpj = simple_tvae.log_pseudo_joint(data, states.K)
@@ -103,7 +113,7 @@ def test_free_energy(simple_tvae):
     H0, H1, D = simple_tvae.shape
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     states = fullem_for(simple_tvae, N)
-    data = to.tensor([[0.0], [1.0]])
+    data = to.tensor([[0.0], [1.0]], device=tvem.get_device())
     assert data.shape == (N, D)
 
     states.lpj[:] = simple_tvae.log_pseudo_joint(data, states.K)
@@ -112,21 +122,22 @@ def test_free_energy(simple_tvae):
 
 
 @pytest.fixture(scope="function")
-def tvae_and_corresponding_bsc():
+def tvae_and_corresponding_bsc(add_gpu_mark):
     precision = to.float64
+    d = tvem.get_device()
     N, D = 10, 10
 
     H0, H1 = 2, 2
     shape = (H0, H1, D)
     assert H0 == H1
-    W = [to.eye(H1), to.rand(H1, D)]
-    b = [to.zeros((H1)), to.zeros((D))]
-    pi = to.full((H0,), 0.2, dtype=precision)
+    W = [to.eye(H1, dtype=precision, device=d), to.rand(H1, D, dtype=precision, device=d)]
+    b = [to.zeros((H1), dtype=precision, device=d), to.zeros((D), dtype=precision, device=d)]
+    pi = to.full((H0,), 0.2, dtype=precision, device=d)
     sigma2 = 0.01
     tvae = TVAE(N, shape, pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2, precision=precision)
 
-    bsc_W = W[1].t().type(precision)
-    bsc_sigma = to.tensor([0.1], dtype=precision)
+    bsc_W = W[1].t()
+    bsc_sigma = to.tensor([0.1], dtype=precision, device=d)
     conf = {
         "N": N,
         "D": D,
@@ -144,7 +155,7 @@ def tvae_and_corresponding_bsc():
 def test_same_as_bsc(tvae_and_corresponding_bsc):
     tvae, bsc = tvae_and_corresponding_bsc
 
-    data = to.tensor([[0.0], [1.0]], dtype=tvae.precision)
+    data = to.tensor([[0.0], [1.0]], dtype=tvae.precision, device=tvem.get_device())
     N = data.shape[0]
 
     states = fullem_for(tvae, N)
@@ -163,15 +174,19 @@ def test_same_as_bsc(tvae_and_corresponding_bsc):
 @pytest.fixture(scope="module")
 def train_setup():
     N, D = 100, 25
-    return Munch(N=N, D=D, shape=(10, 10, D), data=to.rand(N, D))
+    return Munch(N=N, D=D, shape=(10, 10, D), data=to.rand(N, D, device=tvem.get_device()))
 
 
 @pytest.fixture(scope="function")
-def tvae(train_setup):
+def tvae(train_setup, add_gpu_mark):
     return TVAE(train_setup.N, train_setup.shape)
 
 
+@pytest.mark.mpi
 def test_train(train_setup, tvae):
+    if tvem.get_run_policy() == "mpi":
+        init_processes()
+
     N = train_setup.N
     states = fullem_for(tvae, N)
     data = train_setup.data
@@ -189,12 +204,16 @@ def test_train(train_setup, tvae):
     assert new_F > first_F
 
 
+@pytest.mark.mpi
 def test_gradients_independent_of_estep(train_setup, tvae):
     """Verify that weights are updated the same way independently of number of E-steps.
 
     This could not be the case if we screwed up gradient updates and they pick up on other
     calculations performed outside of the M-step.
     """
+    if tvem.get_run_policy() == "mpi":
+        init_processes()
+
     tvae_copy = deepcopy(tvae)
 
     N = train_setup.N
