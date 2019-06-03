@@ -128,7 +128,6 @@ def evolve_states(
     # It'states probable that not all new_states will be filled with a
     # new unique state. Unfilled new_states will remain uninitialized and
     # their corresponding new_lpj will be lower than any state in states[n].
-    # TODO would (max_new_states, N, H) be more performant?
     new_states = to.empty((N, max_new_states, H), dtype=to.uint8, device=device)
     new_lpj = to.empty((N, max_new_states), dtype=dtype_f, device=device)
     parents = to.empty((N, n_parents, H), dtype=to.uint8, device=device)
