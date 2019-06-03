@@ -7,6 +7,7 @@ from tvem.variational import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce
 from tvem.utils import get
+from torch.optim import Adam
 import tvem
 import torch as to
 from typing import Tuple, List, Dict, Iterable, Optional, Sequence
@@ -37,7 +38,6 @@ class TVAE(TVEMModel):
         """
         theta = {}
         self.precision = precision
-        self.lr = lr
         self._net_shape = tuple(reversed(shape))
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
@@ -51,6 +51,7 @@ class TVAE(TVEMModel):
         self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
         self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
         self._N = N
+        self._adam = Adam(self.W + self.b, lr=learning_rate)
 
     def _init_W(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
         shape = self._net_shape
@@ -151,10 +152,8 @@ class TVAE(TVEMModel):
             out=sigma2,
         )
 
-        # TODO when using a proper optimizer, just call `zero_grad()` on that
         for W, b in zip(self.W, self.b):
-            W.grad.zero_()
-            b.grad.zero_()
+            self._adam.zero_grad()
         self._new_pi.zero_()
         self._new_sigma2.zero_()
 
@@ -188,15 +187,8 @@ class TVAE(TVEMModel):
         loss = -F / data.shape[0]
         loss.backward()
 
-        with to.no_grad():
-            for w, b in zip(self.W, self.b):
-                all_reduce(w.grad)
-                all_reduce(b.grad)
-
-            # TODO use a proper optimizer, e.g. adam
-            for l in range(len(self.W)):
-                self.W[l][:] = self.W[l] - self.lr * self.W[l].grad
-                self.b[l][:] = self.b[l] - self.lr * self.b[l].grad
+        self._mpi_average_grads()
+        self._adam.step()
 
         return F.item(), mlp_out
 
@@ -225,3 +217,9 @@ class TVAE(TVEMModel):
         output = output @ self.W[-1] + self.b[-1]
 
         return output
+
+    def _mpi_average_grads(self) -> None:
+        with to.no_grad():
+            for w, b in zip(self.W, self.b):
+                all_reduce(w.grad)
+                all_reduce(b.grad)
