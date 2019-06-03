@@ -116,7 +116,6 @@ class TVAE(TVEMModel):
         PI = to.tensor(MATH_PI)
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = self._net_shape[-1]
-        # TODO summands that do not depend on N can be brought outside of the logsumexp
         # logjoints has shape (N, S)
         logjoints = lpj - D / 2 * to.log(2 * PI * sigma2) + to.log(1 - pi).sum()
         Fn = to.logsumexp(logjoints, dim=1)
