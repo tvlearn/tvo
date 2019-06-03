@@ -153,7 +153,6 @@ def evolve_states(
             device="cpu"
         )
 
-    # TODO check that new_lpj contains very low numbers
     set_redundant_lpj_to_low(new_states, new_lpj, states)
 
     return new_states, new_lpj
