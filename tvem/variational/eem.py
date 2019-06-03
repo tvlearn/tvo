@@ -332,10 +332,7 @@ def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     # NOTE: this a fitness-proportional parent selection __with replacement__
 
     precision, device = lpj.dtype, candidates.device
-    assert (
-        candidates.shape[:2] == lpj.shape
-    ), "candidates and lpj must \
-                                                have same shape"
+    assert candidates.shape[:2] == lpj.shape, "candidates and lpj must have same shape"
 
     # compute fitness (per batch)
     lpj_fitness = lpj - 2 * to.min(to.tensor([to.min(lpj).item(), 0.0])).item()
