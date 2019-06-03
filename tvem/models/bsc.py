@@ -47,19 +47,25 @@ class BSC(TVEMModel):
             "indS_filled": 0,
         }
 
-        assert W_init is None or W_init.shape == (D, H) and W_init.device == device
-        assert pies_init is None or pies_init.shape == (H,) and pies_init.device == device
-        assert sigma_init is None or sigma_init.shape == (1,) and sigma_init.device == device
+        if W_init is not None:
+            assert W_init.shape == (D, H)
+            W_init = W_init.to(dtype=precision, device=device)
+        else:
+            W_init = to.rand((D, H), dtype=precision, device=device)
 
-        theta = {
-            "pies": pies_init
-            if pies_init is not None
-            else to.full((H,), 1.0 / H, dtype=precision, device=device),
-            "W": W_init if W_init is not None else to.rand((D, H), dtype=precision, device=device),
-            "sigma": sigma_init
-            if sigma_init is not None
-            else to.tensor([1.0], dtype=precision, device=device),
-        }
+        if pies_init is not None:
+            assert pies_init.shape == (H,)
+            pies_init = pies_init.to(dtype=precision, device=device)
+        else:
+            pies_init = to.full((H,), 1.0 / H, dtype=precision, device=device)
+
+        if sigma_init is not None:
+            assert sigma_init.shape == (1,)
+            sigma_init = sigma_init.to(dtype=precision, device=device)
+        else:
+            sigma_init = to.tensor([1.0], dtype=precision, device=device)
+
+        theta = {"pies": pies_init, "W": W_init, "sigma": sigma_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
             "W": [None, to.full_like(theta["W"], -inf), to.full_like(theta["W"], inf)],
