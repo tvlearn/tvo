@@ -19,7 +19,7 @@ class TVAE(TVEMModel):
         N: int,
         shape: Sequence[int],
         precision: to.dtype = to.float32,
-        learn_rate: float = 0.01,
+        learning_rate: float = 0.01,
         pi_init: to.Tensor = None,
         W_init: Iterable[to.Tensor] = None,
         b_init: Iterable[to.Tensor] = None,
@@ -37,7 +37,7 @@ class TVAE(TVEMModel):
         """
         theta = {}
         self.precision = precision
-        self.learn_rate = learn_rate
+        self.lr = lr
         self._net_shape = tuple(reversed(shape))
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
@@ -183,8 +183,6 @@ class TVAE(TVEMModel):
         W, b are changed in-place. All other arguments are left untouched.
         :returns: F and mlp_output _before_ the weight update
         """
-        learn_rate = self.learn_rate
-
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
         F = self._free_energy_from_logjoints(lpj)
         loss = -F / data.shape[0]
@@ -197,8 +195,8 @@ class TVAE(TVEMModel):
 
             # TODO use a proper optimizer, e.g. adam
             for l in range(len(self.W)):
-                self.W[l][:] = self.W[l] - learn_rate * self.W[l].grad
-                self.b[l][:] = self.b[l] - learn_rate * self.b[l].grad
+                self.W[l][:] = self.W[l] - self.lr * self.W[l].grad
+                self.b[l][:] = self.b[l] - self.lr * self.b[l].grad
 
         return F.item(), mlp_out
 
