@@ -6,7 +6,7 @@ import torch as to
 from torch.utils.data import TensorDataset, DataLoader
 import torch.distributed as dist
 import h5py
-from typing import Union, Dict, Iterable
+from typing import Union, Dict, Iterable, Any
 from os import path, rename
 
 
@@ -98,7 +98,7 @@ class H5Logger:
 
             self._data[k] = v
 
-    def write(self):
+    def write(self) -> None:
         """Write logged data to output file.
 
         If a file with this name already exists (e.g. because of a previous call to this method)
@@ -114,10 +114,19 @@ class H5Logger:
 
         f = h5py.File(fname, "w")
         for k, v in self._data.items():
-            if isinstance(v, to.Tensor):
-                f.create_dataset(k, data=v.cpu())
-            else:  # dictionary
-                g = f.create_group(k)
-                for name, tensor in v.items():
-                    g.create_dataset(name, data=tensor.cpu())
+            H5Logger._write_one(f, k, v)
         f.close()
+
+    @staticmethod
+    def _write_one(f: h5py.Group, key: str, value: Any) -> None:
+        if isinstance(value, to.Tensor):
+            f.create_dataset(key, data=value.cpu())
+        elif isinstance(value, dict):
+            g = f.create_group(key)
+            for k, v in value.items():
+                H5Logger._write_one(g, k, v)
+        else:
+            try:
+                f.create_dataset(key, data=value)
+            except TypeError:
+                f.create_dataset(key, data=str(value))
