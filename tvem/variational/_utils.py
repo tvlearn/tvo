@@ -114,7 +114,6 @@ def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_stat
     newS = new_states.shape[1]
 
     # old_states must come first for np.unique to discard redundant new_states
-    # TODO Check if still holds for to.unique
     old_and_new = to.cat((old_states, new_states), dim=1)
     for n in range(N):
         uniq_idx = unique_ind(old_and_new[n], dim=0)
