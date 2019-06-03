@@ -19,6 +19,7 @@ class TVAE(TVEMModel):
         N: int,
         shape: Sequence[int],
         precision: to.dtype = to.float32,
+        learn_rate: float = 0.01,
         pi_init: to.Tensor = None,
         W_init: Iterable[to.Tensor] = None,
         b_init: Iterable[to.Tensor] = None,
@@ -36,6 +37,7 @@ class TVAE(TVEMModel):
         """
         theta = {}
         self.precision = precision
+        self.learn_rate = learn_rate
         self._net_shape = tuple(reversed(shape))
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
@@ -181,7 +183,7 @@ class TVAE(TVEMModel):
         W, b are changed in-place. All other arguments are left untouched.
         :returns: F and mlp_output _before_ the weight update
         """
-        learn_rate = 0.01  # TODO make this a configurable parameter
+        learn_rate = self.learn_rate
 
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
         F = self._free_energy_from_logjoints(lpj)
