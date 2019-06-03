@@ -336,8 +336,9 @@ def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
 
     # compute fitness (per batch)
     lpj_fitness = lpj - 2 * to.min(to.tensor([to.min(lpj).item(), 0.0])).item()
-    # is (batch_size, no_candidates). TODO Check if size is correct
+    # is (batch_size, no_candidates).
     lpj_fitness = lpj_fitness / lpj_fitness.sum()
+    assert lpj_fitness.shape == lpj.shape
 
     # we will look for the indeces n for which cum_p[n-1] < x < cump[n]
     # last dimension of x < cum_p will be of the form [False,...,False,
