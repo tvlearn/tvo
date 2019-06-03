@@ -13,7 +13,7 @@ from tvem.exp._EStepConfig import FullEMConfig, EEMConfig, EStepConfig
 from tvem.utils.parallel import scatter_to_processes
 
 
-def _make_var_states(
+def make_var_states(
     conf: EStepConfig, N: int, H: int, precision: to.dtype
 ) -> Union[EEMVariationalStates, FullEM]:
     if isinstance(conf, FullEMConfig):
@@ -43,7 +43,7 @@ def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
     return EEMVariationalStates(eem_conf)
 
 
-def _get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:
+def get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:
     """Return dataset with the first of `possible_keys` that is found in hdf5 file `fname`."""
     rank = dist.get_rank() if dist.is_initialized() else 0
 

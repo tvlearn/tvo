@@ -7,7 +7,7 @@ from tvem.utils.data import TVEMDataLoader, H5Logger
 from tvem.models import TVEMModel
 from tvem.trainer import Trainer
 from tvem.utils.parallel import pprint, init_processes, gather_from_processes
-from tvem.exp._utils import _make_var_states, _get_h5_dataset_to_processes
+from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
 from tvem.utils import get
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
@@ -63,7 +63,7 @@ class _TrainingAndOrValidation(Experiment):
                 drop_last=conf.drop_last,
             )
             N = train_dataset.shape[0]
-            self.train_states = _make_var_states(estep_conf, N, H, conf.precision)
+            self.train_states = make_var_states(estep_conf, N, H, conf.precision)
             self._estep_conf.estep_type = type(self.train_states).__name__
             assert self.train_states.precision is self.model.precision
             if train_dataset.dtype is not to.uint8:
@@ -82,7 +82,7 @@ class _TrainingAndOrValidation(Experiment):
                 drop_last=conf.drop_last,
             )
             N = test_dataset.shape[0]
-            self.test_states = _make_var_states(estep_conf, N, H, conf.precision)
+            self.test_states = make_var_states(estep_conf, N, H, conf.precision)
             assert self.test_states.precision is self.model.precision
             if test_dataset.dtype is not to.uint8:
                 assert self.model.precision is self.test_data.precision
@@ -210,10 +210,10 @@ class Training(_TrainingAndOrValidation):
         """
         if tvem.get_run_policy() == "mpi":
             init_processes()
-        train_dataset = _get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
+        train_dataset = get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
         val_dataset = None
         if val_data_file is not None:
-            val_dataset = _get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
+            val_dataset = get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
 
         setattr(conf, "train_dataset", train_data_file)
         setattr(conf, "val_dataset", val_data_file)
@@ -234,7 +234,7 @@ class Testing(_TrainingAndOrValidation):
         """
         if tvem.get_run_policy() == "mpi":
             init_processes()
-        dataset = _get_h5_dataset_to_processes(data_file, ("test_data", "data"))
+        dataset = get_h5_dataset_to_processes(data_file, ("test_data", "data"))
 
         setattr(conf, "test_dataset", data_file)
         super().__init__(conf, estep_conf, model, None, dataset)
