@@ -331,7 +331,7 @@ def fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
 
 
 def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
-    # FIXME this a fitness-proportional parent selection __with replacement__
+    # NOTE: this a fitness-proportional parent selection __with replacement__
 
     precision, device = lpj.dtype, candidates.device
     assert (
