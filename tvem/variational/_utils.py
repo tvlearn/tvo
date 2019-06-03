@@ -83,9 +83,8 @@ def update_states_for_batch(
     conc_states = to.cat((old_states, new_states), dim=1)
     conc_lpj = to.cat((old_lpj, new_lpj), dim=1)  # (batch_size, S+newS)
 
-    sorted_idx = to.flip(
-        to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1]
-    )  # is (batch_size, S)
+    # is (batch_size, S)
+    sorted_idx = to.flip(to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1])
     flattened_sorted_idx = sorted_idx.flatten()
 
     idx_n = idx.repeat(S, 1).t().flatten()
