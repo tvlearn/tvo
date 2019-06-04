@@ -13,7 +13,8 @@ from tvem.utils import get
 from tvem.utils.parallel import pprint, all_reduce
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
-from tvem.models.TVEMModel import TVEMModel, fix_theta
+from tvem.models.TVEMModel import TVEMModel
+from tvem.utils.sanity import fix_theta
 
 
 class BSC(TVEMModel):
