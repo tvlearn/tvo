@@ -14,19 +14,23 @@ class TVEMDataLoader(DataLoader):
     def __init__(self, *data: to.Tensor, **kwargs):
         """TVEM DataLoader class. Derived from torch.utils.data.DataLoader.
 
+        :param data: Tensor containing the input dataset. Must have exactly two dimensions (N,D).
+        :param kwargs: forwarded to pytorch's DataLoader.
+
         TVEMDataLoader is constructed exactly the same way as pytorch's DataLoader,
-        but it restricts possible input datasets to a single to.Tensor.
-        All other arguments are forwarded to pytorch's DataLoader.
+        but it restricts datasets to TensorDataset constructed from the *data passed
+        as parameter. All other arguments are forwarded to pytorch's DataLoader.
+
         When iterated over, TVEMDataLoader yields a tuple containing the indeces of
         the datapoints in each batch as well as the actual datapoints for each
         tensor in the input Tensor.
 
-        :param data: Tensor containing the input dataset. Must have exactly two dimensions (N,D).
-        :param kwargs: forwarded to pytorch's DataLoader.
+        TVEMDataLoader instances optionally expose the attribute `precision`, which is set to the
+        dtype of the first dataset in *data if it is a floating point dtype.
         """
         N = data[0].shape[0]
-        for d in data:
-            assert d.shape[0] == N, "Dimension mismatch in data sets."
+        assert all(d.shape[0] == N for d in data), "Dimension mismatch in data sets."
+
         if data[0].dtype is not to.uint8:
             self.precision = data[0].dtype
         super().__init__(TensorDataset(to.arange(N), *data), **kwargs)
