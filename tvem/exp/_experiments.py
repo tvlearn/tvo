@@ -11,6 +11,7 @@ from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
 from tvem.utils import get
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
+from tvem.variational import TVEMVariationalStates
 import tvem
 
 import math
@@ -53,39 +54,32 @@ class _TrainingAndOrValidation(Experiment):
         self.train_data = None
         self.train_states = None
         if train_dataset is not None:
-            if train_dataset.dtype is not to.uint8:
-                train_dataset = train_dataset.to(dtype=conf.precision)
-            train_dataset = train_dataset.to(device=tvem.get_device())
-            self.train_data = TVEMDataLoader(
-                train_dataset,
-                batch_size=conf.batch_size,
-                shuffle=conf.shuffle,
-                drop_last=conf.drop_last,
-            )
+            self.train_data = self._make_dataloader(train_dataset, conf)
             N = train_dataset.shape[0]
-            self.train_states = make_var_states(estep_conf, N, H, conf.precision)
-            self._estep_conf.estep_type = type(self.train_states).__name__
-            assert self.train_states.precision is self.model.precision
-            if train_dataset.dtype is not to.uint8:
-                assert self.model.precision is self.train_data.precision
+            self.train_states = self._make_states(N, H, conf.precision, estep_conf)
 
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
-            if test_dataset.dtype is not to.uint8:
-                test_dataset = test_dataset.to(dtype=conf.precision)
-            test_dataset = test_dataset.to(device=tvem.get_device())
-            self.test_data = TVEMDataLoader(
-                test_dataset,
-                batch_size=conf.batch_size,
-                shuffle=conf.shuffle,
-                drop_last=conf.drop_last,
-            )
+            self.test_data = self._make_dataloader(test_dataset, conf)
             N = test_dataset.shape[0]
-            self.test_states = make_var_states(estep_conf, N, H, conf.precision)
-            assert self.test_states.precision is self.model.precision
-            if test_dataset.dtype is not to.uint8:
-                assert self.model.precision is self.test_data.precision
+            self.test_states = self._make_states(N, H, conf.precision, estep_conf)
+
+    def _make_dataloader(self, dataset: to.Tensor, conf: ExpConfig) -> TVEMDataLoader:
+        if dataset.dtype is not to.uint8:
+            dataset = dataset.to(dtype=conf.precision)
+            assert dataset.dtype is self.model.precision
+        dataset = dataset.to(device=tvem.get_device())
+        return TVEMDataLoader(
+            dataset, batch_size=conf.batch_size, shuffle=conf.shuffle, drop_last=conf.drop_last
+        )
+
+    def _make_states(
+        self, N: int, H: int, precision: to.dtype, estep_conf: EStepConfig
+    ) -> TVEMVariationalStates:
+        states = make_var_states(estep_conf, N, H, precision)
+        assert states.precision is self.model.precision
+        return states
 
     @property
     def conf(self) -> Dict[str, Any]:
