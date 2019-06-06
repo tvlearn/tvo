@@ -136,7 +136,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             other_length = tuple(shape[1:])
 
             # no datapoints per process, rounded up if not exactly divisible
-            local_length = math.ceil(total_length / comm_size)
+            local_length = (total_length + comm_size - 1) // comm_size
 
             # in case total_length is not evenly divisible by the number of processes
             # `empty_length` dummy rows are used in process with rank comm_rank -1
