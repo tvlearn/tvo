@@ -9,6 +9,8 @@ import h5py
 from typing import Union, Dict, Iterable, Any
 from os import path, rename
 import numpy as np
+import tvem
+from tvem.utils.parallel import broadcast
 
 
 class TVEMDataLoader(DataLoader):
@@ -34,7 +36,22 @@ class TVEMDataLoader(DataLoader):
 
         if data[0].dtype is not to.uint8:
             self.precision = data[0].dtype
-        super().__init__(TensorDataset(to.arange(N), *data), **kwargs)
+
+        dataset = TensorDataset(to.arange(N), *data)
+
+        if tvem.get_run_policy() == "mpi" and "sampler" not in kwargs:
+            # Number of _desired_ datapoints per worker: the last worker might have less actual
+            # datapoints, but we want it to sample as many as the other workers so that all
+            # processes can loop over batches in sync.
+            # NOTE: this means that the E-step will sometimes write over a certain K[idx] and
+            # lpj[idx] twice over the course of an epoch, even in the same batch (although that
+            # will happen rarely). This double writing is not a race condition: the last write wins.
+            n_samples = to.tensor(N)
+            broadcast(n_samples, src=0)
+            kwargs["sampler"] = ShufflingSampler(dataset, int(n_samples))
+            kwargs["shuffle"] = None
+
+        super().__init__(dataset, **kwargs)
 
 
 class H5Logger:
