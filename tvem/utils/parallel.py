@@ -135,15 +135,12 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             total_length = shape[0].item()
             other_length = tuple(shape[1:])
 
-            # no datapoints per process
-            local_length_ = math.ceil(total_length / comm_size)
+            # no datapoints per process, rounded up if not exactly divisible
+            local_length = math.ceil(total_length / comm_size)
 
             # in case total_length is not evenly divisible by the number of processes
-            # dummy rows are used in process with rank comm_rank -1
-            empty_length = local_length_ * comm_size - total_length
-            local_length = local_length_
-            if comm_rank == comm_size - 1:
-                local_length -= empty_length
+            # `empty_length` dummy rows are used in process with rank comm_rank -1
+            empty_length = local_length * comm_size - total_length
 
             # split into chunks and scatter
             chunks = []  # type: ignore
@@ -167,7 +164,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                 )
 
             my_data = torch.zeros(
-                (local_length_,) + other_length, dtype=this_dtype, device=this_device
+                (local_length,) + other_length, dtype=this_dtype, device=this_device
             )
 
             dist.scatter(my_data, src=src, scatter_list=chunks)
@@ -175,7 +172,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             # remove dummy rows
             if empty_length != 0:
                 if comm_rank == comm_size - 1:
-                    my_data = my_data[:local_length, :]
+                    my_data = my_data[: local_length - empty_length, :]
 
             my_tensors.append(my_data)
 
