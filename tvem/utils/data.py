@@ -3,11 +3,12 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, Dataset, Sampler
 import torch.distributed as dist
 import h5py
 from typing import Union, Dict, Iterable, Any
 from os import path, rename
+import numpy as np
 
 
 class TVEMDataLoader(DataLoader):
@@ -134,3 +135,32 @@ class H5Logger:
                 f.create_dataset(key, data=value)
             except TypeError:
                 f.create_dataset(key, data=str(value))
+
+
+class ShufflingSampler(Sampler):
+    def __init__(self, dataset: Dataset, n_samples: int = None):
+        """A torch sampler that shuffles datapoints.
+
+        :param dataset: The torch dataset for this sampler.
+        :param n_samples: Number of desired samples. Defaults to len(dataset). If larger than
+                          len(dataset), some datapoints will be sampled multiple times.
+        """
+        self._ds_len = len(dataset)
+        self.n_samples = n_samples if n_samples is not None else self._ds_len
+
+    def __iter__(self):
+        idxs = np.arange(self._ds_len)
+        np.random.shuffle(idxs)
+
+        if self.n_samples > self._ds_len:
+            n_extra_samples = self.n_samples - self._ds_len
+            replace = True if n_extra_samples > idxs.size else False
+            extra_samples = np.random.choice(idxs, size=n_extra_samples, replace=replace)
+            idxs = np.concatenate((idxs, extra_samples))
+        else:
+            idxs = idxs[: self.n_samples]
+
+        return iter(idxs)
+
+    def __len__(self):
+        return self.n_samples
