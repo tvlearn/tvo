@@ -152,8 +152,7 @@ class TVAE(TVEMModel):
             out=sigma2,
         )
 
-        for W, b in zip(self.W, self.b):
-            self._adam.zero_grad()
+        self._adam.zero_grad()
         self._new_pi.zero_()
         self._new_sigma2.zero_()
 
