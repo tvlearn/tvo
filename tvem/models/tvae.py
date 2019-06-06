@@ -10,6 +10,7 @@ from tvem.utils import get
 from torch.optim import Adam
 import tvem
 import torch as to
+import torch.distributed as dist
 from typing import Tuple, List, Dict, Iterable, Optional, Sequence
 from math import pi as MATH_PI
 
@@ -219,6 +220,9 @@ class TVAE(TVEMModel):
 
     def _mpi_average_grads(self) -> None:
         with to.no_grad():
+            n_procs = dist.get_world_size() if tvem.get_run_policy() == "mpi" else 1
             for w, b in zip(self.W, self.b):
                 all_reduce(w.grad)
+                w.grad /= n_procs
                 all_reduce(b.grad)
+                b.grad /= n_procs
