@@ -61,4 +61,5 @@ class EEMConfig(EStepConfig):
 
 class FullEMConfig(EStepConfig):
     def __init__(self):
+        """Full EM configuration. Does not require parameters."""
         pass
