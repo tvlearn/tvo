@@ -43,7 +43,7 @@ def simple_tvae(add_gpu_mark):
 def test_mlp_forward(simple_tvae):
     D, H1, H0 = simple_tvae.net_shape
 
-    mlp_in = to.zeros((2, H0), device=tvem.get_device())
+    mlp_in = to.zeros((2, H0), device=tvem.get_device(), dtype=simple_tvae.precision)
     mlp_in[1, -1] = 1.0
     # assuming all W==1, all b==0 and ReLU activation
     expected_output = H1 * to.relu(mlp_in.sum(dim=1, keepdim=True))
@@ -51,7 +51,7 @@ def test_mlp_forward(simple_tvae):
     out = simple_tvae._mlp_forward(mlp_in)
     assert to.allclose(out, expected_output)
 
-    mlp_in = to.rand(100, H0, device=tvem.get_device())
+    mlp_in = to.rand(100, H0, device=tvem.get_device(), dtype=simple_tvae.precision)
     expected_output = H1 * mlp_in.sum(dim=1, keepdim=True)
     out = simple_tvae._mlp_forward(mlp_in)
     assert to.allclose(out, expected_output)
@@ -63,15 +63,15 @@ def true_lpj(tvae_model, data, states):
     d = tvem.get_device()
     pi, sigma2 = get(tvae_model.theta, "pies", "sigma2")
     assert all(math.isclose(pi[0], p) for p in pi)
-    assert all(w.allclose(to.ones(1, device=d)) for w in tvae_model.W)
-    assert all(b.allclose(to.zeros(1, device=d)) for b in tvae_model.b)
+    assert all(w.allclose(to.ones(1, device=d, dtype=tvae_model.precision)) for w in tvae_model.W)
+    assert all(b.allclose(to.zeros(1, device=d, dtype=tvae_model.precision)) for b in tvae_model.b)
 
     D, H1, H0 = tvae_model.net_shape
-    mlp_out = states.K.sum(dim=2, dtype=to.float, keepdim=True).mul_(H1)
+    mlp_out = states.K.sum(dim=2, dtype=tvae_model.precision, keepdim=True).mul_(H1)
     assert mlp_out.allclose(tvae_model._mlp_forward(states.K))
 
     s1 = (data.unsqueeze(1) - mlp_out).pow_(2).sum(dim=2).div_(2 * sigma2)
-    s2 = states.K.float().matmul(to.log(pi / (1 - pi)))
+    s2 = states.K.to(dtype=tvae_model.precision).matmul(to.log(pi / (1 - pi)))
     true_lpj = s2.sub_(s1)
 
     return true_lpj
@@ -98,7 +98,7 @@ def test_lpj(simple_tvae):
     states = fullem_for(simple_tvae, N=N)
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     assert states.K.shape == (N, S, H0)
-    data = to.tensor([[0.0], [1.0]], device=tvem.get_device())
+    data = to.tensor([[0.0], [1.0]], device=tvem.get_device(), dtype=simple_tvae.precision)
     assert data.shape == (N, D)
 
     lpj = simple_tvae.log_pseudo_joint(data, states.K)
@@ -113,7 +113,7 @@ def test_free_energy(simple_tvae):
     D, H1, H0 = simple_tvae.net_shape
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     states = fullem_for(simple_tvae, N)
-    data = to.tensor([[0.0], [1.0]], device=tvem.get_device())
+    data = to.tensor([[0.0], [1.0]], device=tvem.get_device(), dtype=simple_tvae.precision)
     assert data.shape == (N, D)
 
     states.lpj[:] = simple_tvae.log_pseudo_joint(data, states.K)
@@ -180,7 +180,7 @@ def train_setup():
 
 @pytest.fixture(scope="function")
 def tvae(train_setup, add_gpu_mark):
-    return TVAE(train_setup.N, train_setup.shape)
+    return TVAE(train_setup.N, train_setup.shape, precision=train_setup.data.dtype)
 
 
 @pytest.mark.mpi
