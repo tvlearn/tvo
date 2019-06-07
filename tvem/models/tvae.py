@@ -20,7 +20,7 @@ class TVAE(TVEMModel):
         self,
         N: int,
         shape: Sequence[int],
-        precision: to.dtype = to.float32,
+        precision: to.dtype = to.float64,
         learning_rate: float = 0.01,
         pi_init: to.Tensor = None,
         W_init: Iterable[to.Tensor] = None,
