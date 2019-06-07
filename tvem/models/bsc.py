@@ -179,15 +179,11 @@ class BSC(TVEMModel):
         )
         return lpj.to(device=states.device)
 
-    def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
-
-        fenergy_const = self.tmp["fenergy_const"]
-        lpj = states.lpj[idx]
-        batch_size = lpj.shape[0]
-
-        lpj_shifted_sum_chunk = to.logsumexp(lpj, dim=1).sum()
-
-        return (fenergy_const * batch_size + lpj_shifted_sum_chunk).item()
+    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
+        """Evaluate log-joints for BSC."""
+        if lpj is None:
+            lpj = self.log_pseudo_joint(data, states)
+        return lpj + self.tmp["fenergy_const"]
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
 

@@ -64,10 +64,16 @@ class Trainer:
     def _do_e_step(data: TVEMDataLoader, states: TVEMVariationalStates, model: TVEMModel, N: int):
         F = to.tensor(0.0)
         subs = to.tensor(0)
+
+        if model.log_pseudo_joint is NotImplemented:
+            lpj_func = model.log_joint
+        else:
+            lpj_func = model.log_pseudo_joint
+
         model.init_epoch()
         for idx, batch in data:
             model.init_batch()
-            subs += states.update(idx, batch, model.log_pseudo_joint)
+            subs += states.update(idx, batch, lpj_func)
             F += model.free_energy(idx, batch, states)
         all_reduce(F)
         all_reduce(subs)
@@ -111,7 +117,10 @@ class Trainer:
         model = self.model
         train_data, train_states = self.train_data, self.train_states
         test_data, test_states = self.test_data, self.test_states
-        lpj_fn = self.model.log_pseudo_joint
+        if self.model.log_pseudo_joint is NotImplemented:
+            lpj_fn = self.model.log_joint
+        else:
+            lpj_fn = self.model.log_pseudo_joint
 
         ret_dict = {}
 

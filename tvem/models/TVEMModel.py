@@ -29,17 +29,32 @@ class TVEMModel(ABC):
         if last_dtype is not None:
             self.precision = last_dtype
 
+    """Evaluate log-pseudo-joint probabilities for this model.
+
+    Function signature: log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor.
+
+    :param data: shape is (N,D)
+    :param states: shape is (N,S,H)
+    :returns: log-pseudo-joints for data and states - shape is (N,S)
+
+    Log-pseudo-joint probabilities are the log-joint probabilities of the model
+    for the specified set of datapoints and variational states where, potentially,
+    some factors that do not depend on the variational states have been elided.
+
+    Implementation of this method is an optional performance optimization.
+    """
+    log_pseudo_joint = NotImplemented
+
     @abstractmethod
-    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
-        """Evaluate log-pseudo-joint probabilities for this model.
+    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
+        """Evaluate log-joint probabilities for this model.
 
         :param data: shape is (N,D)
         :param states: shape is (N,S,H)
-        :returns: log-pseudo-joints for data and states - shape is (N,S)
-
-        Log-pseudo-joint probabilities are the log-joint probabilities of the model
-        for the specified set of datapoints and variational states where, potentially,
-        some factors that do not depend on the variational states have been elided.
+        :param lpj: shape is (N,S). For models that implement the log_pseudo_joint method, when
+                    lpj is not None it will contain pre-evaluated log-pseudo joints for the given
+                    data and statss.
+        :returns: log-joints for data and states - shape is (N,S)
         """
         pass  # pragma: no cover
 
@@ -78,7 +93,6 @@ class TVEMModel(ABC):
         """
         pass  # pragma: no cover
 
-    @abstractmethod
     def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
@@ -86,7 +100,12 @@ class TVEMModel(ABC):
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all TVEMVariationalStates states for this dataset
         """
-        pass  # pragma: no cover
+        if self.log_pseudo_joint is NotImplemented:
+            log_joints = states.lpj[idx]
+        else:
+            log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx])
+
+        return to.logsumexp(log_joints, dim=1).sum(dim=0).item()
 
     def generate_data(self, N: int) -> Dict[str, Tensor]:
         """Sample N datapoints from this model.

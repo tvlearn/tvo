@@ -145,12 +145,12 @@ class NoisyOR(TVEMModel):
         self.Btilde[:] = 0.0
         self.Ctilde[:] = 0.0
 
-    def free_energy(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> float:
+    def log_joint(self, data, states, lpj=None):
         pi = self.theta["pies"]
-        batch_size = batch.shape[0]
-        F = batch_size * to.sum(to.log(1 - pi)) + to.logsumexp(states.lpj[idx], dim=1).sum(dim=0)
-        assert not (to.isnan(F) or to.isinf(F)), f"free energy is invalid!"
-        return F.item()
+        if lpj is None:
+            lpj = self.log_pseudo_joint(data, states)
+        # TODO: could pre-evaluate the constant factor once per epoch
+        return to.sum(to.log(1 - pi)) + lpj
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Use hidden states to sample datapoints according to the NoisyOR generative model.
