@@ -5,7 +5,6 @@
 import torch as to
 
 from torch import Tensor
-from itertools import combinations
 from typing import Callable, Dict
 
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
@@ -21,15 +20,12 @@ def state_matrix(H: int, device: to.device = None):
     """
     if device is None:
         device = tvem.get_device()
-    sl = []
-    for g in range(0, H + 1):
-        for s in combinations(range(H), g):
-            sl.append(to.tensor(s, dtype=to.int64))
-    SM = to.zeros((len(sl), H), dtype=to.uint8, device=device)
-    for i in range(len(sl)):
-        s = sl[i]
-        SM[i, s] = 1
-    return SM
+
+    all_states = to.empty((2 ** H, H), dtype=to.uint8, device=device)
+    for state in range(2 ** H):
+        bit_sequence = tuple(int(bit) for bit in f"{state:0{H}b}")
+        all_states[state] = to.tensor(bit_sequence, dtype=to.uint8, device=device)
+    return all_states
 
 
 class FullEM(TVEMVariationalStates):
