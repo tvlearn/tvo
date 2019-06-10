@@ -19,27 +19,30 @@ class TVAE(TVEMModel):
     def __init__(
         self,
         N: int,
-        shape: Sequence[int],
+        shape: Sequence[int] = None,
         precision: to.dtype = to.float64,
         learning_rate: float = 0.01,
         pi_init: to.Tensor = None,
-        W_init: Iterable[to.Tensor] = None,
-        b_init: Iterable[to.Tensor] = None,
+        W_init: Sequence[to.Tensor] = None,
+        b_init: Sequence[to.Tensor] = None,
         sigma2_init: float = None,
     ):
         """Create a TVAE model.
 
-        :param shape: network shape, from observable to most hidden: (D,...,H1,H0)
-        :param precision: one of to.float32 or to.float64, indicates the floating point precision
+        :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
+                      Can be None if W_init is not None.
+        :param precision: One of to.float32 or to.float64, indicates the floating point precision
                           of model parameters.
-        :param pi_init: optional tensor with initial prior values
-        :param W_init: optional list of tensors with initial weight values
-        :param b_init: optional list of tensors with initial
-        :param sigma2_init: optional initial value for model variance
+        :param pi_init: Optional tensor with initial prior values
+        :param W_init: Optional list of tensors with initial weight values. Weight matrices
+                       must be ordered from most hidden to observable layer. If this parameter
+                       is not None, the shape parameter can be omitted.
+        :param b_init: Optional list of tensors with initial
+        :param sigma2_init: Optional initial value for model variance
         """
         theta = {}
         self.precision = precision
-        self._net_shape = tuple(reversed(shape))
+        self._net_shape = self._get_net_shape(shape, W_init)
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
         theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
@@ -53,6 +56,13 @@ class TVAE(TVEMModel):
         self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
         self._N = N
         self._adam = Adam(self.W + self.b, lr=learning_rate)
+
+    def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
+        if shape is not None:
+            return tuple(reversed(shape))
+        else:
+            assert W_init is not None, "Must pass one of `shape` and `W_init` to TVAE.__init__"
+            return tuple(w.shape[0] for w in W_init) + (W_init[-1].shape[1],)
 
     def _init_W(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
         shape = self._net_shape

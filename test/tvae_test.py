@@ -32,12 +32,11 @@ def fullem_for(tvae, N):
 def simple_tvae(add_gpu_mark):
     N = 2
     H0, H1, D = 2, 3, 1
-    shape = (D, H1, H0)
     W = [to.ones((H0, H1)), to.ones((H1, D))]
     b = [to.zeros((H1)), to.zeros((D))]
     pi = to.full((H0,), 0.2)
     sigma2 = 0.01
-    return TVAE(N, shape, pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
+    return TVAE(N, pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
 
 
 def test_forward(simple_tvae):
@@ -129,13 +128,12 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
     N, D = 10, 10
 
     H0, H1 = 2, 2
-    shape = (D, H1, H0)
     assert H0 == H1
     W = [to.eye(H1, dtype=precision, device=d), to.rand(H1, D, dtype=precision, device=d)]
     b = [to.zeros((H1), dtype=precision, device=d), to.zeros((D), dtype=precision, device=d)]
     pi = to.full((H0,), 0.2, dtype=precision, device=d)
     sigma2 = 0.01
-    tvae = TVAE(N, shape, pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2, precision=precision)
+    tvae = TVAE(N, pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2, precision=precision)
 
     bsc_W = W[1].t()
     bsc_sigma = to.tensor([0.1], dtype=precision, device=d)
