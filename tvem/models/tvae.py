@@ -97,7 +97,7 @@ class TVAE(TVEMModel):
         return pi.to(device=tvem.get_device(), dtype=self.precision)
 
     def _init_sigma2(self, init: Optional[float]) -> to.Tensor:
-        sigma2 = to.tensor([0.01] if init is None else init)
+        sigma2 = to.tensor([0.01] if init is None else [init])
         return sigma2.to(device=tvem.get_device(), dtype=self.precision)
 
     @staticmethod
