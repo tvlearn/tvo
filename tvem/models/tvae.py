@@ -18,7 +18,7 @@ from math import pi as MATH_PI
 class TVAE(TVEMModel):
     def __init__(
         self,
-        N: int,
+        N: int = None,
         shape: Sequence[int] = None,
         precision: to.dtype = to.float64,
         learning_rate: float = 0.01,
@@ -29,6 +29,7 @@ class TVAE(TVEMModel):
     ):
         """Create a TVAE model.
 
+        :param N: Number of datapoints used for training. Only required if TVAE is to be trained.
         :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
                       Can be None if W_init is not None.
         :param precision: One of to.float32 or to.float64, indicates the floating point precision
@@ -146,6 +147,7 @@ class TVAE(TVEMModel):
 
     def update_param_epoch(self) -> None:
         N, D = self._N, self._net_shape[-1]
+        assert N is not None, "TVAE: N is None but model is being trained."
 
         all_reduce(self._new_pi)
         self.theta["pies"][:] = self._new_pi / N
