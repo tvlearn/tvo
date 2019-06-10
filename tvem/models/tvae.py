@@ -105,7 +105,7 @@ class TVAE(TVEMModel):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         states = states.to(dtype=self.precision)
 
-        mlp_out = self._mlp_forward(states)  # (N, S, D)
+        mlp_out = self.forward(states)  # (N, S, D)
         s1 = (data.unsqueeze(1) - mlp_out).pow_(2).sum(dim=2).div_(2 * sigma2)  # (N, S)
         s2 = states @ to.log(pi / (1.0 - pi))  # (N, S)
         lpj = s2 - s1
@@ -159,7 +159,7 @@ class TVAE(TVEMModel):
 
     def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
         with to.no_grad():
-            mlp_out = self._mlp_forward(hidden_state)
+            mlp_out = self.forward(hidden_state)
         return to.distributions.Normal(loc=mlp_out, scale=self.theta["sigma2"]).sample()
 
     @property
@@ -204,9 +204,9 @@ class TVAE(TVEMModel):
         y_minus_a_sqr = (data.unsqueeze(1) - mlp_out).pow_(2)  # (D, N, S)
         self._new_sigma2.add_(mean_posterior(y_minus_a_sqr, states.lpj[idx]).sum((0, 1)))
 
-    def _mlp_forward(self, x: to.Tensor) -> to.Tensor:
+    def forward(self, x: to.Tensor) -> to.Tensor:
         """Forward application of TVAE's MLP to the specified input."""
-        assert x.shape[-1] == self._net_shape[0], "Incompatible shape in _mlp_forward input"
+        assert x.shape[-1] == self._net_shape[0], "Incompatible shape in forward input"
 
         # middle layers (relu)
         output = x.to(dtype=self.precision)

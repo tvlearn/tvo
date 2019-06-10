@@ -40,7 +40,7 @@ def simple_tvae(add_gpu_mark):
     return TVAE(N, shape, pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
 
 
-def test_mlp_forward(simple_tvae):
+def test_forward(simple_tvae):
     D, H1, H0 = simple_tvae.net_shape
 
     mlp_in = to.zeros((2, H0), device=tvem.get_device(), dtype=simple_tvae.precision)
@@ -48,12 +48,12 @@ def test_mlp_forward(simple_tvae):
     # assuming all W==1, all b==0 and ReLU activation
     expected_output = H1 * to.relu(mlp_in.sum(dim=1, keepdim=True))
 
-    out = simple_tvae._mlp_forward(mlp_in)
+    out = simple_tvae.forward(mlp_in)
     assert to.allclose(out, expected_output)
 
     mlp_in = to.rand(100, H0, device=tvem.get_device(), dtype=simple_tvae.precision)
     expected_output = H1 * mlp_in.sum(dim=1, keepdim=True)
-    out = simple_tvae._mlp_forward(mlp_in)
+    out = simple_tvae.forward(mlp_in)
     assert to.allclose(out, expected_output)
 
 
@@ -68,7 +68,7 @@ def true_lpj(tvae_model, data, states):
 
     D, H1, H0 = tvae_model.net_shape
     mlp_out = states.K.sum(dim=2, dtype=tvae_model.precision, keepdim=True).mul_(H1)
-    assert mlp_out.allclose(tvae_model._mlp_forward(states.K))
+    assert mlp_out.allclose(tvae_model.forward(states.K))
 
     s1 = (data.unsqueeze(1) - mlp_out).pow_(2).sum(dim=2).div_(2 * sigma2)
     s2 = states.K.to(dtype=tvae_model.precision).matmul(to.log(pi / (1 - pi)))
