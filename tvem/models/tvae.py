@@ -66,11 +66,15 @@ class TVAE(TVEMModel):
             return tuple(w.shape[0] for w in W_init) + (W_init[-1].shape[1],)
 
     def _init_W(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
+        """Return weights initialized with Xavier or to specified init values.
+
+        This method also makes sure that device and precision are the ones required by the model.
+        """
         shape = self._net_shape
         if init is None:
             n_layers = len(shape) - 1
             W_shapes = ((shape[l], shape[l + 1]) for l in range(n_layers))
-            W = (self._from_normal(s) for s in W_shapes)
+            W = map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes))
         else:
             assert all(w.shape == (shape[l], shape[l + 1]) for l, w in enumerate(init))
             W = (w.clone() for w in init)
@@ -79,8 +83,12 @@ class TVAE(TVEMModel):
         ]
 
     def _init_b(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
+        """Return biases initialized to zeros or to specified init values.
+
+        This method also makes sure that device and precision are the ones required by the model.
+        """
         if init is None:
-            B = [self._from_normal((s,)) for s in self._net_shape[1:]]
+            B = [to.zeros(s) for s in self._net_shape[1:]]
         else:
             assert all(b.shape == (self._net_shape[l + 1],) for l, b in enumerate(init))
             B = [b.clone() for b in init]
@@ -99,10 +107,6 @@ class TVAE(TVEMModel):
     def _init_sigma2(self, init: Optional[float]) -> to.Tensor:
         sigma2 = to.tensor([0.01] if init is None else [init])
         return sigma2.to(device=tvem.get_device(), dtype=self.precision)
-
-    @staticmethod
-    def _from_normal(shape: Iterable[int]) -> to.Tensor:
-        return to.distributions.Normal(0.0, 0.1).sample(shape)
 
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         with to.no_grad():
