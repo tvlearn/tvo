@@ -31,10 +31,12 @@ def generate_unique_states(
     if device is None:
         device = tvem.get_device()
     assert n_states <= 2 ** H, "n_states must be smaller than 2**H"
-    s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_states // 2, H))}
+    n_samples = max(n_states // 2, 1)
+
+    s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))}
     while len(s_set) < n_states:
         s_set.update(
-            {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_states // 2, H))}
+            {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))}
         )
     while len(s_set) > n_states:
         s_set.pop()
