@@ -234,8 +234,11 @@ class TVAE(TVEMModel):
         return output
 
     def _mpi_average_grads(self) -> None:
+        if tvem.get_run_policy() != "mpi":
+            return  # nothing to do
+
         with to.no_grad():
-            n_procs = dist.get_world_size() if tvem.get_run_policy() == "mpi" else 1
+            n_procs = dist.get_world_size()
             for w, b in zip(self.W, self.b):
                 all_reduce(w.grad)
                 w.grad /= n_procs
