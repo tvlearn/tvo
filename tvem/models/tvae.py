@@ -132,11 +132,10 @@ class TVAE(TVEMModel):
             return self._free_energy_from_logjoints(states.lpj[idx]).item()
 
     def _free_energy_from_logjoints(self, lpj: to.Tensor) -> to.Tensor:
-        PI = to.tensor(MATH_PI)
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = self._net_shape[-1]
         # logjoints has shape (N, S)
-        logjoints = lpj - D / 2 * to.log(2 * PI * sigma2) + to.log(1 - pi).sum()
+        logjoints = lpj - D / 2 * to.log(2 * MATH_PI * sigma2) + to.log(1 - pi).sum()
         Fn = to.logsumexp(logjoints, dim=1)
         assert Fn.shape == (lpj.shape[0],)
         return Fn.sum()
