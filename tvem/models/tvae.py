@@ -168,7 +168,6 @@ class TVAE(TVEMModel):
             out=sigma2,
         )
 
-        self._adam.zero_grad()
         self._new_pi.zero_()
         self._new_sigma2.zero_()
 
@@ -204,6 +203,7 @@ class TVAE(TVEMModel):
 
         self._mpi_average_grads()
         self._adam.step()
+        self._adam.zero_grad()
 
         return F.item(), mlp_out
 
