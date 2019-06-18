@@ -125,6 +125,7 @@ class TVAE(TVEMModel):
         s2 = states @ to.log(pi / (1.0 - pi))  # (N, S)
         lpj = s2 - s1
         assert lpj.shape == (N, S)
+        assert not to.isnan(lpj).any() and not to.isinf(lpj).any()
         return lpj, mlp_out
 
     def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
@@ -138,6 +139,7 @@ class TVAE(TVEMModel):
         logjoints = lpj - D / 2 * to.log(2 * MATH_PI * sigma2) + to.log(1 - pi).sum()
         Fn = to.logsumexp(logjoints, dim=1)
         assert Fn.shape == (lpj.shape[0],)
+        assert not to.isnan(Fn).any() and not to.isinf(Fn).any()
         return Fn.sum()
 
     def update_param_batch(
