@@ -26,10 +26,13 @@ class TVAE(TVEMModel):
         W_init: Sequence[to.Tensor] = None,
         b_init: Sequence[to.Tensor] = None,
         sigma2_init: float = None,
+        analytical_sigma_updates: bool = False,
+        analytical_pi_updates: bool = False,
     ):
         """Create a TVAE model.
 
-        :param N: Number of datapoints used for training. Only required if TVAE is to be trained.
+        :param N: Number of datapoints used for training. Only required if TVAE is to be trained
+                  and one of the analytical_*_updates parameters is True.
         :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
                       Can be None if W_init is not None.
         :param precision: One of to.float32 or to.float64, indicates the floating point precision
@@ -38,25 +41,39 @@ class TVAE(TVEMModel):
         :param W_init: Optional list of tensors with initial weight values. Weight matrices
                        must be ordered from most hidden to observable layer. If this parameter
                        is not None, the shape parameter can be omitted.
-        :param b_init: Optional list of tensors with initial
-        :param sigma2_init: Optional initial value for model variance
+        :param b_init: Optional list of tensors with initial.
+        :param sigma2_init: Optional initial value for model variance.
+        :param analytical_sigma_updates: Whether sigmas should be updated via the analytical
+                                         max-likelihood solution rather than gradient descent.
+        :param analytical_pi_updates: Whether priors should be updated via the analytical
+                                      max-likelihood solution rather than gradient descent.
         """
         theta = {}
         self.precision = precision
         self._net_shape = self._get_net_shape(shape, W_init)
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
+        self._N = N
         theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
         theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
         H0 = self._net_shape[0]
-        theta["pies"] = self._init_pi(pi_init, H0)
-        theta["sigma2"] = self._init_sigma2(sigma2_init)
+        theta["pies"] = self._init_pi(pi_init, H0, requires_grad=not analytical_pi_updates)
+        theta["sigma2"] = self._init_sigma2(sigma2_init, requires_grad=not analytical_sigma_updates)
         super().__init__(theta)
 
-        self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
-        self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
-        self._N = N
-        self._adam = Adam(self.W + self.b, lr=learning_rate)
+        gd_parameters = self.W + self.b
+
+        if analytical_sigma_updates:
+            self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
+        else:
+            gd_parameters.append(theta["sigma2"])
+
+        if analytical_pi_updates:
+            self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
+        else:
+            gd_parameters.append(theta["pies"])
+
+        self._adam = Adam(gd_parameters, lr=learning_rate)
 
     def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
         if shape is not None:
@@ -96,17 +113,19 @@ class TVAE(TVEMModel):
             b.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for b in B
         ]
 
-    def _init_pi(self, init: Optional[to.Tensor], H0: int) -> to.Tensor:
+    def _init_pi(self, init: Optional[to.Tensor], H0: int, requires_grad: bool) -> to.Tensor:
         if init is None:
             pi = to.full((H0,), 1 / H0)
         else:
             assert init.shape == (H0,)
             pi = init.clone()
-        return pi.to(device=tvem.get_device(), dtype=self.precision)
+        return pi.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(requires_grad)
 
-    def _init_sigma2(self, init: Optional[float]) -> to.Tensor:
+    def _init_sigma2(self, init: Optional[float], requires_grad: bool) -> to.Tensor:
         sigma2 = to.tensor([0.01] if init is None else [init])
-        return sigma2.to(device=tvem.get_device(), dtype=self.precision)
+        return sigma2.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(
+            requires_grad
+        )
 
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         with to.no_grad():
@@ -151,27 +170,29 @@ class TVAE(TVEMModel):
         return F
 
     def update_param_epoch(self) -> None:
-        N, D = self._N, self._net_shape[-1]
-        assert N is not None, "TVAE: N is None but model is being trained."
-
-        all_reduce(self._new_pi)
-        self.theta["pies"][:] = self._new_pi / N
-        # avoids infinites in lpj evaluation
-        to.clamp(self.theta["pies"], 1e-5, 1 - 1e-5, out=self.theta["pies"])
-
+        pi = self.theta["pies"]
         sigma2 = self.theta["sigma2"]
-        all_reduce(self._new_sigma2)
-        sigma2[:] = self._new_sigma2 / (N * D)
-        # disallow arbitrary growth of sigma. at each iteration, it can grow by at most 1%
-        to.clamp(
-            sigma2,
-            (sigma2 - sigma2.abs() * 0.01).item(),
-            (sigma2 + sigma2.abs() * 0.01).item(),
-            out=sigma2,
-        )
 
-        self._new_pi.zero_()
-        self._new_sigma2.zero_()
+        if pi.requires_grad and sigma2.requires_grad:
+            return  # nothing to do
+        else:
+            # FIXME is this N correct in mpi runs?
+            N, D = self._N, self._net_shape[-1]
+            assert N is not None, "TVAE: N is None but model is being trained."
+
+        if not pi.requires_grad:
+            all_reduce(self._new_pi)
+            pi[:] = self._new_pi / N
+            # avoids infinites in lpj evaluation
+            to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
+            self._new_pi.zero_()
+
+        if not sigma2.requires_grad:
+            all_reduce(self._new_sigma2)
+            sigma2[:] = self._new_sigma2 / (N * D)
+            # disallow arbitrary growth of sigma. at each iteration, it can grow by at most 1%
+            to.clamp(sigma2, sigma2 - sigma2.abs() * 0.01, sigma2 + sigma2.abs() * 0.01, out=sigma2)
+            self._new_sigma2.zero_()
 
     def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
         with to.no_grad():
@@ -196,6 +217,7 @@ class TVAE(TVEMModel):
     ) -> Tuple[float, to.Tensor]:
         """
         W, b are changed in-place. All other arguments are left untouched.
+
         :returns: F and mlp_output _before_ the weight update
         """
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
@@ -207,19 +229,30 @@ class TVAE(TVEMModel):
         self._adam.step()
         self._adam.zero_grad()
 
+        with to.no_grad():
+            sigma2 = self.theta["sigma2"]
+            if sigma2.requires_grad:
+                to.clamp(sigma2, 1e-5, out=sigma2)
+            pi = self.theta["pies"]
+            if pi.requires_grad:
+                to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
+
         return F.item(), mlp_out
 
     def _accumulate_param_updates(
         self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates, mlp_out: to.Tensor
     ) -> None:
         """Evaluate partial updates to pi and sigma2."""
-        # \pi_h = \frac{1}{N} \sum_n < K_nsh >_{q^n}
-        K_batch = states.K[idx].type_as(states.lpj)
-        self._new_pi.add_(mean_posterior(K_batch, states.lpj[idx]).sum(dim=0))
 
-        # \sigma2 = \frac{1}{DN} \sum_{n,d} < (y^n_d - \vec{a}^L_d)^2 >_{q^n}
-        y_minus_a_sqr = (data.unsqueeze(1) - mlp_out).pow_(2)  # (D, N, S)
-        self._new_sigma2.add_(mean_posterior(y_minus_a_sqr, states.lpj[idx]).sum((0, 1)))
+        if not self.theta["pies"].requires_grad:
+            # \pi_h = \frac{1}{N} \sum_n < K_nsh >_{q^n}
+            K_batch = states.K[idx].type_as(states.lpj)
+            self._new_pi.add_(mean_posterior(K_batch, states.lpj[idx]).sum(dim=0))
+
+        if not self.theta["sigma2"].requires_grad:
+            # \sigma2 = \frac{1}{DN} \sum_{n,d} < (y^n_d - \vec{a}^L_d)^2 >_{q^n}
+            y_minus_a_sqr = (data.unsqueeze(1) - mlp_out).pow_(2)  # (D, N, S)
+            self._new_sigma2.add_(mean_posterior(y_minus_a_sqr, states.lpj[idx]).sum((0, 1)))
 
     def forward(self, x: to.Tensor) -> to.Tensor:
         """Forward application of TVAE's MLP to the specified input."""
@@ -239,6 +272,7 @@ class TVAE(TVEMModel):
         if tvem.get_run_policy() != "mpi":
             return  # nothing to do
 
+        # FIXME is this correct/necessary? see https://bit.ly/2FlJsxS
         with to.no_grad():
             n_procs = dist.get_world_size()
             for w, b in zip(self.W, self.b):
