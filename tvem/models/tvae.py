@@ -26,8 +26,8 @@ class TVAE(TVEMModel):
         W_init: Sequence[to.Tensor] = None,
         b_init: Sequence[to.Tensor] = None,
         sigma2_init: float = None,
-        analytical_sigma_updates: bool = False,
-        analytical_pi_updates: bool = False,
+        analytical_sigma_updates: bool = True,
+        analytical_pi_updates: bool = True,
     ):
         """Create a TVAE model.
 
