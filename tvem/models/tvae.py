@@ -191,7 +191,12 @@ class TVAE(TVEMModel):
             all_reduce(self._new_sigma2)
             sigma2[:] = self._new_sigma2 / (N * D)
             # disallow arbitrary growth of sigma. at each iteration, it can grow by at most 1%
-            to.clamp(sigma2, sigma2 - sigma2.abs() * 0.01, sigma2 + sigma2.abs() * 0.01, out=sigma2)
+            to.clamp(
+                sigma2,
+                (sigma2 - sigma2.abs() * 0.01).item(),
+                (sigma2 + sigma2.abs() * 0.01).item(),
+                out=sigma2,
+            )
             self._new_sigma2.zero_()
 
     def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
