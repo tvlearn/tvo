@@ -175,9 +175,23 @@ def train_setup():
     return Munch(N=N, D=D, shape=(D, 10, 10), data=to.rand(N, D, device=tvem.get_device()))
 
 
-@pytest.fixture(scope="function")
-def tvae(train_setup, add_gpu_mark):
-    return TVAE(train_setup.N, train_setup.shape, precision=train_setup.data.dtype)
+@pytest.fixture(scope="function", params=["analytical_pisigma", "gd_sigma", "gd_pisigma"])
+def tvae(request, train_setup, add_gpu_mark):
+    analytical_pi_updates = True
+    analytical_sigma_updates = True
+    if request.param == "gd_sigma":
+        analytical_sigma_updates = False
+    if request.param == "gd_pisigma":
+        analytical_sigma_updates = False
+        analytical_pi_updates = False
+
+    return TVAE(
+        train_setup.N,
+        train_setup.shape,
+        precision=train_setup.data.dtype,
+        analytical_pi_updates=analytical_pi_updates,
+        analytical_sigma_updates=analytical_sigma_updates,
+    )
 
 
 @pytest.mark.mpi
