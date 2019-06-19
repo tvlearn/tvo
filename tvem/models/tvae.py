@@ -73,7 +73,7 @@ class TVAE(TVEMModel):
         else:
             gd_parameters.append(theta["pies"])
 
-        self._adam = Adam(gd_parameters, lr=learning_rate)
+        self._optimizer = Adam(gd_parameters, lr=learning_rate)
 
     def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
         if shape is not None:
@@ -226,8 +226,8 @@ class TVAE(TVEMModel):
         loss.backward()
 
         self._mpi_average_grads()
-        self._adam.step()
-        self._adam.zero_grad()
+        self._optimizer.step()
+        self._optimizer.zero_grad()
 
         with to.no_grad():
             sigma2 = self.theta["sigma2"]
