@@ -195,10 +195,8 @@ class TVAE(TVEMModel):
         if not sigma2.requires_grad:
             all_reduce(self._new_sigma2)
             # disallow arbitrary growth of sigma. at each iteration, it can grow by at most 1%
-            new_sigma_min = (sigma2 - sigma2.abs() * 0.01).item()
-            new_sigma_max = (sigma2 + sigma2.abs() * 0.01).item()
             sigma2[:] = self._new_sigma2 / (N * D)
-            to.clamp(sigma2, new_sigma_min, new_sigma_max, out=sigma2)
+            assert not sigma2.requires_grad
             self._new_sigma2.zero_()
 
     def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
