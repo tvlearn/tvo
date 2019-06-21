@@ -227,7 +227,7 @@ class TVAE(TVEMModel):
         """
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
         F = self._free_energy_from_logjoints(lpj)
-        loss = -F
+        loss = -F / data.shape[0]
         loss.backward()
 
         self._mpi_average_grads()
