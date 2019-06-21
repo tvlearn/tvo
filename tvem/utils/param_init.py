@@ -24,7 +24,7 @@ def init_W_data_mean(
         device = tvem.get_device()
     return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() + to.mean(
         to.sqrt(data_var.to(dtype=dtype, device=device))
-    ) * to.randn((data_mean.size(), H), dtype=dtype, device=device)
+    ) * to.randn((len(data_mean), H), dtype=dtype, device=device)
 
 
 def init_sigma_default(
@@ -42,7 +42,7 @@ def init_sigma_default(
 
     if device is None:
         device = tvem.get_device()
-    return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)))
+    return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)), dim=0, keepdim=True)
 
 
 def init_pies_default(
