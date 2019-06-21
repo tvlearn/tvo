@@ -256,7 +256,10 @@ class TVAE(TVEMModel):
 
         if not self.theta["sigma2"].requires_grad:
             # \sigma2 = \frac{1}{DN} \sum_{n,d} < (y^n_d - \vec{a}^L_d)^2 >_{q^n}
-            y_minus_a_sqr = (data.unsqueeze(1) - mlp_out).pow_(2)  # (D, N, S)
+            # TODO would it be better (faster or more numerically stable) to
+            # sum over D _before_ taking the mean_posterior?
+            y_minus_a_sqr = (data.unsqueeze(1) - mlp_out).pow_(2)  # (N, S, D)
+            assert y_minus_a_sqr.shape == (idx.numel(), K_batch.shape[1], data.shape[1])
             self._new_sigma2.add_(mean_posterior(y_minus_a_sqr, states.lpj[idx]).sum((0, 1)))
 
     def forward(self, x: to.Tensor) -> to.Tensor:
