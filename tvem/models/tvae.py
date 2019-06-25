@@ -32,7 +32,8 @@ class TVAE(TVEMModel):
         """Create a TVAE model.
 
         :param N: Number of datapoints used for training. Only required if TVAE is to be trained
-                  and one of the analytical_*_updates parameters is True.
+                  and one of the analytical_*_updates parameters is True. In MPI runs, must be the
+                  _total_ number of datapoints.
         :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
                       Can be None if W_init is not None.
         :param precision: One of to.float32 or to.float64, indicates the floating point precision
@@ -181,7 +182,11 @@ class TVAE(TVEMModel):
         if pi.requires_grad and sigma2.requires_grad:
             return  # nothing to do
         else:
-            # FIXME is this N correct in mpi runs?
+            # FIXME this is slightly incorrect in mpi runs:
+            # the ShufflingSampler provides the same number of datapoints to each
+            # worker by duplicating datapoints when needed. The total number of
+            # datapoints processed in an epoch might be slightly higher than the
+            # number of datapoints in the dataset.
             N, D = self._N, self._net_shape[-1]
             assert N is not None, "TVAE: N is None but model is being trained."
 
@@ -280,7 +285,7 @@ class TVAE(TVEMModel):
         if tvem.get_run_policy() != "mpi":
             return  # nothing to do
 
-        # FIXME is this correct/necessary? see https://bit.ly/2FlJsxS
+        # Average gradients across processes. See https://bit.ly/2FlJsxS
         with to.no_grad():
             n_procs = dist.get_world_size()
             for w, b in zip(self.W, self.b):
