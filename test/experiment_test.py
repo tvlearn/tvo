@@ -4,7 +4,7 @@
 
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
-from tvem.models import NoisyOR, BSC, TVAE
+from tvem.models import NoisyOR, BSC, TVAE, TVEMModel
 from tvem.utils.parallel import init_processes
 from tvem.utils import get
 import tvem
@@ -15,6 +15,31 @@ import pytest
 import torch as to
 import torch.distributed as dist
 from munch import Munch
+
+
+class LogJointOnly(TVEMModel):
+    """A dummy TVEMModel that only implements log_joint."""
+
+    def __init__(self, H, D, precision):
+        self._H = H
+        self._D = D
+        self.precision = precision
+        self.theta = dict(W=to.zeros(D, H))
+
+    def log_joint(self, data, states):
+        N, S = data.shape[0], states.shape[1]
+        return to.ones(N, S, dtype=self.precision, device=tvem.get_device())
+
+    def update_param_batch(self, *args, **kwargs):
+        pass
+
+    @property
+    def shape(self):
+        return (self._H, self._D)
+
+    def generate_from_hidden(self, hidden_state):
+        N, D = hidden_state.shape[0], self._D
+        return to.zeros(N, D, dtype=self.precision, device=tvem.device())
 
 
 gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
@@ -90,7 +115,7 @@ def batch_size(request):
     return request.param
 
 
-@pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE"))
+@pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE", "LogJointOnly"))
 def model_and_data(request, hyperparams, input_files, precision, estep_conf, batch_size):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
@@ -112,6 +137,8 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
         return BSC(conf), input_files.continuous_data
     elif request.param == "TVAE":
         return TVAE(N=N, shape=(D, H * 2, H), precision=precision), input_files.continuous_data
+    elif request.param == "LogJointOnly":
+        return LogJointOnly(H, D, precision), input_files.continuous_data
 
 
 @pytest.fixture(scope="module", params=(0, 3), ids=("nowarmup", "warmup"))
