@@ -149,15 +149,20 @@ class TVAE(TVEMModel):
 
     def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
         with to.no_grad():
-            return self._free_energy_from_logjoints(states.lpj[idx]).item()
+            return super().free_energy(idx, batch, states)
 
-    def _free_energy_from_logjoints(self, lpj: to.Tensor) -> to.Tensor:
+    def log_joint(self, data, states, lpj=None):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = self._net_shape[-1]
-        # logjoints has shape (N, S)
+        if lpj is None:
+            lpj = self.log_pseudo_joint(data, states)
+        # TODO: could pre-evaluate the constant factor once per epoch
         logjoints = lpj - D / 2 * to.log(2 * MATH_PI * sigma2) + to.log(1 - pi).sum()
+        return logjoints
+
+    def _free_energy_from_logjoints(self, logjoints: to.Tensor) -> to.Tensor:
         Fn = to.logsumexp(logjoints, dim=1)
-        assert Fn.shape == (lpj.shape[0],)
+        assert Fn.shape == (logjoints.shape[0],)
         assert not to.isnan(Fn).any() and not to.isinf(Fn).any()
         return Fn.sum()
 
@@ -223,7 +228,7 @@ class TVAE(TVEMModel):
         :returns: F and mlp_output _before_ the weight update
         """
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
-        F = self._free_energy_from_logjoints(lpj)
+        F = self._free_energy_from_logjoints(self.log_joint(data, states, lpj))
         loss = -F / data.shape[0]
         loss.backward()
 
