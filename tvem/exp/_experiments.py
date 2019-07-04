@@ -11,11 +11,12 @@ from tvem.utils import get, H5Logger
 from tvem.trainer import Trainer
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
+from tvem.exp._EpochLog import EpochLog
 from tvem.variational import TVEMVariationalStates
 import tvem
 
 import math
-from typing import Dict, Any
+from typing import Dict, Any, Generator
 import torch as to
 import torch.distributed as dist
 import time
@@ -28,7 +29,7 @@ class Experiment(ABC):
     """Abstract base class for all experiments."""
 
     @abstractmethod
-    def run(self, epochs: int):
+    def run(self, epochs: int) -> Generator[EpochLog, None, None]:
         pass  # pragma: no cover
 
 
@@ -89,7 +90,7 @@ class _TrainingAndOrValidation(Experiment):
     def estep_conf(self) -> Dict[str, Any]:
         return dict(self._estep_conf)
 
-    def run(self, epochs: int):
+    def run(self, epochs: int) -> Generator[EpochLog, None, None]:
         """Run training and/or testing.
 
         :param epochs: Number of epochs to train for
@@ -118,11 +119,11 @@ class _TrainingAndOrValidation(Experiment):
 
         # EM steps
         for e in range(epochs):
-            pprint(f"epoch {e}")
             start_t = time.time()
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
-            end_t = time.time()
-            self._log_epoch(logger, d, epoch_runtime=end_t - start_t)
+            epoch_runtime = time.time() - start_t
+            self._log_epoch(logger, d)
+            yield EpochLog(e, d, epoch_runtime)
 
         # remove leftover ".old" logfiles produced by the logger
         rank = dist.get_rank() if dist.is_initialized() else 0
@@ -142,14 +143,11 @@ class _TrainingAndOrValidation(Experiment):
         pprint()
         logger.set(estep_config=self.estep_conf)
 
-    def _log_epoch(
-        self, logger: H5Logger, epoch_results: Dict[str, float], epoch_runtime: float = None
-    ):
-        """Log F, subs, model.theta, states.K and states.lpj to file.
+    def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float]):
+        """Log F, subs, model.theta, states.K and states.lpj to file, return printable log.
 
         :param logger: the logger for this run
         :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
-        :param epoch_runtime: wall-clock duration of the epoch
         """
         for data_kind in "train", "test":
             if data_kind + "_F" not in epoch_results:
@@ -162,7 +160,6 @@ class _TrainingAndOrValidation(Experiment):
             # log F and subs to stdout and file
             F, subs = get(epoch_results, f"{data_kind}_F", f"{data_kind}_subs")
             assert not (math.isnan(F) or math.isinf(F)), f"{log_kind} free energy is invalid!"
-            pprint(f"\t{log_kind} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
             F_and_subs_dict = {f"{log_kind}_F": to.tensor(F), f"{log_kind}_subs": to.tensor(subs)}
             logger.append(**F_and_subs_dict)
 
@@ -173,9 +170,6 @@ class _TrainingAndOrValidation(Experiment):
                 f"{log_kind}_lpj": gather_from_processes(states.lpj),
             }
             logger.set(**states_and_lpj_dict)
-
-        if epoch_runtime is not None:
-            pprint(f"\ttotal epoch runtime: {epoch_runtime:<5.2f} s")
 
         logger.append(theta=self.model.theta)
         logger.write()

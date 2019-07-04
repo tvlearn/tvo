@@ -195,6 +195,7 @@ def check_file(input_file):
         assert np.all(np.diff(F_seq_cuda) >= -eps)
         assert to.allclose(F_mpi, F_seq_cpu)
         assert to.allclose(F_seq_cpu, F_seq_cuda)
+
         import glob
 
         for p in glob.glob("*.h5"):
@@ -214,6 +215,7 @@ def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
 
     model, input_file = model_and_data
     exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
-    exp.run(10)
+    for log in exp.run(10):
+        log.print()
 
     check_file(input_file)

@@ -182,7 +182,8 @@ def check_file(fname, *prefixes: str):
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
-    exp.run(10)
+    for log in exp.run(10):
+        log.print()
     check_file(exp_conf.output, "train")
 
 
@@ -191,12 +192,14 @@ def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_a
     exp = Training(
         exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
     )
-    exp.run(10)
+    for log in exp.run(10):
+        log.print()
     check_file(exp_conf.output, "train", "valid")
 
 
 def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
     exp = _Testing(exp_conf, estep_conf, model, data_file=input_file)
-    exp.run(10)
+    for log in exp.run(10):
+        log.print()
     check_file(exp_conf.output, "test")
