@@ -3,11 +3,11 @@
 # Licensed under the Academic Free License version 3.0
 
 from abc import ABC, abstractmethod
-from tvem.utils.data import TVEMDataLoader, H5Logger
+from tvem.utils.data import TVEMDataLoader
 from tvem.models import TVEMModel
 from tvem.utils.parallel import pprint, init_processes, gather_from_processes
 from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
-from tvem.utils import get
+from tvem.utils import get, H5Logger
 from tvem.trainer import Trainer
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
