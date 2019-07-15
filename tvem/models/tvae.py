@@ -106,7 +106,9 @@ class TVAE(TVEMModel):
             W_shapes = ((shape[l], shape[l + 1]) for l in range(n_layers))
             W = map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes))
         else:
-            assert all(w.shape == (shape[l], shape[l + 1]) for l, w in enumerate(init))
+            assert all(
+                w.shape == (shape[l], shape[l + 1]) for l, w in enumerate(init)
+            ), "shapes: {}".format([w.shape for w in init])
             W = (w.clone() for w in init)
         return [
             w.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for w in W
