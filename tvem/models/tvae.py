@@ -7,7 +7,7 @@ from tvem.variational import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce
 from tvem.utils import get
-from torch.optim import Adam
+import torch.optim as opt
 import tvem
 import torch as to
 import torch.distributed as dist
@@ -21,7 +21,9 @@ class TVAE(TVEMModel):
         N: int = None,
         shape: Sequence[int] = None,
         precision: to.dtype = to.float64,
-        learning_rate: float = 0.01,
+        min_lr: float = 0.001,
+        max_lr: float = 0.01,
+        cycliclr_step_size_up=400,
         pi_init: to.Tensor = None,
         W_init: Sequence[to.Tensor] = None,
         b_init: Sequence[to.Tensor] = None,
@@ -77,7 +79,14 @@ class TVAE(TVEMModel):
         else:
             gd_parameters.append(theta["pies"])
 
-        self._optimizer = Adam(gd_parameters, lr=learning_rate)
+        self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
+        self._scheduler = opt.lr_scheduler.CyclicLR(
+            self._optimizer,
+            base_lr=min_lr,
+            max_lr=max_lr,
+            step_size_up=cycliclr_step_size_up,
+            cycle_momentum=False,
+        )
 
     def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
         if shape is not None:
@@ -243,6 +252,7 @@ class TVAE(TVEMModel):
 
         self._mpi_average_grads()
         self._optimizer.step()
+        self._scheduler.step()
         self._optimizer.zero_grad()
 
         with to.no_grad():
