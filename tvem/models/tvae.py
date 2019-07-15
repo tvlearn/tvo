@@ -6,7 +6,7 @@ from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce
-from tvem.utils import get
+from tvem.utils import get, CyclicLR
 import torch.optim as opt
 import tvem
 import torch as to
@@ -80,7 +80,7 @@ class TVAE(TVEMModel):
             gd_parameters.append(theta["pies"])
 
         self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
-        self._scheduler = opt.lr_scheduler.CyclicLR(
+        self._scheduler = CyclicLR(
             self._optimizer,
             base_lr=min_lr,
             max_lr=max_lr,
