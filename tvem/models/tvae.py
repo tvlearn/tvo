@@ -224,7 +224,7 @@ class TVAE(TVEMModel):
     def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
         with to.no_grad():
             mlp_out = self.forward(hidden_state)
-        return to.distributions.Normal(loc=mlp_out, scale=self.theta["sigma2"]).sample()
+        return to.distributions.Normal(loc=mlp_out, scale=to.sqrt(self.theta["sigma2"])).sample()
 
     @property
     def shape(self) -> Tuple[int, ...]:
