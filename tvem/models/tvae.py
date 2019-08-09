@@ -271,10 +271,10 @@ class TVAE(TVEMModel):
         self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates, mlp_out: to.Tensor
     ) -> None:
         """Evaluate partial updates to pi and sigma2."""
+        K_batch = states.K[idx].type_as(states.lpj)
 
         if not self.theta["pies"].requires_grad:
             # \pi_h = \frac{1}{N} \sum_n < K_nsh >_{q^n}
-            K_batch = states.K[idx].type_as(states.lpj)
             self._new_pi.add_(mean_posterior(K_batch, states.lpj[idx]).sum(dim=0))
 
         if not self.theta["sigma2"].requires_grad:
