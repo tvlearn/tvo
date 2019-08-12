@@ -6,11 +6,25 @@ import pytest
 import torch as to
 from tvem.variational import FullEM
 import tvem
+from tvem.models import TVEMModel
 from munch import Munch
 
 
-def count_active_units(data, states):
-    return states.sum(dim=2, dtype=to.float32)
+class DummyModel(TVEMModel):
+    def __init__(self):
+        super().__init__({})
+
+    def update_param_batch(self):
+        pass
+
+    def generate_from_hidden(self):
+        pass
+
+    def shape(self):
+        pass
+
+    def log_joint(self, data, states):
+        return states.sum(dim=2, dtype=to.float32)
 
 
 @pytest.fixture(
@@ -32,7 +46,7 @@ def test_update(setup):
     var_states = setup.var_states
     data = to.rand(setup.N, 1, device=tvem.get_device())
     idx = to.arange(data.shape[0], device=tvem.get_device())
-    lpj = count_active_units(data=None, states=var_states.K)
-    n_subs = var_states.update(idx, data, lpj_fn=count_active_units)
+    lpj = DummyModel().log_joint(data=None, states=var_states.K)
+    n_subs = var_states.update(idx, data, model=DummyModel())
     assert n_subs == 0
     assert (var_states.lpj == lpj).all()

@@ -9,23 +9,37 @@ from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import generate_unique_states
 from tvem.variational import eem
+from tvem.models import TVEMModel
 import tvem
 import pytest
 
 
-def lpj_dummy(data: Tensor, states: Tensor) -> Tensor:
-    """Dummy log-pseudo-joint. """
-    N, S, H = states.shape
+class DummyModel(TVEMModel):
+    def __init__(self):
+        super().__init__({})
 
-    s_ids = to.empty((H,), dtype=to.int64, device=states.device)
-    for h in range(H):
-        s_ids[h] = 2 ** h
+    def shape(self):
+        pass
 
-    return (
-        to.mul(states.to(dtype=to.int64), s_ids[None, None, :].expand(N, S, -1))
-        .sum(dim=2)
-        .to(dtype=to.float64)
-    )
+    def generate_from_hidden(self):
+        pass
+
+    def update_param_batch(self):
+        pass
+
+    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
+        """Dummy log-pseudo-joint. """
+        N, S, H = states.shape
+
+        s_ids = to.empty((H,), dtype=to.int64, device=states.device)
+        for h in range(H):
+            s_ids[h] = 2 ** h
+
+        return (
+            to.mul(states.to(dtype=to.int64), s_ids[None, None, :].expand(N, S, -1))
+            .sum(dim=2)
+            .to(dtype=to.float64)
+        )
 
 
 @pytest.mark.gpu
@@ -164,7 +178,7 @@ class TestEEM(unittest.TestCase):
                 batch_size, 1, 1
             )  # is (batch_size, n_candidates, H)
             # is (batch_size, n_candidates)
-            lpj = lpj_dummy(None, candidates)
+            lpj = DummyModel().log_joint(None, candidates)
 
             # is (batch_size, n_parents, H)
             parents = eem.batch_fitparents(candidates, n_parents, lpj)
@@ -196,11 +210,11 @@ class TestEEM(unittest.TestCase):
             var_states = eem.EEMVariationalStates(conf=eem_conf)
 
             # is (batch_size, n_candidates)
-            var_states.lpj[:] = lpj_dummy(data=data_dummy, states=var_states.K[idx])
+            var_states.lpj[:] = DummyModel().log_joint(data=data_dummy, states=var_states.K[idx])
 
             old_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
 
-            nsubs = var_states.update(idx=idx, batch=data_dummy, lpj_fn=lpj_dummy)
+            nsubs = var_states.update(idx=idx, batch=data_dummy, model=DummyModel())
 
             new_sum_lpj_over_n = var_states.lpj[:].sum(dim=1)  # is (N,)
             no_datapoints_without_lpj_increase = (new_sum_lpj_over_n == old_sum_lpj_over_n).sum()

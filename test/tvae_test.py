@@ -237,7 +237,7 @@ def test_gradients_independent_of_estep(train_setup, tvae):
         tvae.init_epoch()
         tvae.init_batch()
         for _ in range(n_esteps):
-            states.update(idx=to.arange(N), batch=data, lpj_fn=tvae.log_pseudo_joint)
+            states.update(idx=to.arange(N), batch=data, model=tvae)
         tvae.update_param_batch(idx=to.arange(N), batch=data, states=states)
         tvae.update_param_epoch()
         return deepcopy(tvae.theta)
