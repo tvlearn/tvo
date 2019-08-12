@@ -6,7 +6,7 @@ import torch as to
 from torch import Tensor
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Any
+from typing import Dict, Any
 
 from tvem.variational._utils import generate_unique_states
 from tvem.utils import get
@@ -40,8 +40,7 @@ class TVEMVariationalStates(ABC):
         self,
         idx: Tensor,
         batch: Tensor,
-        lpj_fn: Callable[[Tensor, Tensor], Tensor],
-        sort_by_lpj: Dict[str, Tensor] = {},
+        model,  # TVEMModel (an explicit type annotation would require circular imports)
     ) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 

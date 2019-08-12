@@ -5,9 +5,9 @@
 import torch as to
 
 from torch import Tensor
-from typing import Callable, Dict
 
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
+from tvem.models import TVEMModel
 import tvem
 
 
@@ -40,13 +40,10 @@ class FullEM(TVEMVariationalStates):
         conf = dict(N=N, S=2 ** H, H=H, precision=precision)
         super().__init__(conf, state_matrix(H)[None, :, :].expand(N, -1, -1))
 
-    def update(
-        self,
-        idx: Tensor,
-        batch: Tensor,
-        lpj_fn: Callable[[Tensor, Tensor], Tensor],
-        sort_by_lpj: Dict[str, Tensor] = {},
-    ) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: TVEMModel) -> int:
+        lpj_fn = (
+            model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
+        )
 
         K = self.K
         lpj = self.lpj

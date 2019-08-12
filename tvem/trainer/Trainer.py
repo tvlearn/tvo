@@ -65,15 +65,10 @@ class Trainer:
         F = to.tensor(0.0)
         subs = to.tensor(0)
 
-        if model.log_pseudo_joint is NotImplemented:
-            lpj_func = model.log_joint
-        else:
-            lpj_func = model.log_pseudo_joint
-
         model.init_epoch()
         for idx, batch in data:
             model.init_batch()
-            subs += states.update(idx, batch, lpj_func)
+            subs += states.update(idx, batch, model)
             F += model.free_energy(idx, batch, states)
         all_reduce(F)
         all_reduce(subs)
@@ -117,10 +112,6 @@ class Trainer:
         model = self.model
         train_data, train_states = self.train_data, self.train_states
         test_data, test_states = self.test_data, self.test_states
-        if self.model.log_pseudo_joint is NotImplemented:
-            lpj_fn = self.model.log_joint
-        else:
-            lpj_fn = self.model.log_pseudo_joint
 
         ret_dict = {}
 
@@ -132,7 +123,7 @@ class Trainer:
             model.init_epoch()
             for idx, batch in train_data:
                 model.init_batch()
-                subs += train_states.update(idx, batch, lpj_fn, sort_by_lpj=model.sorted_by_lpj)
+                subs += train_states.update(idx, batch, model)
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
