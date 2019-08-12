@@ -51,6 +51,9 @@ class EEMConfig(EStepConfig):
         assert (
             n_parents <= n_states
         ), f"n_parents ({n_parents}) must be lower than n_states ({n_states})"
+        assert (
+            mutation != "sparsity" or bitflip_frequency is not None
+        ), "bitflip_frequency is required for mutation algorithm 'sparsity'"
 
         self.n_parents = n_parents
         self.n_children = n_children
