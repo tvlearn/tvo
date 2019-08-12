@@ -39,7 +39,7 @@ def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
         "N": N,
         "H": H,
         "precision": precision,
-        "p_bf": conf.bitflip_frequency
+        "p_bf": conf.bitflip_frequency,
     }
     return EEMVariationalStates(eem_conf)
 

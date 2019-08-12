@@ -24,7 +24,7 @@ class LogJointOnly(TVEMModel):
         self._H = H
         self._D = D
         self.precision = precision
-        self.theta = dict(W=to.zeros(D, H))
+        self.theta = dict(pies=to.zeros(H), W=to.zeros(D, H))
 
     def log_joint(self, data, states):
         N, S = data.shape[0], states.shape[1]
@@ -98,8 +98,16 @@ def input_files(hyperparams):
 
 @pytest.fixture(scope="module", params=(True, False), ids=("cross", "nocross"))
 def estep_conf(request, hyperparams):
+    # randomly select mutation algorithm (testing both for every model and experiment is a bit much)
+    mutation = ["sparsity", "uniform"][np.random.randint(2)]
     return EEMConfig(
-        n_states=hyperparams.S, n_parents=3, n_children=2, n_generations=2, crossover=request.param
+        n_states=hyperparams.S,
+        n_parents=3,
+        n_children=2,
+        n_generations=2,
+        mutation=mutation,
+        crossover=request.param,
+        bitflip_frequency=1 / hyperparams.H if mutation == "sparsity" else None,
     )
 
 
