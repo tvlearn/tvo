@@ -55,6 +55,8 @@ class EEMVariationalStates(TVEMVariationalStates):
             n_generations=n_generations,
             parent_selection=parent_selection,
             mutation=mutation,
+            sparsity=model.theta["pies"].mean() if "sparsity" in mutation else None,
+            p_bf=self.conf.get('p_bf')
         )
 
         return update_states_for_batch(

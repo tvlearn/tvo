@@ -24,6 +24,7 @@ class EEMConfig(EStepConfig):
         parent_selection: str = "fitness",
         crossover: bool = True,
         mutation: str = "uniform",
+        bitflip_frequency: float = None,
     ):
         """Configuration object for EEM E-step.
 
@@ -34,14 +35,16 @@ class EEMConfig(EStepConfig):
                            at each EEM generation.
         :param parent_selection: Parent selection algorithm for EEM. Must be one of:
                                  - 'fitness': fitness-proportional parent selection
-                                 - 'uniform': random uniform parent selection
         :param crossover: Whether crossover should be applied or not.
         :param mutation: Mutation algorithm for EEM. Must be one of:
                          - 'sparsity': bits are flipped so that states tend
                             towards current model sparsity.
                          - 'uniform': random uniform selection of bits to flip.
+        :param bitflip_frequency: Probability of flipping a bit during the mutation step (e.g.
+                                  2/H for an average of 2 bitflips per mutation). Required when
+                                  using the 'sparsity' mutation algorithm.
         """
-        valid_selections = ("fitness", "random")
+        valid_selections = ("fitness",)
         assert parent_selection in valid_selections, f"Unknown parent selection {parent_selection}"
         valid_mutations = ("sparsity", "uniform")
         assert mutation in valid_mutations, f"Unknown mutation {mutation}"
@@ -55,6 +58,7 @@ class EEMConfig(EStepConfig):
         self.parent_selection = parent_selection
         self.crossover = crossover
         self.mutation = mutation
+        self.bitflip_frequency = bitflip_frequency
 
         super().__init__(n_states)
 
