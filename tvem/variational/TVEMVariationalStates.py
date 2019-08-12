@@ -46,9 +46,7 @@ class TVEMVariationalStates(ABC):
 
         :param idx: data point indices of batch w.r.t. K
         :param batch: batch of data points
-        :param lpj_fn: function to evaluate lpj
-        :param sort_by_lpj: optional dictionary of tensors with shape (N,S,...) that will be\
-            sorted by all_lpj, the same way all_lpj and all_states are sorted.
+        :param model: the TVEMModel being used
         :returns: average number of variational state substitutions per datapoint performed
         """
         pass  # pragma: no cover
