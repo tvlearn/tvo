@@ -194,7 +194,7 @@ def tvae(request, train_setup, add_gpu_mark):
     )
 
 
-@pytest.mark.mpi
+@pytest.mark.gpu
 def test_train(train_setup, tvae):
     if tvem.get_run_policy() == "mpi":
         init_processes()
@@ -216,7 +216,7 @@ def test_train(train_setup, tvae):
     assert new_F > first_F
 
 
-@pytest.mark.mpi
+@pytest.mark.gpu
 def test_gradients_independent_of_estep(train_setup, tvae):
     """Verify that weights are updated the same way independently of number of E-steps.
 
