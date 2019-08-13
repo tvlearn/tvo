@@ -18,7 +18,6 @@ class NoisyOR(TVEMModel):
 
     def __init__(
         self,
-        N: int,
         H: int,
         D: int,
         W_init: Tensor = None,
@@ -27,7 +26,6 @@ class NoisyOR(TVEMModel):
     ):
         """Shallow NoisyOR model.
 
-        :param N: Total number of datapoints in the dataset.
         :param H: Number of hidden units.
         :param D: Number of observables.
         :param W_init: Tensor with shape (D,H), initializes NoisyOR weights.
@@ -61,7 +59,8 @@ class NoisyOR(TVEMModel):
         self.new_pi = to.zeros(H, device=device, dtype=precision)
         self.Btilde = to.zeros(D, H, device=device, dtype=precision)
         self.Ctilde = to.zeros(D, H, device=device, dtype=precision)
-        self.N = N
+        # number of datapoints processed in a training epoch
+        self._train_datapoints = to.tensor([0], dtype=to.int, device=device)
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for NoisyOR."""
@@ -130,11 +129,15 @@ class NoisyOR(TVEMModel):
         assert not to.isnan(self.Ctilde).any()
         assert not to.isnan(self.Btilde).any()
 
+        self._train_datapoints.add_(batch.shape[0])
+
         return None
 
     def update_param_epoch(self) -> None:
+        all_reduce(self._train_datapoints)
         all_reduce(self.new_pi)
-        self.theta["pies"][:] = self.new_pi / self.N
+        N = self._train_datapoints.item()
+        self.theta["pies"][:] = self.new_pi / N
         to.clamp(self.theta["pies"], self.eps, 1 - self.eps, out=self.theta["pies"])
         self.new_pi[:] = 0.0
 
@@ -144,6 +147,8 @@ class NoisyOR(TVEMModel):
         to.clamp(self.theta["W"], self.eps, 1 - self.eps, out=self.theta["W"])
         self.Btilde[:] = 0.0
         self.Ctilde[:] = 0.0
+
+        self._train_datapoints[:] = 0
 
     def log_joint(self, data, states, lpj=None):
         pi = self.theta["pies"]
