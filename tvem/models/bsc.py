@@ -25,13 +25,13 @@ class BSC(TVEMModel):
     ):
         device = tvem.get_device()
 
-        required_keys = ("N", "D", "H", "S", "Snew", "batch_size", "precision")
+        required_keys = ("D", "H", "S", "Snew", "batch_size", "precision")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.conf = conf
         self.required_keys = required_keys
 
-        N, D, H, S, Snew, batch_size, precision = get(conf, *required_keys)
+        D, H, S, Snew, batch_size, precision = get(conf, *required_keys)
 
         self.tmp = {
             "my_Wp": to.empty((D, H), dtype=precision, device=device),
@@ -46,6 +46,7 @@ class BSC(TVEMModel):
             "batch_Wq": to.empty((batch_size, H, H), dtype=precision, device=device),
             "batch_sigma": to.empty((batch_size,), dtype=precision, device=device),
             "indS_filled": 0,
+            "my_N": to.tensor([0], dtype=to.int, device=device),
         }
 
         if W_init is not None:
@@ -208,6 +209,7 @@ class BSC(TVEMModel):
             my_sigma,
             indS_fill_upto,
             fenergy_const,
+            my_N,
         ) = get(
             tmp,
             "batch_s_pjc",
@@ -220,6 +222,7 @@ class BSC(TVEMModel):
             "my_sigma",
             "indS_fill_upto",
             "fenergy_const",
+            "my_N",
         )
         batch_Wbar = sorted_by_lpj["batch_Wbar"]
 
@@ -238,6 +241,7 @@ class BSC(TVEMModel):
         my_Wp.add_(to.sum(batch_Wp[:batch_size, :, :], dim=0))
         my_Wq.add_(to.sum(batch_Wq[:batch_size, :, :], dim=0))
         my_sigma.add_(to.sum(batch_sigma[:batch_size]))
+        my_N.add_(batch_size)
 
         return None
 
@@ -248,8 +252,10 @@ class BSC(TVEMModel):
         tmp = self.tmp
         policy = self.policy
 
-        N, D = get(conf, "N", "D")
-        my_pies, my_Wp, my_Wq, my_sigma = get(tmp, "my_pies", "my_Wp", "my_Wq", "my_sigma")
+        D = conf["D"]
+        my_pies, my_Wp, my_Wq, my_sigma, my_N = get(
+            tmp, "my_pies", "my_Wp", "my_Wq", "my_sigma", "my_N"
+        )
 
         theta_new = {}
 
@@ -257,6 +263,8 @@ class BSC(TVEMModel):
         all_reduce(my_Wp)
         all_reduce(my_Wq)
         all_reduce(my_sigma)
+        all_reduce(my_N)
+        N = my_N.item()
 
         # Calculate updated W
         Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
@@ -279,6 +287,8 @@ class BSC(TVEMModel):
 
         for key in theta:
             theta[key] = theta_new[key]
+
+        my_N[:] = 0
 
     @property
     def shape(self) -> Tuple[int, ...]:
