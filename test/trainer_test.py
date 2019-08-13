@@ -19,7 +19,7 @@ import numpy as np
 def setup(request):
     class Setup:
         N, D, S, H = 10, 16, 8, 8
-        model = NoisyOR(N, H, D, precision=to.float32)
+        model = NoisyOR(H, D, precision=to.float32)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
         data = TVEMDataLoader(_td, batch_size=N)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
@@ -88,8 +88,8 @@ def test_rollback():
     # parameters are initialized stochastically. here we choose a seed for which we know the
     # unconstrained M-step will decrease free energies.
     to.manual_seed(123)
-    m1 = NoisyOR(N, H, D, precision=to.float64)
-    m2 = NoisyOR(N, H, D, precision=m1.precision, W_init=m1.theta["W"], pi_init=m1.theta["pies"])
+    m1 = NoisyOR(H, D, precision=to.float64)
+    m2 = NoisyOR(H, D, precision=m1.precision, W_init=m1.theta["W"], pi_init=m1.theta["pies"])
 
     # use FullEM so training is deterministic
     states = FullEM(N, H, m1.precision)

@@ -24,15 +24,7 @@ def setup(request):
         W_init = to.full((D, H), 1.0, dtype=precision, device=_device)
         sigma_init = to.tensor([1.0], dtype=precision, device=_device)
 
-        conf = {
-            "N": N,
-            "D": D,
-            "H": H,
-            "S": 2 ** H,
-            "Snew": 0,
-            "batch_size": N,
-            "precision": precision,
-        }
+        conf = {"D": D, "H": H, "S": 2 ** H, "Snew": 0, "batch_size": N, "precision": precision}
         m = BSC(conf, W_init, sigma_init, pi_init)
         all_s = FullEM(N, H, precision)
         all_s.lpj = to.zeros_like(all_s.lpj)

@@ -131,10 +131,9 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
     """
     N, S, D, H = get(hyperparams, "N", "S", "D", "H")
     if request.param == "NoisyOR":
-        return NoisyOR(N=N, H=H, D=D, precision=precision), input_files.binary_data
+        return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == "BSC":
         conf = {
-            "N": N,
             "D": D,
             "H": H,
             "S": S,
@@ -144,7 +143,7 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
         }
         return BSC(conf), input_files.continuous_data
     elif request.param == "TVAE":
-        return TVAE(N=N, shape=(D, H * 2, H), precision=precision), input_files.continuous_data
+        return TVAE(shape=(D, H * 2, H), precision=precision), input_files.continuous_data
     elif request.param == "LogJointOnly":
         return LogJointOnly(H, D, precision), input_files.continuous_data
 

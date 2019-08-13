@@ -186,7 +186,6 @@ def tvae(request, train_setup, add_gpu_mark):
         analytical_pi_updates = False
 
     return TVAE(
-        train_setup.N,
         train_setup.shape,
         precision=train_setup.data.dtype,
         analytical_pi_updates=analytical_pi_updates,

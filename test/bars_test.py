@@ -145,7 +145,7 @@ def model_and_data(request, hyperparams, estep_conf):
         broadcast(W_init)
         pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
 
-        model = NoisyOR(N=N, H=H, D=D, W_init=W_gt, pi_init=pies_gt, precision=precision)
+        model = NoisyOR(H=H, D=D, W_init=W_gt, pi_init=pies_gt, precision=precision)
 
         fname = "bars_test_data_nor.h5"
 
