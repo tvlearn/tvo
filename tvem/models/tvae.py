@@ -18,7 +18,6 @@ from math import pi as MATH_PI
 class TVAE(TVEMModel):
     def __init__(
         self,
-        N: int = None,
         shape: Sequence[int] = None,
         precision: to.dtype = to.float64,
         min_lr: float = 0.001,
@@ -34,9 +33,6 @@ class TVAE(TVEMModel):
     ):
         """Create a TVAE model.
 
-        :param N: Number of datapoints used for training. Only required if TVAE is to be trained
-                  and one of the analytical_*_updates parameters is True. In MPI runs, must be the
-                  _total_ number of datapoints.
         :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
                       Can be None if W_init is not None.
         :param precision: One of to.float32 or to.float64, indicates the floating point precision
@@ -59,7 +55,6 @@ class TVAE(TVEMModel):
         self._net_shape = self._get_net_shape(shape, W_init)
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
-        self._N = N
         theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
         theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
         H0 = self._net_shape[0]
@@ -87,6 +82,8 @@ class TVAE(TVEMModel):
             step_size_up=cycliclr_step_size_up,
             cycle_momentum=False,
         )
+        # number of datapoints processed in a training epoch
+        self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
 
     def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
         if shape is not None:
@@ -196,13 +193,9 @@ class TVAE(TVEMModel):
         if pi.requires_grad and sigma2.requires_grad:
             return  # nothing to do
         else:
-            # FIXME this is slightly incorrect in mpi runs:
-            # the ShufflingSampler provides the same number of datapoints to each
-            # worker by duplicating datapoints when needed. The total number of
-            # datapoints processed in an epoch might be slightly higher than the
-            # number of datapoints in the dataset.
-            N, D = self._N, self._net_shape[-1]
-            assert N is not None, "TVAE: N is None but model is being trained."
+            D = self._net_shape[-1]
+            all_reduce(self._train_datapoints)
+            N = self._train_datapoints.item()
 
         if not pi.requires_grad:
             all_reduce(self._new_pi)
@@ -220,6 +213,8 @@ class TVAE(TVEMModel):
             if self._clamp_sigma:
                 to.clamp(sigma2, new_sigma_min, new_sigma_max, out=sigma2)
             self._new_sigma2.zero_()
+
+        self._train_datapoints[:] = 0
 
     def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
         with to.no_grad():
@@ -284,6 +279,8 @@ class TVAE(TVEMModel):
             y_minus_a_sqr = (data.unsqueeze(1) - mlp_out).pow_(2)  # (N, S, D)
             assert y_minus_a_sqr.shape == (idx.numel(), K_batch.shape[1], data.shape[1])
             self._new_sigma2.add_(mean_posterior(y_minus_a_sqr, states.lpj[idx]).sum((0, 1)))
+
+        self._train_datapoints.add_(data.shape[0])
 
     def forward(self, x: to.Tensor) -> to.Tensor:
         """Forward application of TVAE's MLP to the specified input."""
