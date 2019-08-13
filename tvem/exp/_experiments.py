@@ -56,6 +56,8 @@ class _TrainingAndOrValidation(Experiment):
         self.train_states = None
         if train_dataset is not None:
             self.train_data = self._make_dataloader(train_dataset, conf)
+            # might differ between processes: last process might have smaller N and less states
+            # (but TVEMDataLoader+ShufflingSampler make sure the number of batches is the same)
             N = train_dataset.shape[0]
             self.train_states = self._make_states(N, H, conf.precision, estep_conf)
 
