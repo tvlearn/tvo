@@ -5,7 +5,7 @@
 from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
-from tvem.utils.parallel import all_reduce
+from tvem.utils.parallel import all_reduce, broadcast
 from tvem.utils import get, CyclicLR
 import torch.optim as opt
 import tvem
@@ -101,12 +101,14 @@ class TVAE(TVEMModel):
         if init is None:
             n_layers = len(shape) - 1
             W_shapes = ((shape[l], shape[l + 1]) for l in range(n_layers))
-            W = map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes))
+            W = list(map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes)))
         else:
             assert all(
                 w.shape == (shape[l], shape[l + 1]) for l, w in enumerate(init)
             ), "shapes: {}".format([w.shape for w in init])
-            W = (w.clone() for w in init)
+            W = list(w.clone() for w in init)
+        for w in W:
+            broadcast(w)
         return [
             w.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for w in W
         ]
@@ -189,6 +191,12 @@ class TVAE(TVEMModel):
     def update_param_epoch(self) -> None:
         pi = self.theta["pies"]
         sigma2 = self.theta["sigma2"]
+
+        if tvem.get_run_policy() == "mpi":
+            with to.no_grad():
+                for p in self.theta.values():
+                    if p.requires_grad:
+                        broadcast(p)
 
         if pi.requires_grad and sigma2.requires_grad:
             return  # nothing to do
