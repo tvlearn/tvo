@@ -10,7 +10,7 @@ from typing import Dict, Tuple
 
 import tvem
 from tvem.utils import get
-from tvem.utils.parallel import pprint, all_reduce
+from tvem.utils.parallel import pprint, all_reduce, broadcast
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.models.TVEMModel import TVEMModel
@@ -54,6 +54,7 @@ class BSC(TVEMModel):
             W_init = W_init.to(dtype=precision, device=device)
         else:
             W_init = to.rand((D, H), dtype=precision, device=device)
+            broadcast(W_init)
 
         if pies_init is not None:
             assert pies_init.shape == (H,)
@@ -268,6 +269,7 @@ class BSC(TVEMModel):
 
         # Calculate updated W
         Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
+        broadcast(Wold_noisy)
         try:
             theta_new["W"] = to.gels(my_Wp.t(), my_Wq)[0].t()
         except RuntimeError:
