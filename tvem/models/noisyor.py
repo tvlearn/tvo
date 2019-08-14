@@ -6,7 +6,7 @@
 from .TVEMModel import TVEMModel
 from tvem.variational import TVEMVariationalStates  # type: ignore
 from tvem.variational._utils import mean_posterior
-from tvem.utils.parallel import all_reduce
+from tvem.utils.parallel import all_reduce, broadcast
 from torch import Tensor
 import torch as to
 from typing import Dict, Optional, Tuple
@@ -43,6 +43,7 @@ class NoisyOR(TVEMModel):
             assert W_init.shape == (D, H)
         else:
             W_init = to.rand(D, H, device=device)
+            broadcast(W_init)
 
         if pi_init is not None:
             assert pi_init.shape == (H,)
