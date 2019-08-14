@@ -301,10 +301,9 @@ class TVAE(TVEMModel):
             return  # nothing to do
 
         # Average gradients across processes. See https://bit.ly/2FlJsxS
+        n_procs = dist.get_world_size()
+        parameters = [p for p in self.theta.values() if p.requires_grad]
         with to.no_grad():
-            n_procs = dist.get_world_size()
-            for w, b in zip(self.W, self.b):
-                all_reduce(w.grad)
-                w.grad /= n_procs
-                all_reduce(b.grad)
-                b.grad /= n_procs
+            for p in parameters:
+                all_reduce(p.grad)
+                p.grad /= n_procs
