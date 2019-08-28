@@ -116,8 +116,11 @@ class _TrainingAndOrValidation(Experiment):
             d = trainer.e_step()
             self._log_epoch(logger, d)
 
-        # log initial model parameters
-        logger.append(theta=self.model.theta)
+        # log initial free energies (after warm-up E-steps if any)
+        if self._conf.warmup_Esteps == 0:
+            d = trainer.eval_free_energies()
+        self._log_epoch(logger, d)
+        yield EpochLog(epoch=0, results=d)
 
         # EM steps
         for e in range(epochs):
@@ -125,7 +128,7 @@ class _TrainingAndOrValidation(Experiment):
             d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
             epoch_runtime = time.time() - start_t
             self._log_epoch(logger, d)
-            yield EpochLog(e, d, epoch_runtime)
+            yield EpochLog(e + 1, d, epoch_runtime)
 
         # remove leftover ".old" logfiles produced by the logger
         rank = dist.get_rank() if dist.is_initialized() else 0
