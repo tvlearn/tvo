@@ -145,6 +145,42 @@ class Trainer:
 
         return ret_dict
 
+    def eval_free_energies(self) -> Dict[str, Any]:
+        """Return a dictionary with the same contents as e_step/em_step, without training the model.
+
+        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        m = self.model
+        train_data, train_states = self.train_data, self.train_states
+        test_data, test_states = self.test_data, self.test_states
+        lpj_fn = m.log_joint if m.log_pseudo_joint is NotImplemented else m.log_pseudo_joint
+        ret = {}
+
+        if self.can_train:
+            F = to.tensor(0.0)
+            m.init_epoch()
+            for idx, batch in train_data:
+                m.init_batch()
+                train_states.lpj[idx] = lpj_fn(batch, train_states.K[idx])
+                F += m.free_energy(idx, batch, train_states)
+            all_reduce(F)
+            ret["train_F"] = F.item() / self.N_train
+            ret["train_subs"] = 0
+
+        if self.can_test:
+            F = to.tensor(0.0)
+            m.init_epoch()
+            for idx, batch in test_data:
+                m.init_batch()
+                test_states.lpj[idx] = lpj_fn(batch, test_states.K[idx])
+                F += m.free_energy(idx, batch, test_states)
+            all_reduce(F)
+            ret["test_F"] = F.item() / self.N_test
+            ret["test_subs"] = 0
+
+        return ret
+
     def _update_parameters_with_rollback(self) -> None:
         m = self.model
         lpj_fn = m.log_joint if m.log_pseudo_joint is NotImplemented else m.log_pseudo_joint
