@@ -107,8 +107,20 @@ class Trainer:
 
         Both E-step and M-step are executed.
         :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
-                  (keys might be missing depending on what is available)
+                  (keys might be missing depending on what is available). The free energy values
+                  are calculated per batch, so if the model updates its parameters in
+                  `update_param_epoch`, the free energies reported at epoch X are calculated
+                  using the weights of epoch X-1.
         """
+        # NOTE:
+        # For models that update the parameters in update_param_epoch, the free energy reported at
+        # each epoch is the one after the E-step and before the M-step (K sets of epoch X and
+        # \Theta of epoch X-1 yield free energy of epoch X).
+        # For models that update the parameters in update_param_batch, the free energy reported
+        # at each epoch does not correspond to a fixed set of parameters: each batch had a
+        # different set of parameters and the reported free energy is more of an average of the
+        # free energies yielded by all the sets of parameters spanned during an epoch.
+
         model = self.model
         train_data, train_states = self.train_data, self.train_states
         test_data, test_states = self.test_data, self.test_states
