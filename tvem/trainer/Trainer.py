@@ -158,6 +158,7 @@ class Trainer:
         ret = {}
 
         if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
             F = to.tensor(0.0)
             m.init_epoch()
             for idx, batch in train_data:
@@ -169,6 +170,7 @@ class Trainer:
             ret["train_subs"] = 0
 
         if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
             F = to.tensor(0.0)
             m.init_epoch()
             for idx, batch in test_data:
