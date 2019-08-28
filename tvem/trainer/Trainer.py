@@ -147,6 +147,7 @@ class Trainer:
 
     def _update_parameters_with_rollback(self) -> None:
         m = self.model
+        lpj_fn = m.log_joint if m.log_pseudo_joint is NotImplemented else m.log_pseudo_joint
 
         assert self.train_data is not None and self.train_states is not None  # to make mypy happy
         all_data = self.train_data.dataset.tensors[1]
@@ -157,7 +158,7 @@ class Trainer:
         all_reduce(old_F)
         old_lpj = states.lpj.clone()
         m.update_param_epoch()
-        states.lpj[:] = m.log_pseudo_joint(all_data, states.K)
+        states.lpj[:] = lpj_fn(all_data, states.K)
         new_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
         all_reduce(new_F)
         if new_F < old_F:
