@@ -34,7 +34,7 @@ class TestTVEM(unittest.TestCase):
 
         states = to.tensor([[0, 1, 1], [0, 1, 1], [0, 0, 0], [0, 0, 0], [1, 0, 0]], dtype=to.uint8)
 
-        states_unique_ind = unique_ind(states, dim=0)
+        states_unique_ind = unique_ind(states)
 
         self.assertEqual(states_unique_ind.numel(), 3)
         self.assertEqual((states_unique_ind.sort()[0] == to.tensor([0, 2, 4])).sum().item(), 3)

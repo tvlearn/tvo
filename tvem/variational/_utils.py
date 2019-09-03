@@ -4,13 +4,13 @@ import numpy as np
 from typing import Dict
 
 
-def unique_ind(x: to.Tensor, dim: int = None) -> to.Tensor:
-    """Find indices of unique elements in x along specific dimension.
+def unique_ind(x: to.Tensor) -> to.Tensor:
+    """Find indices of unique rows in tensor.
 
     :param x: torch tensor
-    :param dim: dimension to apply unique
+    :returns: indices of unique rows in tensor.
     """
-    unique, inverse = to.unique(x, sorted=False, return_inverse=True, dim=dim)
+    unique, inverse = to.unique(x, sorted=False, return_inverse=True, dim=0)
     perm = to.arange(inverse.size(0), device=inverse.device)
     inverse, perm = inverse.flip([0]), perm.flip([0])
     return inverse.new_empty(unique.size(0)).scatter_(0, inverse, perm)
@@ -118,7 +118,7 @@ def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_stat
     # old_states must come first for np.unique to discard redundant new_states
     old_and_new = to.cat((old_states, new_states), dim=1)
     for n in range(N):
-        uniq_idx = unique_ind(old_and_new[n], dim=0)
+        uniq_idx = unique_ind(old_and_new[n])
         # indexes of states in new_states[n] that are not in old_states[n]
         new_uniq_idx = uniq_idx[uniq_idx >= S] - S
         # BoolTensor in pytorch>=1.2, ByteTensor otherwise
