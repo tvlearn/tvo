@@ -11,9 +11,9 @@ def unique_ind(x: to.Tensor) -> to.Tensor:
     :returns: indices of unique rows in tensor.
     """
     unique, inverse = to.unique(x, sorted=False, return_inverse=True, dim=0)
-    perm = to.arange(inverse.size(0), device=inverse.device)
+    perm = to.arange(inverse.shape[0], device=inverse.device)
     inverse, perm = inverse.flip([0]), perm.flip([0])
-    return inverse.new_empty(unique.size(0)).scatter_(0, inverse, perm)
+    return inverse.new_empty(unique.shape[0]).scatter_(0, inverse, perm)
 
 
 def generate_unique_states(
