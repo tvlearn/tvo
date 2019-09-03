@@ -127,7 +127,7 @@ def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_stat
         # indexes of all non-unique states in new_states (complementary of new_uniq_idx)
         mask[new_uniq_idx.to(device=new_lpj.device)] = 0
         # set lpj of redundant states to an arbitrary low value
-        new_lpj[n][mask] = to.tensor([-1e100], dtype=new_lpj.dtype, device=new_lpj.device)
+        new_lpj[n][mask] = -1e100
 
 
 def _lpj2pjc(lpj: to.Tensor):
