@@ -171,7 +171,7 @@ class NoisyOR(TVEMModel):
         W = self.theta["W"]
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)
         py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
-        return to.rand_like(py) < py
+        return (to.rand_like(py) < py).byte()
 
     @property
     def shape(self) -> Tuple[int, ...]:

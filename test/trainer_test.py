@@ -84,7 +84,7 @@ def test_rollback():
 
     eps = 1e-6
     N, H, D = 10, 4, 32
-    data = to.rand(N, D, device=tvem.get_device()) < 0.8  # noisy data
+    data = (to.rand(N, D, device=tvem.get_device()) < 0.8).byte()  # noisy data
     dataloader = TVEMDataLoader(data, batch_size=N)
 
     # make two identical copies of the model: we'll train twice with same initial conditions
