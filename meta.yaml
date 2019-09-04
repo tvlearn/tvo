@@ -1,6 +1,6 @@
 package:
   name: tvem
-  version: 0.4
+  version: 0.4.1
 
 about:
   home: https://gitlab.com/mloldenburg/tvem
@@ -32,6 +32,7 @@ requirements:
     - cudatoolkit=10.0
     - matplotlib
     - h5py
+    - munch
 
 test:
   imports:
