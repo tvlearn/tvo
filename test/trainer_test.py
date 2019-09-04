@@ -79,15 +79,16 @@ def test_estep(setup):
 
 @pytest.mark.gpu
 def test_rollback():
+    # A seed for which we know the unconstrained M-step will decrease free energies.
+    to.manual_seed(123)
+
     eps = 1e-6
     N, H, D = 10, 4, 32
     data = to.rand(N, D, device=tvem.get_device()) < 0.8  # noisy data
     dataloader = TVEMDataLoader(data, batch_size=N)
 
     # make two identical copies of the model: we'll train twice with same initial conditions
-    # parameters are initialized stochastically. here we choose a seed for which we know the
-    # unconstrained M-step will decrease free energies.
-    to.manual_seed(123)
+    # parameters are initialized stochastically.
     m1 = NoisyOR(H, D, precision=to.float64)
     m2 = NoisyOR(H, D, precision=m1.precision, W_init=m1.theta["W"], pi_init=m1.theta["pies"])
 
