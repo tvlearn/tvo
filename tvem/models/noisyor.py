@@ -89,7 +89,7 @@ class NoisyOR(TVEMModel):
         # logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}
         f1 = to.log(1.0 / prods - 1.0)
         indeces = Y[:, None, :].expand(batch_size, S, D)
-        f1[~indeces] = 0.0
+        f1[1 - indeces] = 0.0
         logPy[:, :] = to.sum(f1, dim=-1) + to.sum(to.log(prods), dim=2)
         K[zeroStatesInd] = 0
 

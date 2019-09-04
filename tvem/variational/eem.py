@@ -221,7 +221,7 @@ def randflip(
     # position indicated by ind_flip_flat
     ind_slice_flat = to.arange(n_children * n_parents, device=parents.device)
 
-    children[ind_slice_flat, ind_flip_flat] = ~(children[ind_slice_flat, ind_flip_flat])
+    children[ind_slice_flat, ind_flip_flat] = 1 - children[ind_slice_flat, ind_flip_flat]
 
     return children
 
@@ -271,11 +271,11 @@ def sparseflip(
     # is (n_parents*n_children, H)
     p = to.empty(p_0.shape, dtype=precision, device=device)
     p[children] = p_1[children]
-    p[~children] = p_0[~children]
+    p[1 - children] = p_0[1 - children]
 
     # Determine bits to be flipped and do the bitflip
     flips = to.rand((n_parents * n_children, int(H)), dtype=precision, device=device) < p
-    children[flips] = ~children[flips]
+    children[flips] = 1 - children[flips]
 
     return children
 
