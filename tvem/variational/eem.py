@@ -270,8 +270,11 @@ def sparseflip(
     p_0 = p_0[:, None].expand(-1, int(H)).repeat(1, n_children).view(-1, int(H))
     # is (n_parents*n_children, H)
     p = to.empty(p_0.shape, dtype=precision, device=device)
-    p[children] = p_1[children]
-    p[1 - children] = p_0[1 - children]
+    # BoolTensor in pytorch>=1.2, ByteTensor otherwise
+    bool_or_byte = (to.empty(0) < 0).dtype
+    children_idx = children.to(bool_or_byte)
+    p[children_idx] = p_1[children_idx]
+    p[~children_idx] = p_0[~children_idx]
 
     # Determine bits to be flipped and do the bitflip
     flips = to.rand((n_parents * n_children, int(H)), dtype=precision, device=device) < p

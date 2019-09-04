@@ -121,9 +121,10 @@ def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_stat
         uniq_idx = unique_ind(old_and_new[n], dim=0)
         # indexes of states in new_states[n] that are not in old_states[n]
         new_uniq_idx = uniq_idx[uniq_idx >= S] - S
-        mask = to.ones(newS, dtype=to.uint8, device=new_lpj.device)
-        # indexes of all non-unique states in new_states (complementary of
-        # new_uniq_idx)
+        # BoolTensor in pytorch>=1.2, ByteTensor otherwise
+        bool_or_byte = (to.empty(0) < 0).dtype
+        mask = to.ones(newS, dtype=bool_or_byte, device=new_lpj.device)
+        # indexes of all non-unique states in new_states (complementary of new_uniq_idx)
         mask[new_uniq_idx.to(device=new_lpj.device)] = 0
         # set lpj of redundant states to an arbitrary low value
         new_lpj[n][mask] = to.tensor([-1e100], dtype=new_lpj.dtype, device=new_lpj.device)
