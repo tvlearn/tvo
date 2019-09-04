@@ -16,6 +16,9 @@ from tvem.variational._utils import mean_posterior
 from tvem.models.TVEMModel import TVEMModel
 from tvem.utils.sanity import fix_theta
 
+# pytorch 1.2 deprecates to.gels in favour of to.lstsq
+lstsq = to.lstsq if int(to.__version__.split(".")[1]) >= 2 else to.gels
+
 
 class BSC(TVEMModel):
     """Binary Sparse Coding (BSC)"""
@@ -271,7 +274,7 @@ class BSC(TVEMModel):
         Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
         broadcast(Wold_noisy)
         try:
-            theta_new["W"] = to.gels(my_Wp.t(), my_Wq)[0].t()
+            theta_new["W"] = lstsq(my_Wp.t(), my_Wq)[0].t()
         except RuntimeError:
             pprint("Inversion error. Will not update W but add some noise instead.")
             theta_new["W"] = Wold_noisy
