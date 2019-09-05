@@ -12,7 +12,6 @@ from math import pi as MATH_PI
 import math
 import pytest
 from munch import Munch
-from copy import deepcopy
 
 
 @pytest.fixture(
@@ -215,6 +214,20 @@ def test_train(train_setup, tvae):
     assert new_F > first_F
 
 
+def copy_tvae(tvae):
+    tvae_copy = TVAE(
+        shape=tvae.net_shape,
+        precision=tvae.precision,
+        W_init=[w.detach().clone() for w in tvae.W],
+        b_init=[b.detach().clone() for b in tvae.b],
+        sigma2_init=float(tvae.theta["sigma2"].detach().clone().item()),
+        pi_init=tvae.theta["pies"].detach().clone(),
+        analytical_pi_updates=not tvae.theta["pies"].requires_grad,
+        analytical_sigma_updates=not tvae.theta["sigma2"].requires_grad,
+    )
+    return tvae_copy
+
+
 @pytest.mark.gpu
 def test_gradients_independent_of_estep(train_setup, tvae):
     """Verify that weights are updated the same way independently of number of E-steps.
@@ -225,7 +238,7 @@ def test_gradients_independent_of_estep(train_setup, tvae):
     if tvem.get_run_policy() == "mpi":
         init_processes()
 
-    tvae_copy = deepcopy(tvae)
+    tvae_copy = copy_tvae(tvae)
 
     N = train_setup.N
     states = fullem_for(tvae, N)
@@ -239,7 +252,7 @@ def test_gradients_independent_of_estep(train_setup, tvae):
             states.update(idx=to.arange(N), batch=data, model=tvae)
         tvae.update_param_batch(idx=to.arange(N), batch=data, states=states)
         tvae.update_param_epoch()
-        return deepcopy(tvae.theta)
+        return tvae.theta
 
     theta_1 = epoch_with_esteps(tvae, 1)
     theta_10 = epoch_with_esteps(tvae_copy, 10)
