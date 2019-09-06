@@ -174,8 +174,8 @@ def check_file(input_file):
     output_file_mpi = ofname.replace(".h5", "_mpi.h5")
     output_file_seq_cpu = ofname.replace(".h5", "_seq_cpu.h5")
     output_file_seq_cuda = ofname.replace(".h5", "_seq_cuda.h5")
-    # to tolerate a bit of noise in floating point calculations (higher for MPI runs)
-    eps = 1e-5 if tvem.get_run_policy() == "seq" else 1e-4
+    # to tolerate a bit of noise in floating point calculations
+    eps = 1e-4
 
     if (
         os.path.exists(output_file_mpi)
