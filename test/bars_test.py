@@ -68,14 +68,14 @@ def add_gpu_and_mpi_marks():
 
 @pytest.fixture(scope="module")
 def hyperparams():
-    """Return an object containing hyperparametrs N,D,S,H as data members."""
+    """Return an object containing hyperparametrs N,D,H as data members."""
     H = 6
-    return Munch(N=500, H=H, D=(H // 2) ** 2, S=2 ** H, batch_size=10, precision=to.float32)
+    return Munch(N=500, H=H, D=(H // 2) ** 2, batch_size=10, precision=to.float32)
 
 
 @pytest.fixture(scope="module")
 def estep_conf(request, hyperparams):
-    return FullEMConfig()
+    return FullEMConfig(hyperparams.H)
 
 
 def write_dataset(fname, N, D, dtype, model):
@@ -97,9 +97,7 @@ def model_and_data(request, hyperparams, estep_conf):
     if tvem.get_run_policy() == "mpi":
         init_processes()
 
-    precision, N, S, D, H, batch_size = get(
-        hyperparams, "precision", "N", "S", "D", "H", "batch_size"
-    )
+    precision, N, D, H, batch_size = get(hyperparams, "precision", "N", "D", "H", "batch_size")
 
     if request.param == "BSC":
 
@@ -119,8 +117,8 @@ def model_and_data(request, hyperparams, estep_conf):
             "N": N,
             "D": D,
             "H": H,
-            "S": S,
-            "Snew": 0,
+            "S": estep_conf.n_states,
+            "Snew": estep_conf.n_new_states,
             "batch_size": batch_size,
             "precision": precision,
         }
