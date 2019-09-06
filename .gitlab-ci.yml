@@ -19,6 +19,8 @@ test:
     - black --check -q . || { black --diff -q . && false; }
     - pylama
     - mypy --no-site-packages tvem test
+    # compile extension modules
+    - python setup.py build_ext --inplace
     # CPU tests
     - pytest --cov=tvem -v test
     # GPU tests

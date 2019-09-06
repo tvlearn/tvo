@@ -8,10 +8,10 @@ import unittest
 import torch as to
 
 from tvem.variational._utils import (
-    unique_ind,
     generate_unique_states,
     update_states_for_batch,
     set_redundant_lpj_to_low,
+    _unique_ind,
 )
 import tvem
 import pytest
@@ -34,7 +34,7 @@ class TestTVEM(unittest.TestCase):
 
         states = to.tensor([[0, 1, 1], [0, 1, 1], [0, 0, 0], [0, 0, 0], [1, 0, 0]], dtype=to.uint8)
 
-        states_unique_ind = unique_ind(states)
+        states_unique_ind = _unique_ind(states)
 
         self.assertEqual(states_unique_ind.numel(), 3)
         self.assertEqual((states_unique_ind.sort()[0] == to.tensor([0, 2, 4])).sum().item(), 3)
@@ -45,13 +45,10 @@ class TestTVEM(unittest.TestCase):
 
         device = tvem.get_device()
         states = generate_unique_states(n_states=n_states, H=H, device=device)
-        states_unique_ind = unique_ind(states, dim=0)
+        _, reverse_ind = to.unique(states, return_inverse=True, dim=0)
 
         self.assertEqual(states.shape[0], n_states)
-        self.assertEqual(
-            (states_unique_ind.sort()[0] == to.arange(n_states, device=device)).sum().item(),
-            n_states,
-        )
+        self.assertTrue(to.equal(reverse_ind.sort()[0], to.arange(n_states, device=device)))
 
     def test_update_states_for_batch(self):
 
@@ -97,4 +94,4 @@ class TestTVEM(unittest.TestCase):
         set_redundant_lpj_to_low(new_states, new_lpj, old_states)
 
         self.assertEqual((new_lpj == 1.0).sum().item(), 3)
-        self.assertEqual(new_lpj[1, 1].item(), -1e100)
+        self.assertEqual(new_lpj[1, 1].item(), -1e20)

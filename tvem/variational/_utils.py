@@ -2,9 +2,10 @@ import torch as to
 import tvem
 import numpy as np
 from typing import Dict
+from tvem.variational._set_redundant_lpj_to_low_CPU import set_redundant_lpj_to_low_CPU
 
 
-def unique_ind(x: to.Tensor) -> to.Tensor:
+def _unique_ind(x: to.Tensor) -> to.Tensor:
     """Find indices of unique rows in tensor.
 
     :param x: torch tensor
@@ -19,6 +20,42 @@ def unique_ind(x: to.Tensor) -> to.Tensor:
     # ...so the indices that are written last in each position are the ones for old_states
     uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
     return uniq_ind
+
+
+def _set_redundant_lpj_to_low_GPU(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+    """Find redundant states in new_states w.r.t. old_states and set
+       corresponding lpg to low.
+
+    :param new_states: set of new variational states (batch_size, newS, H)
+    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
+    :param old_states: (batch_size, S, H)
+    """
+
+    N, S, H = old_states.shape
+    newS = new_states.shape[1]
+
+    # old_states must come first for np.unique to discard redundant new_states
+    old_and_new = to.cat((old_states, new_states), dim=1)
+    for n in range(N):
+        uniq_idx = _unique_ind(old_and_new[n])
+        # indexes of states in new_states[n] that are not in old_states[n]
+        new_uniq_idx = uniq_idx[uniq_idx >= S] - S
+        # BoolTensor in pytorch>=1.2, ByteTensor otherwise
+        bool_or_byte = (to.empty(0) < 0).dtype
+        mask = to.ones(newS, dtype=bool_or_byte, device=new_lpj.device)
+        # indexes of all non-unique states in new_states (complementary of new_uniq_idx)
+        mask[new_uniq_idx.to(device=new_lpj.device)] = 0
+        # set lpj of redundant states to an arbitrary low value
+        new_lpj[n][mask] = -1e20
+
+
+# set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
+# function that runs on numpy arrays, when running on GPU, we stick to torch tensors
+def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+    if tvem.get_device() == "cpu":
+        set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
+    else:
+        _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
 
 
 def generate_unique_states(
@@ -106,33 +143,6 @@ def update_states_for_batch(
         t[idx_n_, idx_s] = t[idx_n_, flattened_sorted_idx]
 
     return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
-
-
-def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
-    """Find redundant states in new_states w.r.t. old_states and set
-       corresponding lpg to low.
-
-    :param new_states: set of new variational states (batch_size, newS, H)
-    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
-    :param old_states: (batch_size, S, H)
-    """
-
-    N, S, H = old_states.shape
-    newS = new_states.shape[1]
-
-    # old_states must come first for np.unique to discard redundant new_states
-    old_and_new = to.cat((old_states, new_states), dim=1)
-    for n in range(N):
-        uniq_idx = unique_ind(old_and_new[n])
-        # indexes of states in new_states[n] that are not in old_states[n]
-        new_uniq_idx = uniq_idx[uniq_idx >= S] - S
-        # BoolTensor in pytorch>=1.2, ByteTensor otherwise
-        bool_or_byte = (to.empty(0) < 0).dtype
-        mask = to.ones(newS, dtype=bool_or_byte, device=new_lpj.device)
-        # indexes of all non-unique states in new_states (complementary of new_uniq_idx)
-        mask[new_uniq_idx.to(device=new_lpj.device)] = 0
-        # set lpj of redundant states to an arbitrary low value
-        new_lpj[n][mask] = -1e100
 
 
 def _lpj2pjc(lpj: to.Tensor):
