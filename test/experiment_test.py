@@ -53,8 +53,8 @@ def add_gpu_and_mpi_marks():
 
 @pytest.fixture(scope="module")
 def hyperparams():
-    """Return an object containing hyperparametrs N,D,S,H as data members."""
-    return Munch(N=10, D=8, S=4, H=10)
+    """Return an object containing hyperparametrs N,D,H as data members."""
+    return Munch(N=10, D=8, H=10)
 
 
 @pytest.fixture(scope="module", params=[to.float32, to.float64], ids=["float32", "float64"])
@@ -111,13 +111,6 @@ def estep_conf(request, hyperparams):
     )
 
 
-def get_eem_new_states(c: EEMConfig):
-    if c.crossover:
-        return c.n_parents * (c.n_parents - 1) * c.n_children * c.n_generations
-    else:
-        return c.n_parents * c.n_children * c.n_generations
-
-
 @pytest.fixture(scope="module", params=(1, 2, 3), ids=("batch1", "batch2", "batch3"))
 def batch_size(request):
     return request.param
@@ -129,15 +122,15 @@ def model_and_data(request, hyperparams, input_files, precision, estep_conf, bat
 
     Parametrized fixture, use it to test on several models.
     """
-    N, S, D, H = get(hyperparams, "N", "S", "D", "H")
+    N, D, H = get(hyperparams, "N", "D", "H")
     if request.param == "NoisyOR":
         return NoisyOR(H=H, D=D, precision=precision), input_files.binary_data
     elif request.param == "BSC":
         conf = {
             "D": D,
             "H": H,
-            "S": S,
-            "Snew": get_eem_new_states(estep_conf),
+            "S": estep_conf.n_states,
+            "Snew": estep_conf.n_new_states,
             "batch_size": batch_size,
             "precision": precision,
         }
