@@ -54,7 +54,7 @@ def add_gpu_and_mpi_marks():
 @pytest.fixture(scope="module")
 def hyperparams():
     """Return an object containing hyperparametrs N,D,H as data members."""
-    return Munch(N=10, D=8, H=10)
+    return Munch(N=10, D=8, S=4, H=10)
 
 
 @pytest.fixture(scope="module", params=[to.float32, to.float64], ids=["float32", "float64"])
