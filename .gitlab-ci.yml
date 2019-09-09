@@ -1,5 +1,5 @@
 # Configuration to run TVEM CI on our workstations
-# It assumes conda is installed, in path, and the tvem environment has been created from our repo's env.yml file.
+# It assumes conda is installed, in path, and the tvem environment has been created from our repo's environment.yml file.
 # The special environment python/3.6.4-ompi (pytorch+CUDA+MPI) is loaded to run parallelization tests.
 # Documentation generation with sphinx additionally requires
 # `conda install -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints`
