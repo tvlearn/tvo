@@ -46,7 +46,7 @@ class BSC(TVEMModel):
             "batch_Wbar": to.empty((batch_size, S + Snew, D), dtype=precision, device=device),
             "batch_s_pjc": to.empty((batch_size, H), dtype=precision, device=device),
             "batch_Wp": to.empty((batch_size, D, H), dtype=precision, device=device),
-            "batch_Wq": to.empty((batch_size, H, H), dtype=precision, device=device),
+            "batch_Wq": to.empty((H, H), dtype=precision, device=device),
             "batch_sigma": to.empty((batch_size,), dtype=precision, device=device),
             "indS_filled": 0,
             "my_N": to.tensor([0], dtype=to.int, device=device),
@@ -234,7 +234,9 @@ class BSC(TVEMModel):
         batch_Wp[:batch_size, :, :] = batch.unsqueeze(2) * batch_s_pjc[:batch_size].unsqueeze(
             1
         )  # is (batch_size,D,H)
-        batch_Wq[:batch_size, :, :] = mean_posterior(Kfloat.unsqueeze(3) * Kfloat.unsqueeze(2), lpj)
+        q = tvem.variational._utils._lpj2pjc(lpj)
+        Kq = Kfloat.mul(q[:, :, None])
+        batch_Wq[:, :] = to.einsum("ijk,ijl->kl", Kq, Kfloat)
         # is (batch_size,H,H)
         batch_sigma[:batch_size] = mean_posterior(
             to.sum((batch[:, None, :] - batch_Wbar[:batch_size, :S, :]) ** 2, dim=2), lpj
@@ -243,7 +245,7 @@ class BSC(TVEMModel):
 
         my_pies.add_(to.sum(batch_s_pjc[:batch_size, :], dim=0))
         my_Wp.add_(to.sum(batch_Wp[:batch_size, :, :], dim=0))
-        my_Wq.add_(to.sum(batch_Wq[:batch_size, :, :], dim=0))
+        my_Wq.add_(batch_Wq)
         my_sigma.add_(to.sum(batch_sigma[:batch_size]))
         my_N.add_(batch_size)
 
