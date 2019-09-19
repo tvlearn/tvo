@@ -16,6 +16,7 @@ def init_W_data_mean(
     :param data_mean: Mean of all data points. Length equals data dimensionality D.
     :param data_var: Variance of all data points in each dimension d=1,...D.
     :param H: Number of basis functions to be generated.
+    :param std_factor: Scalar to control amount of standard deviation of additive noise
     :param dtype: dtype of output Tensor. Defaults to torch.float64.
     :param device: torch.device of output Tensor. Defaults to tvem.get_device().
     :returns: Weight matrix W with shape (D,H).
