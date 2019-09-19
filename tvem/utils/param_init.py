@@ -7,6 +7,7 @@ def init_W_data_mean(
     data_mean: Tensor,
     data_var: Tensor,
     H: int,
+    std_factor: float = 0.01,
     dtype: to.dtype = to.float64,
     device: to.device = None,
 ) -> Tensor:
@@ -22,7 +23,7 @@ def init_W_data_mean(
 
     if device is None:
         device = tvem.get_device()
-    return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() + to.mean(
+    return data_mean.to(dtype=dtype, device=device).repeat((H, 1)).t() + std_factor * to.mean(
         to.sqrt(data_var.to(dtype=dtype, device=device))
     ) * to.randn((len(data_mean), H), dtype=dtype, device=device)
 
