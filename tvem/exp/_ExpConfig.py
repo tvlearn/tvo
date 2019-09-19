@@ -31,6 +31,7 @@ class ExpConfig:
         :param warmup_Esteps: Number of warm-up E-steps to perform.
         :param output: Name or path of output HDF5 file. It is overwritten if it already exists.
         :param log_blacklist: By default, experiments log all available quantities. These are:
+
                               - "{train,valid,test}_F": one or more of training/validation/test
                                 free energy, depending on the experiment
                               - "{train,valid,test}_subs": average variational state substitutions
@@ -40,8 +41,8 @@ class ExpConfig:
                               - "{train,valid,test}_lpj": latest snapshot of log-pseudo-joints
                                                           per datapoint
                               - "theta": a group containing logs of whatever model.theta contains
-                              If one of these names appears in `log_blacklist`, the corresponing
-                              quantity will not be logged.
+                                If one of these names appears in `log_blacklist`, the corresponing
+                                quantity will not be logged.
         :param rollback_if_F_decreases: names of model parameters (corresponding to those in
                                         TVEMModel.theta) that should be rolled back (i.e. not
                                         updated) if the free energy value before and after

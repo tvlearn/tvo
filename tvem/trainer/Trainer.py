@@ -78,6 +78,7 @@ class Trainer:
         """Run one epoch of E-steps on training and/or test data, depending on what is available.
 
         Only E-steps are executed.
+
         :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
                   (keys might be missing depending on what is available)
         """
@@ -106,6 +107,7 @@ class Trainer:
         """Run one training and/or test epoch, depending on what data is available.
 
         Both E-step and M-step are executed.
+
         :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
                   (keys might be missing depending on what is available). The free energy values
                   are calculated per batch, so if the model updates its parameters in

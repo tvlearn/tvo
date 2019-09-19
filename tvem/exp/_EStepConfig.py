@@ -34,11 +34,13 @@ class EEMConfig(EStepConfig):
         :param n_children: Number of children per parent to generate via mutation
                            at each EEM generation.
         :param parent_selection: Parent selection algorithm for EEM. Must be one of:
+
                                  - 'fitness': fitness-proportional parent selection
         :param crossover: Whether crossover should be applied or not.
         :param mutation: Mutation algorithm for EEM. Must be one of:
+
                          - 'sparsity': bits are flipped so that states tend
-                            towards current model sparsity.
+                           towards current model sparsity.
                          - 'uniform': random uniform selection of bits to flip.
         :param bitflip_frequency: Probability of flipping a bit during the mutation step (e.g.
                                   2/H for an average of 2 bitflips per mutation). Required when

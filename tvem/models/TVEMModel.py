@@ -112,6 +112,7 @@ class TVEMModel(ABC):
 
         :param N: number of data points to be generated.
         :returns: dictionary with keys
+
                   - `data`: a tensor with shape (N, D) where D is the number of
                     observables for this model.
                   - `hidden_state`: a tensor with shape (N, H) where H is the number of
