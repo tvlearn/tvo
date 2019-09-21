@@ -315,3 +315,14 @@ class TVAE(TVEMModel):
             for p in parameters:
                 all_reduce(p.grad)
                 p.grad /= n_procs
+
+    def data_estimator(self, idx: to.Tensor, states: to.Tensor) -> to.Tensor:
+        """
+        :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
+        """
+
+        lpj = states.lpj[idx]
+        K = states.K[idx]
+        means = self.forward(K)  # N,S,D
+
+        return mean_posterior(means, lpj)  # N, D
