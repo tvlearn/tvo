@@ -58,6 +58,18 @@ class TVEMModel(ABC):
         """
         pass  # pragma: no cover
 
+    def init_storage(self, S: int, Snew: int, batch_size: int) -> None:
+        """This method is called once by an experiment when initializing a model
+
+        :param n_states: Number of variational states per datapoint to keep in memory
+        :param n_new_states: Number of new states per datapoint sampled in variational E-step
+        :param batch_size: Batch size used by the data loader
+
+        Concrete models can optionally override this method if it's convenient.
+        By default, it does nothing.
+        """
+        pass  # pragma: no cover
+
     def init_epoch(self) -> None:
         """This method is called once at the beginning of each training epoch.
 
