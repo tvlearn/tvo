@@ -51,6 +51,9 @@ class _TrainingAndOrValidation(Experiment):
         self._conf = Munch(vars(conf))
         self._conf.model = type(model).__name__
         self._estep_conf = Munch(vars(estep_conf))
+        model.init_storage(
+            self._estep_conf.n_states, self._estep_conf.n_new_states, self._conf.batch_size
+        )
 
         self.train_data = None
         self.train_states = None
