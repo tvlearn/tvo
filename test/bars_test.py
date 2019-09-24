@@ -113,16 +113,9 @@ def model_and_data(request, hyperparams, estep_conf):
         sigma_init = to.tensor([1.0], dtype=precision, device=tvem.get_device())
         pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
 
-        conf = {
-            "N": N,
-            "D": D,
-            "H": H,
-            "S": estep_conf.n_states,
-            "Snew": estep_conf.n_new_states,
-            "batch_size": batch_size,
-            "precision": precision,
-        }
-        model = BSC(conf, W_gt, sigma_gt, pies_gt)
+        model = BSC(
+            H=H, D=D, W_init=W_gt, sigma_init=sigma_gt, pies_init=pies_gt, precision=precision
+        )
 
         fname = "bars_test_data_bsc.h5"
 

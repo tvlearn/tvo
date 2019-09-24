@@ -20,12 +20,14 @@ def setup(request):
         _device = tvem.get_device()
         N, D, H = 2, 1, 2
         precision = to.float32
-        pi_init = to.full((H,), 0.5, dtype=precision, device=_device)
+        pies_init = to.full((H,), 0.5, dtype=precision, device=_device)
         W_init = to.full((D, H), 1.0, dtype=precision, device=_device)
         sigma_init = to.tensor([1.0], dtype=precision, device=_device)
 
         conf = {"D": D, "H": H, "S": 2 ** H, "Snew": 0, "batch_size": N, "precision": precision}
-        m = BSC(conf, W_init, sigma_init, pi_init)
+        m = BSC(
+            H=H, D=D, W_init=W_init, sigma_init=sigma_init, pies_init=pies_init, precision=precision
+        )
         all_s = FullEM(N, H, precision)
         all_s.lpj = to.zeros_like(all_s.lpj)
         data = to.tensor([[0], [1]], dtype=precision, device=_device)
@@ -53,6 +55,7 @@ def setup(request):
 
 
 def test_lpj(setup):
+    setup.m.init_storage(S=2 ** setup.H, Snew=0, batch_size=setup.N)
     setup.m.init_epoch()
     lpj = setup.m.log_pseudo_joint(setup.data, setup.all_s.K)
     assert lpj.device == setup.all_s.K.device
@@ -61,6 +64,7 @@ def test_lpj(setup):
 
 def test_free_energy(setup):
     batch, states, m = setup.data, setup.all_s, setup.m
+    m.init_storage(S=2 ** setup.H, Snew=0, batch_size=setup.N)
     m.init_epoch()
     m.init_batch()
     states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
@@ -72,6 +76,7 @@ def test_train(setup):
     m = setup.m
     N = setup.N
     batch, states = setup.data, setup.all_s
+    m.init_storage(S=2 ** setup.H, Snew=0, batch_size=setup.N)
     m.init_epoch()
     m.init_batch()
     states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
