@@ -123,9 +123,8 @@ def test_free_energy(simple_tvae):
 def tvae_and_corresponding_bsc(add_gpu_mark):
     precision = to.float64
     d = tvem.get_device()
-    N, D = 10, 10
 
-    H0, H1 = 2, 2
+    D, H0, H1 = 10, 2, 2
     assert H0 == H1
     W = [to.eye(H1, dtype=precision, device=d), to.rand(H1, D, dtype=precision, device=d)]
     b = [to.zeros((H1), dtype=precision, device=d), to.zeros((D), dtype=precision, device=d)]
@@ -135,16 +134,7 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
 
     bsc_W = W[1].t()
     bsc_sigma = to.tensor([0.1], dtype=precision, device=d)
-    conf = {
-        "N": N,
-        "D": D,
-        "H": H0,
-        "S": 2 ** H0,
-        "Snew": 0,
-        "batch_size": N,
-        "precision": precision,
-    }
-    bsc = BSC(conf, bsc_W, bsc_sigma, pi)
+    bsc = BSC(H=H0, D=D, W_init=bsc_W, sigma_init=bsc_sigma, pies_init=pi)
 
     return tvae, bsc
 
@@ -157,6 +147,7 @@ def test_same_as_bsc(tvae_and_corresponding_bsc):
 
     states = fullem_for(tvae, N)
 
+    bsc.init_storage(S=states.K.shape[1], Snew=0, batch_size=N)
     bsc.init_epoch()
     bsc.init_batch()
     states.lpj[:] = bsc.log_pseudo_joint(data, states.K)
