@@ -21,36 +21,30 @@ lstsq = to.lstsq if int(to.__version__.split(".")[1]) >= 2 else to.gels
 
 
 class BSC(TVEMModel):
-    """Binary Sparse Coding (BSC)"""
-
     def __init__(
-        self, conf, W_init: Tensor = None, sigma_init: Tensor = None, pies_init: Tensor = None
+        self,
+        H: int,
+        D: int,
+        W_init: Tensor = None,
+        sigma_init: Tensor = None,
+        pies_init: Tensor = None,
+        precision: to.dtype = to.float64,
     ):
+        """Shallow Binary Sparse Coding (BSC) model.
+
+        :param H: Number of hidden units.
+        :param D: Number of observables.
+        :param W_init: Tensor with shape (D,H), initializes BSC weights.
+        :param pi_init: Tensor with shape (H,), initializes BSC priors.
+        :param precision: Floating point precision required. Must be one of torch.float32 or
+                          torch.float64.
+
+        """
+
+        assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
+        self.precision = precision
+
         device = tvem.get_device()
-
-        required_keys = ("D", "H", "S", "Snew", "batch_size", "precision")
-        for c in required_keys:
-            assert c in conf and conf[c] is not None
-        self.conf = conf
-        self.required_keys = required_keys
-
-        D, H, S, Snew, batch_size, precision = get(conf, *required_keys)
-
-        self.tmp = {
-            "my_Wp": to.empty((D, H), dtype=precision, device=device),
-            "my_Wq": to.empty((H, H), dtype=precision, device=device),
-            "my_pies": to.empty(H, dtype=precision, device=device),
-            "my_sigma": to.empty(1, dtype=precision, device=device),
-            "pil_bar": to.empty(H, dtype=precision, device=device),
-            "WT": to.empty((H, D), dtype=precision, device=device),
-            "batch_Wbar": to.empty((batch_size, S + Snew, D), dtype=precision, device=device),
-            "batch_s_pjc": to.empty((batch_size, H), dtype=precision, device=device),
-            "batch_Wp": to.empty((batch_size, D, H), dtype=precision, device=device),
-            "batch_Wq": to.empty((H, H), dtype=precision, device=device),
-            "batch_sigma": to.empty((batch_size,), dtype=precision, device=device),
-            "indS_filled": 0,
-            "my_N": to.tensor([0], dtype=to.int, device=device),
-        }
 
         if W_init is not None:
             assert W_init.shape == (D, H)
@@ -85,12 +79,38 @@ class BSC(TVEMModel):
 
         super().__init__(theta=theta)
 
+    def init_storage(self, S: int, Snew: int, batch_size: int):
+        """Allocate tensors used in E- and M-step."""
+        device = tvem.get_device()
+        theta = self.theta
+        precision = self.precision
+
+        D, H = theta["W"].shape
+
+        storage = {
+            "my_Wp": to.empty((D, H), dtype=precision, device=device),
+            "my_Wq": to.empty((H, H), dtype=precision, device=device),
+            "my_pies": to.empty(H, dtype=precision, device=device),
+            "my_sigma": to.empty(1, dtype=precision, device=device),
+            "pil_bar": to.empty(H, dtype=precision, device=device),
+            "WT": to.empty((H, D), dtype=precision, device=device),
+            "batch_Wbar": to.empty((batch_size, S + Snew, D), dtype=precision, device=device),
+            "batch_s_pjc": to.empty((batch_size, H), dtype=precision, device=device),
+            "batch_Wp": to.empty((batch_size, D, H), dtype=precision, device=device),
+            "batch_Wq": to.empty((H, H), dtype=precision, device=device),
+            "batch_sigma": to.empty((batch_size,), dtype=precision, device=device),
+            "indS_filled": 0,
+            "my_N": to.tensor([0], dtype=to.int, device=device),
+        }
+
+        self.storage = storage
+
     @property
     def sorted_by_lpj(self) -> Dict[str, Tensor]:
 
-        tmp = self.tmp
+        storage = self.storage
 
-        return {"batch_Wbar": tmp["batch_Wbar"]}
+        return {"batch_Wbar": storage["batch_Wbar"]}
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Use hidden states to sample datapoints according to the noise model of BSC.
@@ -119,30 +139,29 @@ class BSC(TVEMModel):
         return Y
 
     def init_epoch(self):
-        """Allocate and/or initialize tensors used during EM-step."""
+        """Initialize tensors used in E- and M-step."""
 
-        conf = self.conf
         theta = self.theta
-        tmp = self.tmp
+        storage = self.storage
 
-        D = conf["D"]
+        D = theta["W"].shape[0]
 
-        tmp["my_Wp"].fill_(0.0)
-        tmp["my_Wq"].fill_(0.0)
-        tmp["my_pies"].fill_(0.0)
-        tmp["my_sigma"].fill_(0.0)
+        storage["my_Wp"].fill_(0.0)
+        storage["my_Wq"].fill_(0.0)
+        storage["my_pies"].fill_(0.0)
+        storage["my_sigma"].fill_(0.0)
 
-        tmp["pil_bar"][:] = to.log(theta["pies"] / (1.0 - theta["pies"]))
+        storage["pil_bar"][:] = to.log(theta["pies"] / (1.0 - theta["pies"]))
 
-        tmp["WT"][:, :] = theta["W"].t()
+        storage["WT"][:, :] = theta["W"].t()
 
-        tmp["pre1"] = -1.0 / 2.0 / theta["sigma"] / theta["sigma"]
+        storage["pre1"] = -1.0 / 2.0 / theta["sigma"] / theta["sigma"]
 
-        tmp["fenergy_const"] = to.log(1.0 - theta["pies"]).sum() - D / 2 * to.log(
+        storage["fenergy_const"] = to.log(1.0 - theta["pies"]).sum() - D / 2 * to.log(
             2 * math.pi * theta["sigma"] ** 2
         )
 
-        tmp["infty"] = to.tensor(
+        storage["infty"] = to.tensor(
             [float("inf")], dtype=theta["pies"].dtype, device=theta["pies"].device
         )
 
@@ -151,33 +170,33 @@ class BSC(TVEMModel):
 
         Only relevant if model makes use of the sorted_by_lpj dictionary.
         """
-        tmp = self.tmp
-        tmp["indS_filled"] = 0
+        storage = self.storage
+        storage["indS_filled"] = 0
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for BSC."""
 
         theta = self.theta
-        tmp = self.tmp
+        storage = self.storage
         sorted_by_lpj = self.sorted_by_lpj
 
         batch_size, S, _ = states.shape
 
-        pil_bar = tmp["pil_bar"]
-        WT = tmp["WT"]
-        pre1 = tmp["pre1"]
-        indS_filled = tmp["indS_filled"]
+        pil_bar = storage["pil_bar"]
+        WT = storage["WT"]
+        pre1 = storage["pre1"]
+        indS_filled = storage["indS_filled"]
 
         # TODO Find solution to avoid byte->float casting
         statesfloat = states.to(dtype=theta["W"].dtype)
 
         # TODO Store batch_Wbar in storage allocated at beginning of EM-step, e.g.
-        # to.matmul(tensor1=states, tensor2=tmp['WT'], out=tmp["batch_Wbar"])
+        # to.matmul(tensor1=states, tensor2=storage['WT'], out=storage["batch_Wbar"])
         sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :] = to.matmul(
             statesfloat, WT
         )
         batch_Wbar = sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :]
-        tmp["indS_filled"] += S
+        storage["indS_filled"] += S
         # is (batch_size,S)
         lpj = to.mul(to.sum(to.pow(batch_Wbar - data[:, None, :], 2), dim=2), pre1) + to.matmul(
             statesfloat, pil_bar
@@ -188,11 +207,11 @@ class BSC(TVEMModel):
         """Evaluate log-joints for BSC."""
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
-        return lpj + self.tmp["fenergy_const"]
+        return lpj + self.storage["fenergy_const"]
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
 
-        tmp = self.tmp
+        storage = self.storage
         sorted_by_lpj = self.sorted_by_lpj
 
         lpj = states.lpj[idx]
@@ -215,7 +234,7 @@ class BSC(TVEMModel):
             fenergy_const,
             my_N,
         ) = get(
-            tmp,
+            storage,
             "batch_s_pjc",
             "batch_Wp",
             "batch_Wq",
@@ -253,14 +272,13 @@ class BSC(TVEMModel):
 
     def update_param_epoch(self) -> None:
 
-        conf = self.conf
         theta = self.theta
-        tmp = self.tmp
+        storage = self.storage
         policy = self.policy
 
-        D = conf["D"]
+        D = theta["W"].shape[0]
         my_pies, my_Wp, my_Wq, my_sigma, my_N = get(
-            tmp, "my_pies", "my_Wp", "my_Wq", "my_sigma", "my_N"
+            storage, "my_pies", "my_Wp", "my_Wq", "my_sigma", "my_N"
         )
 
         theta_new = {}
