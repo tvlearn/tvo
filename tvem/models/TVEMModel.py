@@ -11,6 +11,8 @@ from typing import Dict, Optional, Tuple
 
 
 class TVEMModel(ABC):
+    data_estimator = NotImplemented
+
     def __init__(self, theta: Dict[str, Tensor]):
         """Abstract base class for probabilistic generative models to be trained with TVEM."""
         # assert that all parameters have compatible precision
