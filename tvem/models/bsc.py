@@ -318,3 +318,20 @@ class BSC(TVEMModel):
     @property
     def shape(self) -> Tuple[int, ...]:
         return self.theta["W"].shape
+
+    def data_estimator(self, idx: Tensor, states: Tensor) -> Tensor:
+        """Estimator used for data reconstruction. Data reconstruction can only be supported
+        by a model if it implements this method. The estimator to be implemented is defined
+        as follows:
+        :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
+        """
+
+        sorted_by_lpj = self.sorted_by_lpj
+
+        batch_Wbar = sorted_by_lpj["batch_Wbar"]
+
+        lpj = states.lpj[idx]
+        K = states.K[idx]
+        batch_size, S, _ = K.shape
+
+        return mean_posterior(batch_Wbar[:batch_size, :S, :], lpj)
