@@ -19,6 +19,7 @@ class Trainer:
         test_data: TVEMDataLoader = None,
         test_states: TVEMVariationalStates = None,
         rollback_if_F_decreases: Sequence[str] = [],
+        will_reconstruct: bool = False,
     ):
         """Train and/or test a given TVEMModel.
 
@@ -28,6 +29,7 @@ class Trainer:
         :param test_data: validation or test dataset. The contained dataset should have shape (M,D)
         :param test_states: TVEMVariationalStates with shape (M,Z,H)
         :param rollback_if_F_decreases: see ExpConfig docs
+        :param will_reconstruct: True if data will be reconstructed by the Trainer
 
         Both train_data and train_states must be provided, or neither.
         The same holds for test_data and test_states.
@@ -59,17 +61,50 @@ class Trainer:
             all_reduce(self.N_test)
             self.N_test = self.N_test.item()
         self._to_rollback = rollback_if_F_decreases
+        self.will_reconstruct = will_reconstruct
+        if train_data is not None and self.will_reconstruct:
+            self.train_reconstruction = train_data.dataset.tensors[1].clone()
+        else:
+            self.train_reconstruction = None
+        if test_data is not None and self.will_reconstruct:
+            self.test_reconstruction = test_data.dataset.tensors[1].clone()
+        else:
+            self.test_reconstruction = None
 
     @staticmethod
     def _do_e_step(data: TVEMDataLoader, states: TVEMVariationalStates, model: TVEMModel, N: int):
         F = to.tensor(0.0)
         subs = to.tensor(0)
-
         model.init_epoch()
         for idx, batch in data:
             model.init_batch()
             subs += states.update(idx, batch, model)
             F += model.free_energy(idx, batch, states)
+        all_reduce(F)
+        all_reduce(subs)
+        return F.item() / N, subs.item() / N
+
+    @staticmethod
+    def _do_er_step(
+        data: TVEMDataLoader,
+        states: TVEMVariationalStates,
+        model: TVEMModel,
+        N: int,
+        reconstruction: to.Tensor,
+    ):
+        if model.data_estimator is NotImplemented:
+            raise NotImplementedError(
+                f"reconstruction not implemented for model {type(model).__name__}"
+            )
+
+        F = to.tensor(0.0)
+        subs = to.tensor(0)
+        model.init_epoch()
+        for idx, batch in data:
+            model.init_batch()
+            subs += states.update(idx, batch, model)
+            F += model.free_energy(idx, batch, states)
+            reconstruction[idx] = model.data_estimator(idx, states)  # full data estimation
         all_reduce(F)
         all_reduce(subs)
         return F.item() / N, subs.item() / N
@@ -99,6 +134,34 @@ class Trainer:
             assert test_data is not None and test_states is not None  # to make mypy happy
             ret["test_F"], ret["test_subs"] = self._do_e_step(
                 test_data, test_states, model, self.N_test
+            )
+
+        return ret
+
+    def er_step(self) -> Dict[str, Any]:
+        """Run one epoch of E-steps on training and/or test data, depending on what is available.
+
+        Only E-steps and Reconstruction-steps are executed.
+        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        ret = {}
+        model = self.model
+        train_data, train_states = self.train_data, self.train_states
+        test_data, test_states = self.test_data, self.test_states
+
+        # Training #
+        if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
+            ret["train_F"], ret["train_subs"] = self._do_er_step(
+                train_data, train_states, model, self.N_train, self.train_reconstruction
+            )
+
+        # Validation/Testing #
+        if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
+            ret["test_F"], ret["test_subs"] = self._do_er_step(
+                test_data, test_states, model, self.N_test, self.test_reconstruction
             )
 
         return ret
@@ -155,6 +218,63 @@ class Trainer:
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
             res = self._do_e_step(test_data, test_states, model, self.N_test)
+            ret_dict["test_F"], ret_dict["test_subs"] = res
+
+        return ret_dict
+
+    def erm_step(self) -> Dict[str, Any]:
+        """Run one training and/or test epoch, depending on what data is available.
+
+        Both E-step, Reconstruction-step and M-step are executed.
+        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        model = self.model
+        if model.data_estimator is NotImplemented:
+            raise NotImplementedError(
+                f"reconstruction not implemented for model {type(model).__name__}"
+            )
+        train_data, train_states, train_reconstruction = (
+            self.train_data,
+            self.train_states,
+            self.train_reconstruction,
+        )
+        test_data, test_states, test_reconstruction = (
+            self.test_data,
+            self.test_states,
+            self.test_reconstruction,
+        )
+
+        ret_dict = {}
+
+        # Training #
+        if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
+            F = to.tensor(0.0)
+            subs = to.tensor(0)
+            model.init_epoch()
+            for idx, batch in train_data:
+                model.init_batch()
+                subs += train_states.update(idx, batch, model)
+                train_reconstruction[idx] = model.data_estimator(
+                    idx, train_states
+                )  # full data estimation
+                batch_F = model.update_param_batch(idx, batch, train_states)
+                batch_F = model.free_energy(idx, batch, train_states)
+                F += batch_F
+            if len(self._to_rollback) > 0:
+                self._update_parameters_with_rollback()
+            else:
+                model.update_param_epoch()
+            all_reduce(F)
+            all_reduce(subs)
+            ret_dict["train_F"] = F.item() / self.N_train
+            ret_dict["train_subs"] = subs.item() / self.N_train
+
+        # Validation/Testing #
+        if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
+            res = self._do_er_step(test_data, test_states, model, self.N_test, test_reconstruction)
             ret_dict["test_F"], ret_dict["test_subs"] = res
 
         return ret_dict
