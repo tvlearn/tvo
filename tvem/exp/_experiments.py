@@ -107,6 +107,8 @@ class _TrainingAndOrValidation(Experiment):
             self.test_data,
             self.test_states,
             rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
+            will_reconstruct=self._conf.reco_epochs is not None
+            or self._conf.warmup_reco_epochs is not None,
         )
         logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 
@@ -116,7 +118,12 @@ class _TrainingAndOrValidation(Experiment):
         if self._conf.warmup_Esteps > 0:
             pprint("Warm-up E-steps")
         for e in range(self._conf.warmup_Esteps):
-            d = trainer.e_step()
+            if self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs:
+                d = trainer.er_step()
+                d["train_reconstruction"] = trainer.train_reconstruction
+                d["test_reconstruction"] = trainer.test_reconstruction
+            else:
+                d = trainer.e_step()
             self._log_epoch(logger, d)
 
         # log initial free energies (after warm-up E-steps if any)
@@ -128,7 +135,14 @@ class _TrainingAndOrValidation(Experiment):
         # EM steps
         for e in range(epochs):
             start_t = time.time()
-            d = trainer.em_step()  # E- and M-step on training set, E-step on validation/test set
+            if self._conf.reco_epochs is not None and e in self._conf.reco_epochs:
+                # E-, R- and M-step on training set, E- and R-step on validation/test set
+                d = trainer.erm_step()
+                d["train_reconstruction"] = trainer.train_reconstruction
+                d["test_reconstruction"] = trainer.test_reconstruction
+            else:
+                # E- and M-step on training set, E-step on validation/test set
+                d = trainer.em_step()
             epoch_runtime = time.time() - start_t
             self._log_epoch(logger, d)
             yield EpochLog(e + 1, d, epoch_runtime)
@@ -178,6 +192,17 @@ class _TrainingAndOrValidation(Experiment):
                 f"{log_kind}_lpj": gather_from_processes(states.lpj),
             }
             logger.set(**states_and_lpj_dict)
+
+            # log data reconstructions
+            reco_dict = {}
+            if (
+                f"{log_kind}_reconstruction" not in self._conf.log_blacklist
+                and f"{log_kind}_reconstruction" in epoch_results
+            ):
+                reco_dict[f"{log_kind}_reconstruction"] = gather_from_processes(
+                    epoch_results[f"{log_kind}_reconstruction"]
+                )
+                logger.set(**reco_dict)
 
         logger.append(theta=self.model.theta)
         logger.write()
