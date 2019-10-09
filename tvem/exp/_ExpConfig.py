@@ -17,6 +17,7 @@ class ExpConfig:
         output: str = "tvem_exp.h5",
         log_blacklist: Iterable[str] = [],
         rollback_if_F_decreases: Sequence[str] = [],
+        warmup_reco_epochs: Iterable[int] = None,
         reco_epochs: Iterable[int] = None,
     ):
         """Configuration object for Experiment classes.
@@ -54,6 +55,7 @@ class ExpConfig:
                                         BSC and NoisyOR are such models. This feature is useful,
                                         for example, to prevent NoisyOR's M-step equation from
                                         oscillating away from the fixed point (i.e. the optimum).
+        :param warmup_reco_epochs: List of warmup_Estep indices at which to compute data reconstructions.
         :param reco_epochs: List of epoch indices at which to compute data reconstructions.
         """
         assert precision in (to.float32, to.float64), "Precision must be one of torch.float{32,64}"
@@ -65,4 +67,5 @@ class ExpConfig:
         self.output = output
         self.log_blacklist = log_blacklist
         self.rollback_if_F_decreases = rollback_if_F_decreases
+        self.warmup_reco_epochs = warmup_reco_epochs
         self.reco_epochs = reco_epochs
