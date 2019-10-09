@@ -55,7 +55,8 @@ class ExpConfig:
                                         BSC and NoisyOR are such models. This feature is useful,
                                         for example, to prevent NoisyOR's M-step equation from
                                         oscillating away from the fixed point (i.e. the optimum).
-        :param warmup_reco_epochs: List of warmup_Estep indices at which to compute data reconstructions.
+        :param warmup_reco_epochs: List of warmup_Estep indices at which to compute data
+                                   reconstructions.
         :param reco_epochs: List of epoch indices at which to compute data reconstructions.
         """
         assert precision in (to.float32, to.float64), "Precision must be one of torch.float{32,64}"
