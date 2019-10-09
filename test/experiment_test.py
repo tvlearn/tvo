@@ -195,3 +195,31 @@ def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     for log in exp.run(10):
         log.print()
     check_file(exp_conf.output, "test")
+
+
+def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks, warmup_Esteps):
+    model, input_file = model_and_data
+    if not isinstance(model, BSC):
+        return
+    from copy import deepcopy
+
+    _exp_conf = deepcopy(exp_conf)
+    _exp_conf.reco_epochs = range(10)
+    _exp_conf.warmup_Esteps = 0
+    exp = Training(
+        _exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
+    )
+    for log in exp.run(10):
+        log.print()
+
+    rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    if rank == 0:
+        f = h5py.File(exp_conf.output, "r")
+        assert "train_reconstruction" in f.keys()
+        train_reconstruction = to.tensor(f["train_reconstruction"], dtype=exp_conf.precision)
+        f.close()
+
+        f = h5py.File(input_file, "r")
+        train_data = to.tensor(f["data"], dtype=exp_conf.precision)
+        f.close()
+        assert train_reconstruction.shape == train_data.shape
