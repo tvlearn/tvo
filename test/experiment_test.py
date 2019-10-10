@@ -199,7 +199,7 @@ def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
 
 def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks, warmup_Esteps):
     model, input_file = model_and_data
-    if not isinstance(model, BSC):
+    if model.data_estimator is NotImplemented:
         return
     from copy import deepcopy
 
