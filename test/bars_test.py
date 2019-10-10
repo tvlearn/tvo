@@ -6,7 +6,7 @@
 from tvem.exp import ExpConfig, FullEMConfig, Training
 from tvem.models import NoisyOR, BSC
 from tvem.utils.parallel import init_processes, broadcast
-from tvem.utils import get, genBars
+from tvem.utils import get, generate_bars
 import tvem
 import os
 import numpy as np
@@ -60,7 +60,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
     if request.param == "BSC":
 
-        W_gt = genBars(H, bar_amp=10.0, precision=precision)
+        W_gt = generate_bars(H, bar_amp=10.0, precision=precision)
         sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
@@ -86,7 +86,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
     elif request.param == "NoisyOR":
 
-        W_gt = genBars(H, bar_amp=0.8, bg_amp=0.1, precision=precision)
+        W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, precision=precision)
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
         to.manual_seed(999)
