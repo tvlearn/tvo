@@ -120,12 +120,10 @@ class _TrainingAndOrValidation(Experiment):
         if self._conf.warmup_Esteps > 0:
             pprint("Warm-up E-steps")
         for e in range(self._conf.warmup_Esteps):
-            if self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs:
-                d = trainer.er_step()
-                d["train_reconstruction"] = trainer.train_reconstruction
-                d["test_reconstruction"] = trainer.test_reconstruction
-            else:
-                d = trainer.e_step()
+            compute_reconstruction = (
+                self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs
+            )
+            d = trainer.e_step(compute_reconstruction)
             self._log_epoch(logger, d)
 
         # log initial free energies (after warm-up E-steps if any)
@@ -137,14 +135,10 @@ class _TrainingAndOrValidation(Experiment):
         # EM steps
         for e in range(epochs):
             start_t = time.time()
-            if self._conf.reco_epochs is not None and e in self._conf.reco_epochs:
-                # E-, R- and M-step on training set, E- and R-step on validation/test set
-                d = trainer.erm_step()
-                d["train_reconstruction"] = trainer.train_reconstruction
-                d["test_reconstruction"] = trainer.test_reconstruction
-            else:
-                # E- and M-step on training set, E-step on validation/test set
-                d = trainer.em_step()
+            compute_reconstruction = (
+                self._conf.reco_epochs is not None and e in self._conf.reco_epochs
+            )
+            d = trainer.em_step(compute_reconstruction)
             epoch_runtime = time.time() - start_t
             self._log_epoch(logger, d)
             yield EpochLog(e + 1, d, epoch_runtime)
@@ -199,10 +193,10 @@ class _TrainingAndOrValidation(Experiment):
             reco_dict = {}
             if (
                 f"{log_kind}_reconstruction" not in self._conf.log_blacklist
-                and f"{log_kind}_reconstruction" in epoch_results
+                and f"{log_kind}_rec" in epoch_results
             ):
                 reco_dict[f"{log_kind}_reconstruction"] = gather_from_processes(
-                    epoch_results[f"{log_kind}_reconstruction"]
+                    epoch_results[f"{log_kind}_rec"]
                 )
                 logger.set(**reco_dict)
 
