@@ -118,16 +118,20 @@ class Trainer:
         # Training #
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
-            ret["train_F"], ret["train_subs"], ret["train_rec"] = self._do_e_step(
+            ret["train_F"], ret["train_subs"], train_rec = self._do_e_step(
                 train_data, train_states, model, self.N_train, train_reconstruction
             )
+            if train_rec is not None:
+                ret["train_rec"] = train_rec
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            ret["test_F"], ret["test_subs"], ret["test_rec"] = self._do_e_step(
+            ret["test_F"], ret["test_subs"], test_rec = self._do_e_step(
                 test_data, test_states, model, self.N_test, test_reconstruction
             )
+            if test_rec is not None:
+                ret["test_rec"] = test_rec
 
         return ret
 
@@ -194,13 +198,16 @@ class Trainer:
             all_reduce(subs)
             ret_dict["train_F"] = F.item() / self.N_train
             ret_dict["train_subs"] = subs.item() / self.N_train
-            ret_dict["train_rec"] = train_reconstruction
+            if train_reconstruction is not None:
+                ret_dict["train_rec"] = train_reconstruction
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
             res = self._do_e_step(test_data, test_states, model, self.N_test, test_reconstruction)
-            ret_dict["test_F"], ret_dict["test_subs"], ret_dict["test_rec"] = res
+            ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
+            if test_reconstruction is not None:
+                ret_dict["test_rec"] = test_reconstruction
 
         return ret_dict
 
