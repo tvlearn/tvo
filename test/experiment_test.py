@@ -223,3 +223,4 @@ def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_ma
         train_data = to.tensor(f["data"], dtype=exp_conf.precision)
         f.close()
         assert train_reconstruction.shape == train_data.shape
+        assert (train_reconstruction != train_data).any()
