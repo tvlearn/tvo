@@ -58,13 +58,13 @@ class Trainer:
             all_reduce(self.N_train)
             self.N_train = self.N_train.item()
             if self.will_reconstruct:
-                self.train_reconstruction = train_data.dataset.tensors[1].clone()
+                self.train_reconstruction = to.zeros_like(train_data.dataset.tensors[1])
         if test_data is not None:
             self.N_test = to.tensor(len(test_data.dataset))
             all_reduce(self.N_test)
             self.N_test = self.N_test.item()
             if self.will_reconstruct:
-                self.test_reconstruction = test_data.dataset.tensors[1].clone()
+                self.test_reconstruction = to.zeros_like(test_data.dataset.tensors[1])
         self._to_rollback = rollback_if_F_decreases
 
     @staticmethod
