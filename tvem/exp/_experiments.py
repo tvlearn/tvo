@@ -100,6 +100,9 @@ class _TrainingAndOrValidation(Experiment):
 
         :param epochs: Number of epochs to train for
         """
+        will_reconstruct = (
+            self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
+        )
         trainer = Trainer(
             self.model,
             self.train_data,
@@ -107,8 +110,7 @@ class _TrainingAndOrValidation(Experiment):
             self.test_data,
             self.test_states,
             rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
-            will_reconstruct=self._conf.reco_epochs is not None
-            or self._conf.warmup_reco_epochs is not None,
+            will_reconstruct=will_reconstruct,
         )
         logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 
