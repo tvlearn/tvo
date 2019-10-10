@@ -68,31 +68,17 @@ class Trainer:
         self._to_rollback = rollback_if_F_decreases
 
     @staticmethod
-    def _do_e_step(data: TVEMDataLoader, states: TVEMVariationalStates, model: TVEMModel, N: int):
-        F = to.tensor(0.0)
-        subs = to.tensor(0)
-        model.init_epoch()
-        for idx, batch in data:
-            model.init_batch()
-            subs += states.update(idx, batch, model)
-            F += model.free_energy(idx, batch, states)
-        all_reduce(F)
-        all_reduce(subs)
-        return F.item() / N, subs.item() / N
-
-    @staticmethod
-    def _do_er_step(
+    def _do_e_step(
         data: TVEMDataLoader,
         states: TVEMVariationalStates,
         model: TVEMModel,
         N: int,
-        reconstruction: to.Tensor,
+        reconstruction: to.Tensor = None,
     ):
-        if model.data_estimator is NotImplemented:
+        if reconstruction is not None and model.data_estimator is NotImplemented:
             raise NotImplementedError(
                 f"reconstruction not implemented for model {type(model).__name__}"
             )
-
         F = to.tensor(0.0)
         subs = to.tensor(0)
         model.init_epoch()
@@ -100,12 +86,13 @@ class Trainer:
             model.init_batch()
             subs += states.update(idx, batch, model)
             F += model.free_energy(idx, batch, states)
-            reconstruction[idx] = model.data_estimator(idx, states)  # full data estimation
+            if reconstruction is not None:
+                reconstruction[idx] = model.data_estimator(idx, states)  # full data estimation
         all_reduce(F)
         all_reduce(subs)
-        return F.item() / N, subs.item() / N
+        return F.item() / N, subs.item() / N, reconstruction
 
-    def e_step(self) -> Dict[str, Any]:
+    def e_step(self, compute_reconstruction: bool = False) -> Dict[str, Any]:
         """Run one epoch of E-steps on training and/or test data, depending on what is available.
 
         Only E-steps are executed.
@@ -117,55 +104,37 @@ class Trainer:
         model = self.model
         train_data, train_states = self.train_data, self.train_states
         test_data, test_states = self.test_data, self.test_states
+        train_reconstruction = (
+            self.train_reconstruction
+            if (compute_reconstruction and hasattr(self, "train_reconstruction"))
+            else None
+        )
+        test_reconstruction = (
+            self.test_reconstruction
+            if (compute_reconstruction and hasattr(self, "test_reconstruction"))
+            else None
+        )
 
         # Training #
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
-            ret["train_F"], ret["train_subs"] = self._do_e_step(
-                train_data, train_states, model, self.N_train
+            ret["train_F"], ret["train_subs"], ret["train_rec"] = self._do_e_step(
+                train_data, train_states, model, self.N_train, train_reconstruction
             )
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            ret["test_F"], ret["test_subs"] = self._do_e_step(
-                test_data, test_states, model, self.N_test
+            ret["test_F"], ret["test_subs"], ret["test_rec"] = self._do_e_step(
+                test_data, test_states, model, self.N_test, test_reconstruction
             )
 
         return ret
 
-    def er_step(self) -> Dict[str, Any]:
-        """Run one epoch of E-steps on training and/or test data, depending on what is available.
-
-        Only E-steps and Reconstruction-steps are executed.
-        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
-                  (keys might be missing depending on what is available)
-        """
-        ret = {}
-        model = self.model
-        train_data, train_states = self.train_data, self.train_states
-        test_data, test_states = self.test_data, self.test_states
-
-        # Training #
-        if self.can_train:
-            assert train_data is not None and train_states is not None  # to make mypy happy
-            ret["train_F"], ret["train_subs"] = self._do_er_step(
-                train_data, train_states, model, self.N_train, self.train_reconstruction
-            )
-
-        # Validation/Testing #
-        if self.can_test:
-            assert test_data is not None and test_states is not None  # to make mypy happy
-            ret["test_F"], ret["test_subs"] = self._do_er_step(
-                test_data, test_states, model, self.N_test, self.test_reconstruction
-            )
-
-        return ret
-
-    def em_step(self) -> Dict[str, Any]:
+    def em_step(self, compute_reconstruction: bool = False) -> Dict[str, Any]:
         """Run one training and/or test epoch, depending on what data is available.
 
-        Both E-step and M-step are executed.
+        Both E-step and M-step are executed. Eventually reconstructions are computed intermediately.
 
         :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
                   (keys might be missing depending on what is available). The free energy values
@@ -183,8 +152,20 @@ class Trainer:
         # free energies yielded by all the sets of parameters spanned during an epoch.
 
         model = self.model
-        train_data, train_states = self.train_data, self.train_states
-        test_data, test_states = self.test_data, self.test_states
+        train_data, train_states, train_reconstruction = (
+            self.train_data,
+            self.train_states,
+            self.train_reconstruction
+            if (compute_reconstruction and hasattr(self, "train_reconstruction"))
+            else None,
+        )
+        test_data, test_states, test_reconstruction = (
+            self.test_data,
+            self.test_states,
+            self.test_reconstruction
+            if (compute_reconstruction and hasattr(self, "test_reconstruction"))
+            else None,
+        )
 
         ret_dict = {}
 
@@ -197,6 +178,10 @@ class Trainer:
             for idx, batch in train_data:
                 model.init_batch()
                 subs += train_states.update(idx, batch, model)
+                if train_reconstruction is not None:
+                    train_reconstruction[idx] = model.data_estimator(
+                        idx, train_states
+                    )  # full data estimation
                 batch_F = model.update_param_batch(idx, batch, train_states)
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
@@ -209,69 +194,13 @@ class Trainer:
             all_reduce(subs)
             ret_dict["train_F"] = F.item() / self.N_train
             ret_dict["train_subs"] = subs.item() / self.N_train
+            ret_dict["train_rec"] = train_reconstruction
 
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            res = self._do_e_step(test_data, test_states, model, self.N_test)
-            ret_dict["test_F"], ret_dict["test_subs"] = res
-
-        return ret_dict
-
-    def erm_step(self) -> Dict[str, Any]:
-        """Run one training and/or test epoch, depending on what data is available.
-
-        Both E-step, Reconstruction-step and M-step are executed.
-        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
-                  (keys might be missing depending on what is available)
-        """
-        model = self.model
-        if model.data_estimator is NotImplemented:
-            raise NotImplementedError(
-                f"reconstruction not implemented for model {type(model).__name__}"
-            )
-        train_data, train_states, train_reconstruction = (
-            self.train_data,
-            self.train_states,
-            self.train_reconstruction,
-        )
-        test_data, test_states, test_reconstruction = (
-            self.test_data,
-            self.test_states,
-            self.test_reconstruction,
-        )
-
-        ret_dict = {}
-
-        # Training #
-        if self.can_train:
-            assert train_data is not None and train_states is not None  # to make mypy happy
-            F = to.tensor(0.0)
-            subs = to.tensor(0)
-            model.init_epoch()
-            for idx, batch in train_data:
-                model.init_batch()
-                subs += train_states.update(idx, batch, model)
-                train_reconstruction[idx] = model.data_estimator(
-                    idx, train_states
-                )  # full data estimation
-                batch_F = model.update_param_batch(idx, batch, train_states)
-                batch_F = model.free_energy(idx, batch, train_states)
-                F += batch_F
-            if len(self._to_rollback) > 0:
-                self._update_parameters_with_rollback()
-            else:
-                model.update_param_epoch()
-            all_reduce(F)
-            all_reduce(subs)
-            ret_dict["train_F"] = F.item() / self.N_train
-            ret_dict["train_subs"] = subs.item() / self.N_train
-
-        # Validation/Testing #
-        if self.can_test:
-            assert test_data is not None and test_states is not None  # to make mypy happy
-            res = self._do_er_step(test_data, test_states, model, self.N_test, test_reconstruction)
-            ret_dict["test_F"], ret_dict["test_subs"] = res
+            res = self._do_e_step(test_data, test_states, model, self.N_test, test_reconstruction)
+            ret_dict["test_F"], ret_dict["test_subs"], ret_dict["test_rec"] = res
 
         return ret_dict
 
