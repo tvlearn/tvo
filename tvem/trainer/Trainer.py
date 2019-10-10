@@ -52,24 +52,20 @@ class Trainer:
         self.train_states = train_states
         self.test_data = test_data
         self.test_states = test_states
+        self.will_reconstruct = will_reconstruct
         if train_data is not None:
             self.N_train = to.tensor(len(train_data.dataset))
             all_reduce(self.N_train)
             self.N_train = self.N_train.item()
+            if self.will_reconstruct:
+                self.train_reconstruction = train_data.dataset.tensors[1].clone()
         if test_data is not None:
             self.N_test = to.tensor(len(test_data.dataset))
             all_reduce(self.N_test)
             self.N_test = self.N_test.item()
+            if self.will_reconstruct:
+                self.test_reconstruction = test_data.dataset.tensors[1].clone()
         self._to_rollback = rollback_if_F_decreases
-        self.will_reconstruct = will_reconstruct
-        if train_data is not None and self.will_reconstruct:
-            self.train_reconstruction = train_data.dataset.tensors[1].clone()
-        else:
-            self.train_reconstruction = None
-        if test_data is not None and self.will_reconstruct:
-            self.test_reconstruction = test_data.dataset.tensors[1].clone()
-        else:
-            self.test_reconstruction = None
 
     @staticmethod
     def _do_e_step(data: TVEMDataLoader, states: TVEMVariationalStates, model: TVEMModel, N: int):
