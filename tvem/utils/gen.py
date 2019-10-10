@@ -2,7 +2,7 @@ import torch as to
 import tvem
 
 
-def genBars(
+def generate_bars(
     H: int,
     bar_amp: float = 1.0,
     neg_amp: bool = False,
