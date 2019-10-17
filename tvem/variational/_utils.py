@@ -52,7 +52,7 @@ def _set_redundant_lpj_to_low_GPU(new_states: to.Tensor, new_lpj: to.Tensor, old
 # set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
 # function that runs on numpy arrays, when running on GPU, we stick to torch tensors
 def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
-    if tvem.get_device() == "cpu":
+    if tvem.get_device().type == "cpu":
         set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
     else:
         _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
