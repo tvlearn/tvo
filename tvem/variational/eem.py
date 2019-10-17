@@ -383,7 +383,9 @@ def randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) -> Tenso
     # generate indxs for the first dimention of candidates that match ind_children, e.g.
     # [0,0,1,1,2,2] for batch_size=3 and n_parents=2
     # (for each element in the batch, we have 2 ind_children)
-    ind_batch = to.repeat_interleave(to.arange(batch_size), n_parents)
+    # TODO: change to `repeat_interleave(to.arange(batch_size), n_parents)` when
+    # a new-enough pytorch version becomes available at Oldenburg.
+    ind_batch = to.arange(batch_size).unsqueeze(1).repeat(1, n_parents).view(-1)
     # need a reshape because the fancy indexing flattens the first two dimensions
     parents = candidates[ind_batch, ind_children].reshape(batch_size, n_parents, H)
     return parents
