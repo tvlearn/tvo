@@ -96,7 +96,7 @@ def input_files(hyperparams):
         os.remove("tvem_exp.h5")  # default experiment output file
 
 
-@pytest.fixture(scope="module", params=(True, False), ids=("cross", "nocross"))
+@pytest.fixture(scope="function", params=(True, False), ids=("cross", "nocross"))
 def estep_conf(request, hyperparams):
     # randomly select parent selection and mutation algorithm
     # (testing all combinations for every model and experiment takes too much)
