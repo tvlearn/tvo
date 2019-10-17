@@ -36,6 +36,7 @@ class EEMConfig(EStepConfig):
         :param parent_selection: Parent selection algorithm for EEM. Must be one of:
 
                                  - 'fitness': fitness-proportional parent selection
+                                 - 'uniform': random uniform parent selection
         :param crossover: Whether crossover should be applied or not.
         :param mutation: Mutation algorithm for EEM. Must be one of:
 
@@ -46,7 +47,7 @@ class EEMConfig(EStepConfig):
                                   2/H for an average of 2 bitflips per mutation). Required when
                                   using the 'sparsity' mutation algorithm.
         """
-        valid_selections = ("fitness",)
+        valid_selections = ("fitness", "uniform")
         assert parent_selection in valid_selections, f"Unknown parent selection {parent_selection}"
         valid_mutations = ("sparsity", "uniform")
         assert mutation in valid_mutations, f"Unknown mutation {mutation}"

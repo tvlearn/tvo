@@ -98,13 +98,16 @@ def input_files(hyperparams):
 
 @pytest.fixture(scope="module", params=(True, False), ids=("cross", "nocross"))
 def estep_conf(request, hyperparams):
-    # randomly select mutation algorithm (testing both for every model and experiment is a bit much)
+    # randomly select parent selection and mutation algorithm
+    # (testing all combinations for every model and experiment takes too much)
+    parent_selection = ["fitness", "uniform"][np.random.randint(2)]
     mutation = ["sparsity", "uniform"][np.random.randint(2)]
     return EEMConfig(
         n_states=hyperparams.S,
         n_parents=3,
         n_children=2,
         n_generations=2,
+        parent_selection=parent_selection,
         mutation=mutation,
         crossover=request.param,
         bitflip_frequency=1 / hyperparams.H if mutation == "sparsity" else None,

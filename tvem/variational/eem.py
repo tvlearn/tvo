@@ -102,6 +102,8 @@ def evolve_states(
     - 'batch_fitparents'
         parents are selected using fitness-proportional sampling
         _with replacement_.
+    - 'randparents'
+        random uniform selection of parents.
 
     genetic_algorithm can be one of the following:
     - 'randflip'
@@ -168,7 +170,7 @@ def get_n_new_states(mutation: str, n_parents: int, n_children: int, n_gen: int)
 
 def get_EA(parent_selection: str, mutation: str) -> Tuple:
     """Refer to the doc of `evolve_states` for the list of valid arguments"""
-    parent_sel_dict = {"batch_fitparents": batch_fitparents}
+    parent_sel_dict = {"batch_fitparents": batch_fitparents, "randparents": randparents}
     mutation_dict = {
         "randflip": randflip,
         "sparseflip": sparseflip,
@@ -373,5 +375,15 @@ def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
 
 def randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) -> Tensor:
     device = candidates.device
-    ind_children = np.random.choice(candidates.shape[0], size=n_parents, replace=False)
-    return candidates[to.from_numpy(ind_children).to(device=device)]
+    batch_size, n_candidates, H = candidates.shape
+    # for each batch, choose n_parents random idxs, concatenate all idxs together
+    ind_children = to.cat(
+        tuple(to.randperm(n_candidates, device=device)[:n_parents] for _ in range(batch_size))
+    )
+    # generate indxs for the first dimention of candidates that match ind_children, e.g.
+    # [0,0,1,1,2,2] for batch_size=3 and n_parents=2
+    # (for each element in the batch, we have 2 ind_children)
+    ind_batch = to.repeat_interleave(to.arange(batch_size), n_parents)
+    # need a reshape because the fancy indexing flattens the first two dimensions
+    parents = candidates[ind_batch, ind_children].reshape(batch_size, n_parents, H)
+    return parents
