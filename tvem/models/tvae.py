@@ -323,6 +323,8 @@ class TVAE(TVEMModel):
 
         lpj = states.lpj[idx]
         K = states.K[idx]
-        means = self.forward(K)  # N,S,D
+
+        with to.no_grad():
+            means = self.forward(K)  # N,S,D
 
         return mean_posterior(means, lpj)  # N, D
