@@ -2,7 +2,8 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from abc import ABC
+from abc import ABC, abstractmethod
+from typing import Dict, Any
 
 
 class EStepConfig(ABC):
@@ -12,6 +13,10 @@ class EStepConfig(ABC):
         :param n_states: Number of variational states per datapoint to keep in memory.
         """
         self.n_states = n_states
+
+    @abstractmethod
+    def as_dict(self) -> Dict[str, Any]:
+        raise NotImplementedError  # pragma: no cover
 
 
 class EEMConfig(EStepConfig):
@@ -73,6 +78,9 @@ class EEMConfig(EStepConfig):
 
         super().__init__(n_states)
 
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
+
 
 class FullEMConfig(EStepConfig):
     def __init__(self, n_latents: int):
@@ -80,3 +88,6 @@ class FullEMConfig(EStepConfig):
         self.n_new_states = 0
 
         super().__init__(2 ** n_latents)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)

@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Dict, Any
 
 
 class ExpConfig:
@@ -70,3 +70,6 @@ class ExpConfig:
         self.rollback_if_F_decreases = rollback_if_F_decreases
         self.warmup_reco_epochs = warmup_reco_epochs
         self.reco_epochs = reco_epochs
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)

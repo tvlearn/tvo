@@ -48,9 +48,9 @@ class _TrainingAndOrValidation(Experiment):
         """
         H = sum(model.shape[1:])
         self.model = model
-        self._conf = Munch(vars(conf))
+        self._conf = Munch(conf.as_dict())
         self._conf.model = type(model).__name__
-        self._estep_conf = Munch(vars(estep_conf))
+        self._estep_conf = Munch(estep_conf.as_dict())
         model.init_storage(
             self._estep_conf.n_states, self._estep_conf.n_new_states, self._conf.batch_size
         )
