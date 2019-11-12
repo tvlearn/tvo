@@ -9,7 +9,7 @@ from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
 from torch import Tensor
 import torch as to
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import tvem
 
 
@@ -178,3 +178,8 @@ class NoisyOR(TVEMModel):
     @property
     def shape(self) -> Tuple[int, ...]:
         return self.theta["W"].shape
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        D, H = self.theta["W"].shape
+        return dict(H=H, D=D, precision=self.precision)

@@ -7,7 +7,7 @@ import torch as to
 from abc import ABC, abstractmethod
 from torch import Tensor
 from tvem.variational import TVEMVariationalStates  # type: ignore
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 
 class TVEMModel(ABC):
@@ -175,3 +175,7 @@ class TVEMModel(ABC):
         :returns: the model shape, observable layer followed by the hidden layers: (D, H1, H2, ...)
         """
         pass  # pragma: no cover
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        raise NotImplementedError  # pragma: no cover

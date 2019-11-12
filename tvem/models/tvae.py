@@ -60,19 +60,24 @@ class TVAE(TVEMModel):
         H0 = self._net_shape[0]
         theta["pies"] = self._init_pi(pi_init, H0, requires_grad=not analytical_pi_updates)
         theta["sigma2"] = self._init_sigma2(sigma2_init, requires_grad=not analytical_sigma_updates)
+        self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
         super().__init__(theta)
 
         gd_parameters = self.W + self.b
 
         if analytical_sigma_updates:
             self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
+            self._analytical_sigma_updates = True
         else:
             gd_parameters.append(theta["sigma2"])
+            self._analytical_sigma_updates = False
 
         if analytical_pi_updates:
             self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
+            self._analytical_pi_updates = True
         else:
             gd_parameters.append(theta["pies"])
+            self._analytical_pi_updates = False
 
         self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
         self._scheduler = CyclicLR(
@@ -328,3 +333,17 @@ class TVAE(TVEMModel):
             means = self.forward(K)  # N,S,D
 
         return mean_posterior(means, lpj)  # N, D
+
+    @property
+    def config(self):
+        config = dict(
+            net_shape=self._net_shape,
+            precision=self.precision,
+            min_lr=self._min_lr,
+            max_lr=self._max_lr,
+            step_size_up=self._step_size_up,
+            analytical_sigma_updates=self._analytical_sigma_updates,
+            analytical_pi_updates=self._analytical_pi_updates,
+            clamp_sigma_updates=self._clamp_sigma,
+        )
+        return config

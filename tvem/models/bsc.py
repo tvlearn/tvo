@@ -6,7 +6,7 @@ import math
 import torch as to
 
 from torch import Tensor
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 
 import tvem
 from tvem.utils import get
@@ -335,3 +335,8 @@ class BSC(TVEMModel):
         batch_size, S, _ = K.shape
 
         return mean_posterior(batch_Wbar[:batch_size, :S, :], lpj)
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        D, H = self.theta["W"].shape
+        return dict(H=H, D=D, precision=self.precision)
