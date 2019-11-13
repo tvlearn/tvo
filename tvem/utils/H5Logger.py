@@ -7,6 +7,7 @@ import torch as to
 import h5py
 from typing import Union, Iterable, Dict, Any
 from os import path, rename
+from contextlib import closing
 
 
 class H5Logger:
@@ -89,10 +90,9 @@ class H5Logger:
         if path.exists(fname):
             rename(fname, fname + ".old")
 
-        f = h5py.File(fname, "w")
-        for k, v in self._data.items():
-            H5Logger._write_one(f, k, v)
-        f.close()
+        with closing(h5py.File(fname, "w")) as f:
+            for k, v in self._data.items():
+                H5Logger._write_one(f, k, v)
 
     @staticmethod
     def _write_one(f: h5py.Group, key: str, value: Any) -> None:
