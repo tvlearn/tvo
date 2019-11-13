@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 import os
 from munch import Munch
+from contextlib import suppress
 
 
 class Experiment(ABC):
@@ -151,15 +152,21 @@ class _TrainingAndOrValidation(Experiment):
 
     def _log_confs(self, logger: H5Logger):
         """Dump experiment+estep configuration to screen and save it to output file."""
-        pprint("\nExperiment configuration:")
-        for k, v in self.conf.items():
-            pprint(f"\t{k:<20}: {v}")
+        titles = ["Experiment", "E-step"]
+        confs = [self.conf, self.estep_conf]
         logger.set(exp_config=self.conf)
-        pprint("E-step configuration:")
-        for k, v in self.estep_conf.items():
-            pprint(f"\t{k:<20}: {v}")
-        pprint()
         logger.set(estep_config=self.estep_conf)
+
+        with suppress(NotImplementedError):
+            model_conf = self.model.config  # could raise
+            logger.set(model_config=model_conf)
+            confs.append(model_conf)
+            titles.append("Model")
+
+        for title, conf in zip(titles, confs):
+            pprint(f"\n{title} configuration:")
+            for k, v in conf.items():
+                pprint(f"\t{k:<20}: {v}")
 
     def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float]):
         """Log F, subs, model.theta, states.K and states.lpj to file, return printable log.
