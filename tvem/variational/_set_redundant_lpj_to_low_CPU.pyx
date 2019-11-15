@@ -2,14 +2,12 @@ import numpy as np
 import cython
 
 cdef bint is_equal(char[:] arr1, char[:] arr2) nogil:
-    cdef bint ret = True
     cdef size_t l = arr1.shape[0]
     cdef size_t i
     for i in range(l):
         if arr1[i] != arr2[i]:
-            ret = False
-            break
-    return ret
+            return False
+    return True
 
 cpdef void set_redundant_lpj_to_low_CPU(char[:, :, :] new_states, cython.floating[:, :] new_lpj, char[:, :, :] old_states) nogil:
     N = new_states.shape[0]
