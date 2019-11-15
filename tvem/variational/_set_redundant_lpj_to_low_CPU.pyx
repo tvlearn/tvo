@@ -14,13 +14,15 @@ cpdef void set_redundant_lpj_to_low_CPU(char[:, :, :] new_states, cython.floatin
     Snew = new_states.shape[1]
     S = old_states.shape[1]
     low_lpj = -1e20
+    cdef int n, s, ss, next_s
     for n in range(N): # for each datapoint
         for s in range(Snew): # for each new state
-            for ss in range(Snew): # check if equal to other new states
-                if s != ss and is_equal(new_states[n, s], new_states[n, ss]):
+            next_s = s + 1
+            for ss in range(next_s, Snew): # check if equal to other new states
+                if is_equal(new_states[n, s], new_states[n, ss]):
                     new_lpj[n, s] = low_lpj
                     break
-            else: # check if equal to an old state
+            else: # did not find a duplicate in new states, so search old states too
                 for ss in range(S):
                     if is_equal(new_states[n, s], old_states[n, ss]):
                         new_lpj[n, s] = low_lpj
