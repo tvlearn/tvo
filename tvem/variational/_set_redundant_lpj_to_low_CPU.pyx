@@ -11,11 +11,11 @@ cdef bint is_equal(char[:] arr1, char[:] arr2) nogil:
     return True
 
 cpdef void set_redundant_lpj_to_low_CPU(char[:, :, :] new_states, cython.floating[:, :] new_lpj, char[:, :, :] old_states) nogil:
-    N = new_states.shape[0]
-    Snew = new_states.shape[1]
-    S = old_states.shape[1]
-    low_lpj = -1e20
-    cdef int n, s, ss, next_s
+    cdef size_t N = new_states.shape[0]
+    cdef size_t Snew = new_states.shape[1]
+    cdef size_t S = old_states.shape[1]
+    cdef float low_lpj = -1e20
+    cdef size_t n, s, ss, next_s
     for n in range(N): # for each datapoint
         for s in range(Snew): # for each new state
             next_s = s + 1
