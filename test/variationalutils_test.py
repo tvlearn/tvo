@@ -97,6 +97,10 @@ class TestTVEM(unittest.TestCase):
 
         set_redundant_lpj_to_low(new_states, new_lpj, old_states)
 
-        self.assertEqual((new_lpj == 1.0).sum().item(), 4)
-        self.assertEqual(new_lpj[1, 1].item(), -1e20)
-        self.assertEqual(new_lpj[2, 0].item(), -1e20)
+        self.assertEqual(to.isclose(new_lpj, to.ones_like(new_lpj)).sum().item(), 4)
+        # new_lpj[1, 1] repeats an old state
+        expected_low = to.tensor(-1e20, device=device, dtype=precision)
+        self.assertTrue(to.allclose(new_lpj[1, 1], expected_low))
+        # new_lpj[2, :] are the same state: one of the two must be discarded
+        # i.e. the sum of the two lpj will be ~expected_low)
+        self.assertTrue(to.allclose(new_lpj[2].sum(), expected_low))
