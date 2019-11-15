@@ -1,4 +1,5 @@
 # cython: boundscheck=False
+# cython: language_level=3
 import cython
 
 cdef bint is_equal(char[:] arr1, char[:] arr2) nogil:
