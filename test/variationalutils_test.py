@@ -81,10 +81,14 @@ class TestTVEM(unittest.TestCase):
 
         device = tvem.get_device()
         old_states = to.tensor(
-            [[[0, 1, 1], [1, 0, 0]], [[0, 1, 1], [1, 0, 1]]], dtype=to.uint8, device=device
+            [[[0, 1, 1], [1, 0, 0]], [[0, 1, 1], [1, 0, 1]], [[0, 1, 1], [1, 1, 1]]],
+            dtype=to.uint8,
+            device=device,
         )
         new_states = to.tensor(
-            [[[0, 0, 0], [1, 1, 0]], [[0, 0, 0], [1, 0, 1]]], dtype=to.uint8, device=device
+            [[[0, 0, 0], [1, 1, 0]], [[0, 0, 0], [1, 0, 1]], [[0, 0, 0], [0, 0, 0]]],
+            dtype=to.uint8,
+            device=device,
         )
 
         N, S, H = old_states.shape
@@ -93,5 +97,6 @@ class TestTVEM(unittest.TestCase):
 
         set_redundant_lpj_to_low(new_states, new_lpj, old_states)
 
-        self.assertEqual((new_lpj == 1.0).sum().item(), 3)
+        self.assertEqual((new_lpj == 1.0).sum().item(), 4)
         self.assertEqual(new_lpj[1, 1].item(), -1e20)
+        self.assertEqual(new_lpj[2, 0].item(), -1e20)
