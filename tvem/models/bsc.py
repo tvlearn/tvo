@@ -9,7 +9,6 @@ from torch import Tensor
 from typing import Dict, Tuple, Any
 
 import tvem
-from tvem.utils import get
 from tvem.utils.parallel import pprint, all_reduce, broadcast
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
@@ -35,12 +34,11 @@ class BSC(TVEMModel):
         :param H: Number of hidden units.
         :param D: Number of observables.
         :param W_init: Tensor with shape (D,H), initializes BSC weights.
-        :param pi_init: Tensor with shape (H,), initializes BSC priors.
+        :param pies_init: Tensor with shape (H,), initializes BSC priors.
         :param precision: Floating point precision required. Must be one of torch.float32 or
                           torch.float64.
 
         """
-
         assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
         self.precision = precision
 
@@ -82,12 +80,9 @@ class BSC(TVEMModel):
     def init_storage(self, S: int, Snew: int, batch_size: int):
         """Allocate tensors used in E- and M-step."""
         device = tvem.get_device()
-        theta = self.theta
         precision = self.precision
-
-        D, H = theta["W"].shape
-
-        storage = {
+        D, H = self.theta["W"].shape
+        self.storage = {
             "my_Wp": to.empty((D, H), dtype=precision, device=device),
             "my_Wq": to.empty((H, H), dtype=precision, device=device),
             "my_pies": to.empty(H, dtype=precision, device=device),
@@ -103,14 +98,9 @@ class BSC(TVEMModel):
             "my_N": to.tensor([0], dtype=to.int, device=device),
         }
 
-        self.storage = storage
-
     @property
     def sorted_by_lpj(self) -> Dict[str, Tensor]:
-
-        storage = self.storage
-
-        return {"batch_Wbar": storage["batch_Wbar"]}
+        return {"batch_Wbar": self.storage["batch_Wbar"]}
 
     def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
         """Use hidden states to sample datapoints according to the noise model of BSC.
@@ -140,67 +130,43 @@ class BSC(TVEMModel):
 
     def init_epoch(self):
         """Initialize tensors used in E- and M-step."""
-
         theta = self.theta
         storage = self.storage
-
         D = theta["W"].shape[0]
 
-        storage["my_Wp"].fill_(0.0)
-        storage["my_Wq"].fill_(0.0)
-        storage["my_pies"].fill_(0.0)
-        storage["my_sigma"].fill_(0.0)
-
+        for k in ("my_Wp", "my_Wq", "my_pies", "my_sigma"):
+            storage[k].fill_(0.0)
         storage["pil_bar"][:] = to.log(theta["pies"] / (1.0 - theta["pies"]))
-
         storage["WT"][:, :] = theta["W"].t()
-
         storage["pre1"] = -1.0 / 2.0 / theta["sigma"] / theta["sigma"]
-
         storage["fenergy_const"] = to.log(1.0 - theta["pies"]).sum() - D / 2 * to.log(
             2 * math.pi * theta["sigma"] ** 2
         )
 
-        storage["infty"] = to.tensor(
-            [float("inf")], dtype=theta["pies"].dtype, device=theta["pies"].device
-        )
-
     def init_batch(self):
-        """Reset counter for how many states tensors in sorted_by_lpj have been evaluated.
-
-        Only relevant if model makes use of the sorted_by_lpj dictionary.
-        """
-        storage = self.storage
-        storage["indS_filled"] = 0
+        """Reset counter for how many states tensors in sorted_by_lpj have been evaluated."""
+        self.storage["indS_filled"] = 0
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
         """Evaluate log-pseudo-joints for BSC."""
-
-        theta = self.theta
-        storage = self.storage
-        sorted_by_lpj = self.sorted_by_lpj
-
         batch_size, S, _ = states.shape
+        indS_filled = self.storage["indS_filled"]
 
-        pil_bar = storage["pil_bar"]
-        WT = storage["WT"]
-        pre1 = storage["pre1"]
-        indS_filled = storage["indS_filled"]
-
+        # Type casting for compatibility with float tensors
         # TODO Find solution to avoid byte->float casting
-        statesfloat = states.to(dtype=theta["W"].dtype)
+        Kfloat = states.to(dtype=self.theta["W"].dtype)
 
-        # TODO Store batch_Wbar in storage allocated at beginning of EM-step, e.g.
-        # to.matmul(tensor1=states, tensor2=storage['WT'], out=storage["batch_Wbar"])
-        sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :] = to.matmul(
-            statesfloat, WT
-        )
-        batch_Wbar = sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :]
-        storage["indS_filled"] += S
-        # is (batch_size,S)
-        lpj = to.mul(to.sum(to.pow(batch_Wbar - data[:, None, :], 2), dim=2), pre1) + to.matmul(
-            statesfloat, pil_bar
-        )
+        # Pre-compute Ws
+        # TODO Use `out` argument of to.matmul, e.g.
+        # to.matmul(tensor1=Kfloat, tensor2=self.storage['WT'], out=Wbar)
+        Wbar = self.sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :]
+        Wbar[:, :, :] = to.matmul(Kfloat, self.storage["WT"])
+        self.storage["indS_filled"] += S
+
+        # Compute lpj, is (batch_size, S)
+        lpj = to.mul(
+            to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), self.storage["pre1"]
+        ) + to.matmul(Kfloat, self.storage["pil_bar"])
         return lpj.to(device=states.device)
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
@@ -210,110 +176,71 @@ class BSC(TVEMModel):
         return lpj + self.storage["fenergy_const"]
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
-
         storage = self.storage
         sorted_by_lpj = self.sorted_by_lpj
-
         lpj = states.lpj[idx]
         K = states.K[idx]
         batch_size, S, _ = K.shape
 
+        # Type casting for compatibility with float tensors
         # TODO Find solution to avoid byte->float casting
         Kfloat = K.to(dtype=lpj.dtype)
 
-        (
-            batch_s_pjc,
-            batch_Wp,
-            batch_Wq,
-            batch_sigma,
-            my_pies,
-            my_Wp,
-            my_Wq,
-            my_sigma,
-            indS_fill_upto,
-            fenergy_const,
-            my_N,
-        ) = get(
-            storage,
-            "batch_s_pjc",
-            "batch_Wp",
-            "batch_Wq",
-            "batch_sigma",
-            "my_pies",
-            "my_Wp",
-            "my_Wq",
-            "my_sigma",
-            "indS_fill_upto",
-            "fenergy_const",
-            "my_N",
-        )
-        batch_Wbar = sorted_by_lpj["batch_Wbar"]
-
-        batch_s_pjc[:batch_size, :] = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
-        batch_Wp[:batch_size, :, :] = batch.unsqueeze(2) * batch_s_pjc[:batch_size].unsqueeze(
+        storage["batch_s_pjc"][:batch_size, :] = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
+        storage["batch_Wp"][:batch_size, :, :] = batch.unsqueeze(2) * storage["batch_s_pjc"][
+            :batch_size
+        ].unsqueeze(
             1
         )  # is (batch_size,D,H)
-        q = tvem.variational._utils._lpj2pjc(lpj)
-        Kq = Kfloat.mul(q[:, :, None])
-        batch_Wq[:, :] = to.einsum("ijk,ijl->kl", Kq, Kfloat)
-        # is (batch_size,H,H)
-        batch_sigma[:batch_size] = mean_posterior(
-            to.sum((batch[:, None, :] - batch_Wbar[:batch_size, :S, :]) ** 2, dim=2), lpj
-        )
-        # is (batch_size,)
+        Kq = Kfloat.mul(tvem.variational._utils._lpj2pjc(lpj)[:, :, None])
+        storage["batch_Wq"][:, :] = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
+        storage["batch_sigma"][:batch_size] = mean_posterior(
+            to.sum(
+                (batch[:, None, :] - sorted_by_lpj["batch_Wbar"][:batch_size, :S, :]) ** 2, dim=2
+            ),
+            lpj,
+        )  # is (batch_size,)
 
-        my_pies.add_(to.sum(batch_s_pjc[:batch_size, :], dim=0))
-        my_Wp.add_(to.sum(batch_Wp[:batch_size, :, :], dim=0))
-        my_Wq.add_(batch_Wq)
-        my_sigma.add_(to.sum(batch_sigma[:batch_size]))
-        my_N.add_(batch_size)
+        storage["my_pies"].add_(to.sum(storage["batch_s_pjc"][:batch_size, :], dim=0))
+        storage["my_Wp"].add_(to.sum(storage["batch_Wp"][:batch_size, :, :], dim=0))
+        storage["my_Wq"].add_(storage["batch_Wq"])
+        storage["my_sigma"].add_(to.sum(storage["batch_sigma"][:batch_size]))
+        storage["my_N"].add_(batch_size)
 
         return None
 
     def update_param_epoch(self) -> None:
-
         theta = self.theta
         storage = self.storage
         policy = self.policy
 
-        D = theta["W"].shape[0]
-        my_pies, my_Wp, my_Wq, my_sigma, my_N = get(
-            storage, "my_pies", "my_Wp", "my_Wq", "my_sigma", "my_N"
-        )
+        for k in ("my_pies", "my_Wp", "my_Wq", "my_sigma", "my_N"):
+            all_reduce(storage[k])
+        N = storage["my_N"].item()
+        storage["my_N"][:] = 0
 
         theta_new = {}
-
-        all_reduce(my_pies)
-        all_reduce(my_Wp)
-        all_reduce(my_Wq)
-        all_reduce(my_sigma)
-        all_reduce(my_N)
-        N = my_N.item()
-
         # Calculate updated W
         Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
         broadcast(Wold_noisy)
         try:
-            theta_new["W"] = lstsq(my_Wp.t(), my_Wq)[0].t()
+            theta_new["W"] = lstsq(storage["my_Wp"].t(), storage["my_Wq"])[0].t()
         except RuntimeError:
             pprint("Inversion error. Will not update W but add some noise instead.")
             theta_new["W"] = Wold_noisy
 
         # Calculate updated pi
-        theta_new["pies"] = my_pies / N
+        theta_new["pies"] = storage["my_pies"] / N
 
         # Calculate updated sigma
-        theta_new["sigma"] = to.sqrt(my_sigma / N / D)
+        theta_new["sigma"] = to.sqrt(storage["my_sigma"] / N / theta["W"].shape[0])
 
         policy["W"][0] = Wold_noisy
         policy["pies"][0] = theta["pies"]
         policy["sigma"][0] = theta["sigma"]
         fix_theta(theta_new, policy)
-
         for key in theta:
             theta[key] = theta_new[key]
-
-        my_N[:] = 0
 
     @property
     def shape(self) -> Tuple[int, ...]:
@@ -325,16 +252,11 @@ class BSC(TVEMModel):
         as follows:
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
         """
-
-        sorted_by_lpj = self.sorted_by_lpj
-
-        batch_Wbar = sorted_by_lpj["batch_Wbar"]
-
         lpj = states.lpj[idx]
         K = states.K[idx]
         batch_size, S, _ = K.shape
 
-        return mean_posterior(batch_Wbar[:batch_size, :S, :], lpj)
+        return mean_posterior(self.sorted_by_lpj["batch_Wbar"][:batch_size, :S, :], lpj)
 
     @property
     def config(self) -> Dict[str, Any]:
