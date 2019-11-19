@@ -34,7 +34,7 @@ class EEMVariationalStates(TVEMVariationalStates):
             model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
         )
         sort_by_lpj = model.sorted_by_lpj
-        conf = self.conf
+        conf = self.config
         K = self.K
         lpj = self.lpj
         required_keys = self.required_keys
@@ -56,7 +56,7 @@ class EEMVariationalStates(TVEMVariationalStates):
             parent_selection=parent_selection,
             mutation=mutation,
             sparsity=model.theta["pies"].mean() if "sparseflip" in mutation else None,
-            p_bf=self.conf.get("p_bf"),
+            p_bf=self.config.get("p_bf"),
         )
 
         return update_states_for_batch(

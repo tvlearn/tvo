@@ -89,11 +89,11 @@ class _TrainingAndOrValidation(Experiment):
         return states
 
     @property
-    def conf(self) -> Dict[str, Any]:
+    def config(self) -> Dict[str, Any]:
         return dict(self._conf)
 
     @property
-    def estep_conf(self) -> Dict[str, Any]:
+    def estep_config(self) -> Dict[str, Any]:
         return dict(self._estep_conf)
 
     def run(self, epochs: int) -> Generator[EpochLog, None, None]:
@@ -153,9 +153,9 @@ class _TrainingAndOrValidation(Experiment):
     def _log_confs(self, logger: H5Logger):
         """Dump experiment+estep configuration to screen and save it to output file."""
         titles = ["Experiment", "E-step"]
-        confs = [self.conf, self.estep_conf]
-        logger.set(exp_config=self.conf)
-        logger.set(estep_config=self.estep_conf)
+        confs = [self.config, self.estep_config]
+        logger.set(exp_config=self.config)
+        logger.set(estep_config=self.estep_config)
 
         with suppress(NotImplementedError):
             model_conf = self.model.config  # could raise

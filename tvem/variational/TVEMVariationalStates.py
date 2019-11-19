@@ -23,7 +23,7 @@ class TVEMVariationalStates(ABC):
         required_keys = ("N", "H", "S", "precision")
         for c in required_keys:
             assert c in conf and conf[c] is not None
-        self.conf = conf
+        self.config = conf
 
         N, H, S, precision = get(conf, *required_keys)
 
