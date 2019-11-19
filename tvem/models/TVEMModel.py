@@ -6,7 +6,7 @@ import torch as to
 
 from abc import ABC, abstractmethod
 from torch import Tensor
-from tvem.variational import TVEMVariationalStates  # type: ignore
+from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from typing import Dict, Optional, Tuple, Any
 
 

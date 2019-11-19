@@ -7,7 +7,7 @@ import torch as to
 from typing import Dict, Any
 from torch import Tensor
 
-from tvem.models import TVEMModel
+from tvem.models.TVEMModel import TVEMModel
 from ._utils import update_states_for_batch
 from .TVEMVariationalStates import TVEMVariationalStates
 

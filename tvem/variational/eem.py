@@ -11,7 +11,7 @@ from torch import Tensor
 
 import tvem
 from tvem.utils import get
-from tvem.models import TVEMModel
+from tvem.models.TVEMModel import TVEMModel
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import update_states_for_batch, set_redundant_lpj_to_low
 

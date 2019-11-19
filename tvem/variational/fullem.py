@@ -7,7 +7,7 @@ import torch as to
 from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
-from tvem.models import TVEMModel
+from tvem.models.TVEMModel import TVEMModel
 import tvem
 
 
