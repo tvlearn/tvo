@@ -249,7 +249,7 @@ class BSC(TVEMModel):
     def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
-        as follows:
+        as follows:""" r"""
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
         """
         lpj = states.lpj[idx]

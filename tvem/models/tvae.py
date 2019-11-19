@@ -322,7 +322,7 @@ class TVAE(TVEMModel):
                 p.grad /= n_procs
 
     def data_estimator(self, idx: to.Tensor, states: TVEMVariationalStates) -> to.Tensor:
-        """
+        r"""
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
         """
 
