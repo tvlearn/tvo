@@ -18,7 +18,7 @@ test:
     # static checkers
     - black --check -q . || { black --diff -q . && false; }
     - pylama
-    - mypy --no-site-packages tvem test
+    - mypy tvem test
     # compile extension modules
     - python setup.py build_ext --inplace
     # CPU tests
