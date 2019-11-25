@@ -3,17 +3,17 @@
 # Licensed under the Academic Free License version 3.0
 
 
-from .TVEMModel import TVEMModel
+from tvem.models.protocols import Optimized
 from tvem.variational import TVEMVariationalStates  # type: ignore
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
 from torch import Tensor
 import torch as to
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional
 import tvem
 
 
-class NoisyOR(TVEMModel):
+class NoisyOR(Optimized):
     eps = 1e-7
 
     def __init__(
@@ -35,7 +35,7 @@ class NoisyOR(TVEMModel):
         """
 
         assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
-        self.precision = precision
+        self._precision = precision
 
         device = tvem.get_device()
 
@@ -51,17 +51,18 @@ class NoisyOR(TVEMModel):
         else:
             pi_init = to.full((H,), 1.0 / H, device=device, dtype=self.precision)
 
-        theta = {
+        self._theta = {
             "pies": pi_init.to(device=device, dtype=precision),
             "W": W_init.to(device=device, dtype=precision),
         }
-        super().__init__(theta)
 
         self.new_pi = to.zeros(H, device=device, dtype=precision)
         self.Btilde = to.zeros(D, H, device=device, dtype=precision)
         self.Ctilde = to.zeros(D, H, device=device, dtype=precision)
         # number of datapoints processed in a training epoch
         self._train_datapoints = to.tensor([0], dtype=to.int, device=device)
+        self._config = dict(H=H, D=D, precision=self.precision, device=device)
+        self._shape = self.theta["W"].shape
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
         """Evaluate log-pseudo-joints for NoisyOR."""
@@ -174,13 +175,3 @@ class NoisyOR(TVEMModel):
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)
         py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
         return (to.rand_like(py) < py).byte()
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        return self.theta["W"].shape
-
-    @property
-    def config(self) -> Dict[str, Any]:
-        D, H = self.theta["W"].shape
-        device = tvem.get_device().type
-        return dict(H=H, D=D, precision=self.precision, device=device)
