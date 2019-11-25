@@ -6,7 +6,7 @@ import math
 import torch as to
 
 from torch import Tensor
-from typing import Dict
+from typing import Dict, Union, Tuple
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
@@ -106,31 +106,36 @@ class BSC(Optimized):
     def sorted_by_lpj(self) -> Dict[str, Tensor]:
         return {"batch_Wbar": self.storage["batch_Wbar"]}
 
-    def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
-        """Use hidden states to sample datapoints according to the noise model of BSC.
-
-        :param hidden_state: a tensor with shape (N, H) where H is the number of hidden units.
-        :returns: the datapoints, as a tensor with shape (N, D) where D is
-                  the number of observables.
-        """
-
+    def generate_data(
+        self, N: int, hidden_state: to.Tensor = None
+    ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
         theta = self.theta
+        W = theta["W"]
+        D, H = W.shape
 
-        precision, device = theta["W"].dtype, theta["W"].device
-        no_datapoints, D, H_gen = (hidden_state.shape[0],) + theta["W"].shape
+        if hidden_state is None:
+            pies = theta["pies"]
+            hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
+            must_return_hidden_state = True
+        else:
+            shape = hidden_state.shape
+            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            must_return_hidden_state = False
 
-        Wbar = to.zeros((no_datapoints, D), dtype=precision, device=device)
+        precision, device = W.dtype, W.device
+
+        Wbar = to.zeros((N, D), dtype=precision, device=device)
 
         # Linear superposition
-        for n in range(no_datapoints):
-            for h in range(H_gen):
+        for n in range(N):
+            for h in range(H):
                 if hidden_state[n, h]:
                     Wbar[n] += theta["W"][:, h]
 
         # Add noise according to the model parameters
-        Y = Wbar + theta["sigma"] * to.randn((no_datapoints, D), dtype=precision, device=device)
+        Y = Wbar + theta["sigma"] * to.randn((N, D), dtype=precision, device=device)
 
-        return Y
+        return (Y, hidden_state) if must_return_hidden_state else Y
 
     def init_epoch(self):
         """Initialize tensors used in E- and M-step."""

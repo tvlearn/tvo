@@ -9,7 +9,7 @@ from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
 from torch import Tensor
 import torch as to
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, Tuple
 import tvem
 
 
@@ -161,17 +161,30 @@ class NoisyOR(Optimized):
         # TODO: could pre-evaluate the constant factor once per epoch
         return to.sum(to.log(1 - pi)) + lpj
 
-    def generate_from_hidden(self, hidden_state: Tensor) -> Tensor:
+    def generate_data(
+        self, N: int, hidden_state: Tensor = None
+    ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
         """Use hidden states to sample datapoints according to the NoisyOR generative model.
 
         :param hidden_state: a tensor with shape (N, H) where H is the number of hidden units.
         :returns: the datapoints, as a tensor with shape (N, D) where D is
                   the number of observables.
         """
-        N, H = hidden_state.shape
-        expected_H = self.theta["pies"].numel()
-        assert H == expected_H, f"input has wrong shape, expected {(N, expected_H)}, got {(N, H)}"
-        W = self.theta["W"]
+        theta = self.theta
+        W = theta["W"]
+        D, H = W.shape
+
+        if hidden_state is None:
+            pies = theta["pies"]
+            hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
+            must_return_hidden_state = True
+        else:
+            shape = hidden_state.shape
+            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            must_return_hidden_state = False
+
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)
         py = 1 - to.prod(1 - W[None, :, :] * hidden_state.type_as(W)[:, None, :], dim=2)
-        return (to.rand_like(py) < py).byte()
+        Y = (to.rand_like(py) < py).byte()
+
+        return (Y, hidden_state) if must_return_hidden_state else Y

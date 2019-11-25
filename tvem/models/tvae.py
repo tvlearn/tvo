@@ -11,7 +11,7 @@ import torch.optim as opt
 import tvem
 import torch as to
 import torch.distributed as dist
-from typing import Tuple, List, Dict, Iterable, Optional, Sequence
+from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union
 from math import pi as MATH_PI
 
 
@@ -244,10 +244,24 @@ class TVAE(Trainable):
 
         self._train_datapoints[:] = 0
 
-    def generate_from_hidden(self, hidden_state: to.Tensor) -> Dict[str, to.Tensor]:
+    def generate_data(
+        self, N: int, hidden_state: to.Tensor = None
+    ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
+        if hidden_state is None:
+            pies = self.theta["pies"]
+            H = pies.numel()
+            hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
+            must_return_hidden_state = True
+        else:
+            shape = hidden_state.shape
+            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            must_return_hidden_state = False
+
         with to.no_grad():
             mlp_out = self.forward(hidden_state)
-        return to.distributions.Normal(loc=mlp_out, scale=to.sqrt(self.theta["sigma2"])).sample()
+        Y = to.distributions.Normal(loc=mlp_out, scale=to.sqrt(self.theta["sigma2"])).sample()
+
+        return (Y, hidden_state) if must_return_hidden_state else Y
 
     @property
     def shape(self) -> Tuple[int, ...]:

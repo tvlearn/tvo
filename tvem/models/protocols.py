@@ -1,5 +1,5 @@
 from typing_extensions import Protocol, runtime_checkable
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional, Union
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 import torch as to
 
@@ -181,18 +181,18 @@ class Optimized(Trainable, Protocol):
 class Sampler(Protocol):
     """Implements generate_data (hidden_state is an optional parameter)."""
 
-    def generate_data(self, N: int, hidden_state: to.Tensor = None) -> Tuple[to.Tensor, to.Tensor]:
+    def generate_data(
+        self, N: int, hidden_state: to.Tensor = None
+    ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
         """Sample N datapoints from this model.
 
         :param N: number of data points to be generated.
-        :param hidden_state: Tensor with shape (N,H) where H is the number of units in the
-            first latent layer.
-        :returns: dictionary with keys
-
-                  - `data`: a tensor with shape (N, D) where D is the number of
-                    observables for this model.
-                  - `hidden_state`: a tensor with shape (N, H) where H is the number of
-                    hidden variables for this model
+        :param hidden_state: optional Tensor with shape (N,H) where H is the number of units in the
+                             first latent layer.
+        :returns: if hidden_state was not provided, a tuple (data, hidden_state) where data is
+                  a Tensor with shape (N, D) where D is the number of observables for this model
+                  and hidden_state is a the corresponding tensor of hidden variables with shape
+                  (N, H) where H is the number of hidden variables for this model.
         """
         ...
 

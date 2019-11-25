@@ -43,7 +43,7 @@ def write_dataset(fname, N, D, dtype, model):
         if not os.path.exists(fname):
             f = h5py.File(fname, mode="w")
             data = f.create_dataset("data", (N, D), dtype=dtype)
-            data[:] = model.generate_data(N)["data"].cpu()
+            data[:] = model.generate_data(N)[0].cpu()
             f.close()
 
 
