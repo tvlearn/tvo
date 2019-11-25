@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from tvem.utils.data import TVEMDataLoader
-from tvem.models import TVEMModel
+from tvem.models.protocols import Trainable
 from tvem.utils.parallel import pprint, init_processes, gather_from_processes
 from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
 from tvem.utils import get, H5Logger
@@ -23,7 +23,6 @@ import time
 from pathlib import Path
 import os
 from munch import Munch
-from contextlib import suppress
 
 
 class Experiment(ABC):
@@ -39,7 +38,7 @@ class _TrainingAndOrValidation(Experiment):
         self,
         conf: ExpConfig,
         estep_conf: EStepConfig,
-        model: TVEMModel,
+        model: Trainable,
         train_dataset: to.Tensor = None,
         test_dataset: to.Tensor = None,
     ):
@@ -49,6 +48,7 @@ class _TrainingAndOrValidation(Experiment):
         """
         H = sum(model.shape[1:])
         self.model = model
+        assert isinstance(model, Trainable)
         self._conf = Munch(conf.as_dict())
         self._conf.model = type(model).__name__
         self._conf.device = tvem.get_device().type
@@ -155,11 +155,10 @@ class _TrainingAndOrValidation(Experiment):
         logger.set(exp_config=self.config)
         logger.set(estep_config=self.estep_config)
 
-        with suppress(NotImplementedError):
-            model_conf = self.model.config  # could raise
-            logger.set(model_config=model_conf)
-            confs.append(model_conf)
-            titles.append("Model")
+        model_conf = self.model.config  # could raise
+        logger.set(model_config=model_conf)
+        confs.append(model_conf)
+        titles.append("Model")
 
         for title, conf in zip(titles, confs):
             pprint(f"\n{title} configuration:")
@@ -229,7 +228,7 @@ class Training(_TrainingAndOrValidation):
         self,
         conf: ExpConfig,
         estep_conf: EStepConfig,
-        model: TVEMModel,
+        model: Trainable,
         train_data_file: str,
         val_data_file: str = None,
     ):
@@ -237,7 +236,7 @@ class Training(_TrainingAndOrValidation):
 
         :param conf: Experiment configuration.
         :param estep_conf: Instance of a class inheriting from EStepConfig.
-        :param model: TVEMModel to train
+        :param model: model to train
         :param train_data_file: Path to an HDF5 file containing the training dataset.
                                 Datasets with name "train_data" and "data" will be
                                 searched in the file, in this order.
@@ -263,12 +262,12 @@ class Training(_TrainingAndOrValidation):
 
 
 class Testing(_TrainingAndOrValidation):
-    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: TVEMModel, data_file: str):
+    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: Trainable, data_file: str):
         """Test given model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.
         :param estep_conf: Instance of a class inheriting from EStepConfig.
-        :param model: TVEMModel to test
+        :param model: model to test
         :param data_file: Path to an HDF5 file containing the training dataset. Datasets with name
                           "test_data" and "data" will be searched in the file, in this order.
 
