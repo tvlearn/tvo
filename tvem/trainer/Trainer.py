@@ -59,7 +59,8 @@ class Trainer:
 
         _d, _s = (train_data, train_states) if self.can_train else (test_data, test_states)
         assert _d is not None and _s is not None
-        model.init_storage(_s.config["S"], _s.config["S_new"], _d.batch_size)
+        if isinstance(model, Optimized):
+            model.init_storage(_s.config["S"], _s.config["S_new"], _d.batch_size)
 
         self.model = model
         self.train_data = train_data
@@ -98,10 +99,12 @@ class Trainer:
             )
         F = to.tensor(0.0)
         subs = to.tensor(0)
-        model.init_epoch()
+        if isinstance(model, Optimized):
+            model.init_epoch()
         for idx, batch in data:
             batch = data_transform(batch)
-            model.init_batch()
+            if isinstance(model, Optimized):
+                model.init_batch()
             subs += states.update(idx, batch, model)
             F += model.free_energy(idx, batch, states)
             if reconstruction is not None:
@@ -179,56 +182,29 @@ class Trainer:
         # different set of parameters and the reported free energy is more of an average of the
         # free energies yielded by all the sets of parameters spanned during an epoch.
 
-        model = self.model
-        train_data, train_states, train_reconstruction = (
-            self.train_data,
-            self.train_states,
-            self.train_reconstruction
-            if (compute_reconstruction and hasattr(self, "train_reconstruction"))
-            else None,
-        )
-        test_data, test_states, test_reconstruction = (
-            self.test_data,
-            self.test_states,
-            self.test_reconstruction
-            if (compute_reconstruction and hasattr(self, "test_reconstruction"))
-            else None,
-        )
-
         ret_dict = {}
 
         # Training #
         if self.can_train:
-            assert train_data is not None and train_states is not None  # to make mypy happy
-            F = to.tensor(0.0)
-            subs = to.tensor(0)
-            model.init_epoch()
-            for idx, batch in train_data:
-                batch = self.data_transform(batch)
-                model.init_batch()
-                subs += train_states.update(idx, batch, model)
-                if train_reconstruction is not None:
-                    train_reconstruction[idx] = model.data_estimator(  # type:ignore
-                        idx, train_states
-                    )  # full data estimation
-                batch_F = model.update_param_batch(idx, batch, train_states)
-                if not self.eval_F_at_epoch_end:
-                    if batch_F is None:
-                        batch_F = model.free_energy(idx, batch, train_states)
-                    F += batch_F
-            self._update_parameters_with_rollback()
-            if self.eval_F_at_epoch_end:
-                ret_dict.update(self.eval_free_energies())
-            else:
-                all_reduce(F)
-                ret_dict["train_F"] = F.item() / self.N_train
+            F, subs, reco = self._train_epoch(compute_reconstruction)
+            all_reduce(F)
+            ret_dict["train_F"] = F.item() / self.N_train
             all_reduce(subs)
             ret_dict["train_subs"] = subs.item() / self.N_train
-            if train_reconstruction is not None:
-                ret_dict["train_rec"] = train_reconstruction
+            if reco is not None:
+                ret_dict["train_rec"] = reco
 
         # Validation/Testing #
         if self.can_test:
+            test_data, test_states, test_reconstruction = (
+                self.test_data,
+                self.test_states,
+                self.test_reconstruction
+                if (compute_reconstruction and hasattr(self, "test_reconstruction"))
+                else None,
+            )
+            model = self.model
+
             assert test_data is not None and test_states is not None  # to make mypy happy
             res = self._do_e_step(
                 test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
@@ -238,6 +214,39 @@ class Trainer:
                 ret_dict["test_rec"] = test_reconstruction
 
         return ret_dict
+
+    def _train_epoch(self, compute_reconstruction: bool):
+        model = self.model
+        train_data, train_states, train_reconstruction = (
+            self.train_data,
+            self.train_states,
+            self.train_reconstruction
+            if (compute_reconstruction and hasattr(self, "train_reconstruction"))
+            else None,
+        )
+
+        assert train_data is not None and train_states is not None  # to make mypy happy
+        F = to.tensor(0.0)
+        subs = to.tensor(0)
+        if isinstance(model, Optimized):
+            model.init_epoch()
+        for idx, batch in train_data:
+            batch = self.data_transform(batch)
+            if isinstance(model, Optimized):
+                model.init_batch()
+            subs += train_states.update(idx, batch, model)
+            if train_reconstruction is not None:
+                assert isinstance(model, Reconstructor)
+                train_reconstruction[idx] = model.data_estimator(
+                    idx, train_states
+                )  # full data estimation
+            batch_F = model.update_param_batch(idx, batch, train_states)
+            if not self.eval_F_at_epoch_end:
+                if batch_F is None:
+                    batch_F = model.free_energy(idx, batch, train_states)
+                F += batch_F
+        self._update_parameters_with_rollback()
+        return F, subs, train_reconstruction
 
     def eval_free_energies(self) -> Dict[str, Any]:
         """Return a dictionary with the same contents as e_step/em_step, without training the model.
@@ -254,10 +263,12 @@ class Trainer:
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
             F = to.tensor(0.0)
-            m.init_epoch()
+            if isinstance(m, Optimized):
+                m.init_epoch()
             for idx, batch in train_data:
                 batch = self.data_transform(batch)
-                m.init_batch()
+                if isinstance(m, Optimized):
+                    m.init_batch()
                 train_states.lpj[idx] = lpj_fn(batch, train_states.K[idx])
                 F += m.free_energy(idx, batch, train_states)
             all_reduce(F)
@@ -267,10 +278,12 @@ class Trainer:
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
             F = to.tensor(0.0)
-            m.init_epoch()
+            if isinstance(m, Optimized):
+                m.init_epoch()
             for idx, batch in test_data:
                 batch = self.data_transform(batch)
-                m.init_batch()
+                if isinstance(m, Optimized):
+                    m.init_batch()
                 test_states.lpj[idx] = lpj_fn(batch, test_states.K[idx])
                 F += m.free_energy(idx, batch, test_states)
             all_reduce(F)
