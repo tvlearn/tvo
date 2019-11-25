@@ -6,20 +6,20 @@ import math
 import torch as to
 
 from torch import Tensor
-from typing import Dict, Tuple, Any
+from typing import Dict
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior, lpj2pjc
-from tvem.models.TVEMModel import TVEMModel
+from tvem.models.protocols import Optimized
 from tvem.utils.sanity import fix_theta
 
 # pytorch 1.2 deprecates to.gels in favour of to.lstsq
 lstsq = to.lstsq if int(to.__version__.split(".")[1]) >= 2 else to.gels
 
 
-class BSC(TVEMModel):
+class BSC(Optimized):
     def __init__(
         self,
         H: int,
@@ -40,7 +40,7 @@ class BSC(TVEMModel):
 
         """
         assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
-        self.precision = precision
+        self._precision = precision
 
         device = tvem.get_device()
 
@@ -63,25 +63,29 @@ class BSC(TVEMModel):
         else:
             sigma_init = to.tensor([1.0], dtype=precision, device=device)
 
-        theta = {"pies": pies_init, "W": W_init, "sigma": sigma_init}
+        self._theta = {"pies": pies_init, "W": W_init, "sigma": sigma_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
-            "W": [None, to.full_like(theta["W"], -inf), to.full_like(theta["W"], inf)],
+            "W": [None, to.full_like(self._theta["W"], -inf), to.full_like(self._theta["W"], inf)],
             "pies": [
                 None,
-                to.full_like(theta["pies"], eps),
-                to.full_like(theta["pies"], 1.0 - eps),
+                to.full_like(self._theta["pies"], eps),
+                to.full_like(self._theta["pies"], 1.0 - eps),
             ],
-            "sigma": [None, to.full_like(theta["sigma"], eps), to.full_like(theta["sigma"], inf)],
+            "sigma": [
+                None,
+                to.full_like(self._theta["sigma"], eps),
+                to.full_like(self._theta["sigma"], inf),
+            ],
         }
-
-        super().__init__(theta=theta)
+        self._config = dict(H=H, D=D, precision=self.precision, device=device)
+        self._shape = self.theta["W"].shape
 
     def init_storage(self, S: int, Snew: int, batch_size: int):
         """Allocate tensors used in E- and M-step."""
         device = tvem.get_device()
         precision = self.precision
-        D, H = self.theta["W"].shape
+        D, H = self._theta["W"].shape
         self.storage = {
             "my_Wp": to.empty((D, H), dtype=precision, device=device),
             "my_Wq": to.empty((H, H), dtype=precision, device=device),
@@ -246,7 +250,7 @@ class BSC(TVEMModel):
     def shape(self) -> Tuple[int, ...]:
         return self.theta["W"].shape
 
-    def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:  # type: ignore
+    def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
         as follows:""" r"""
@@ -257,9 +261,3 @@ class BSC(TVEMModel):
         batch_size, S, _ = K.shape
 
         return mean_posterior(self.sorted_by_lpj["batch_Wbar"][:batch_size, :S, :], lpj)
-
-    @property
-    def config(self) -> Dict[str, Any]:
-        D, H = self.theta["W"].shape
-        device = tvem.get_device().type
-        return dict(H=H, D=D, precision=self.precision, device=device)
