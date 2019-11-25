@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 
-from tvem.models.protocols import Optimized
+from tvem.models.protocols import Optimized, Sampler
 from tvem.variational import TVEMVariationalStates  # type: ignore
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
@@ -13,7 +13,7 @@ from typing import Dict, Optional, Union, Tuple
 import tvem
 
 
-class NoisyOR(Optimized):
+class NoisyOR(Optimized, Sampler):
     eps = 1e-7
 
     def __init__(

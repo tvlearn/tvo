@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.models.protocols import Trainable
+from tvem.models.protocols import Trainable, Sampler, Reconstructor
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
@@ -15,7 +15,7 @@ from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union
 from math import pi as MATH_PI
 
 
-class TVAE(Trainable):
+class TVAE(Trainable, Sampler, Reconstructor):
     def __init__(
         self,
         shape: Sequence[int] = None,
