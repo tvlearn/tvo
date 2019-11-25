@@ -4,14 +4,12 @@
 
 import torch as to
 
-from typing import Dict, Any, Callable, TYPE_CHECKING
+from typing import Dict, Any
 from torch import Tensor
+from tvem.models.protocols import Trainable, Optimized
 
 from ._utils import update_states_for_batch
 from .TVEMVariationalStates import TVEMVariationalStates
-
-if TYPE_CHECKING:
-    from tvem.models.TVEMModel import TVEMModel
 
 
 class RandomSampledVarStates(TVEMVariationalStates):
@@ -27,13 +25,15 @@ class RandomSampledVarStates(TVEMVariationalStates):
         super().__init__(conf)
         self.sparsity = sparsity
 
-    def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
-        """See :func:`tvem.variational.TVEMVariationalStates.update`."""
-        if model.log_pseudo_joint is NotImplemented:
-            lpj_fn: Callable = model.log_joint
-        else:
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
+        """See :func:`TVEMVariationalStates.update <tvem.variational.TVEMVariationalStates.update>`.
+        """
+        if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
-        sort_by_lpj = model.sorted_by_lpj
+            sort_by_lpj = model.sorted_by_lpj
+        else:
+            lpj_fn = model.log_joint
+            sort_by_lpj = {}
         K = self.K[idx]
         batch_size, S, H = K.shape
         self.lpj[idx] = lpj_fn(batch, K)

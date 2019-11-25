@@ -11,6 +11,7 @@ from typing import Dict, Any
 from tvem.variational._utils import generate_unique_states
 from tvem.utils import get
 import tvem
+from tvem.models.protocols import Trainable
 
 
 class TVEMVariationalStates(ABC):
@@ -36,17 +37,12 @@ class TVEMVariationalStates(ABC):
         self.precision = precision
 
     @abstractmethod
-    def update(
-        self,
-        idx: Tensor,
-        batch: Tensor,
-        model,  # TVEMModel (an explicit type annotation would require circular imports)
-    ) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 
         :param idx: data point indices of batch w.r.t. K
         :param batch: batch of data points
-        :param model: the TVEMModel being used
+        :param model: the model being used
         :returns: average number of variational state substitutions per datapoint performed
         """
         pass  # pragma: no cover
