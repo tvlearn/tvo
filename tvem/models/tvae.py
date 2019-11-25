@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.models.TVEMModel import TVEMModel
+from tvem.models.protocols import Trainable
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
@@ -15,7 +15,7 @@ from typing import Tuple, List, Dict, Iterable, Optional, Sequence
 from math import pi as MATH_PI
 
 
-class TVAE(TVEMModel):
+class TVAE(Trainable):
     def __init__(
         self,
         shape: Sequence[int] = None,
@@ -49,19 +49,20 @@ class TVAE(TVEMModel):
                                       max-likelihood solution rather than gradient descent.
         :param clamp_sigma_updates: Whether to limit the rate at which sigma can be updated.
         """
-        theta = {}
+        self._theta: Dict[str, to.Tensor] = {}
         self._clamp_sigma = clamp_sigma_updates
-        self.precision = precision
+        self._precision = precision
         self._net_shape = self._get_net_shape(shape, W_init)
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
-        theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
-        theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
+        self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
+        self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
         H0 = self._net_shape[0]
-        theta["pies"] = self._init_pi(pi_init, H0, requires_grad=not analytical_pi_updates)
-        theta["sigma2"] = self._init_sigma2(sigma2_init, requires_grad=not analytical_sigma_updates)
+        self._theta["pies"] = self._init_pi(pi_init, H0, requires_grad=not analytical_pi_updates)
+        self._theta["sigma2"] = self._init_sigma2(
+            sigma2_init, requires_grad=not analytical_sigma_updates
+        )
         self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
-        super().__init__(theta)
 
         gd_parameters = self.W + self.b
 
@@ -69,14 +70,14 @@ class TVAE(TVEMModel):
             self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
             self._analytical_sigma_updates = True
         else:
-            gd_parameters.append(theta["sigma2"])
+            gd_parameters.append(self._theta["sigma2"])
             self._analytical_sigma_updates = False
 
         if analytical_pi_updates:
             self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
             self._analytical_pi_updates = True
         else:
-            gd_parameters.append(theta["pies"])
+            gd_parameters.append(self._theta["pies"])
             self._analytical_pi_updates = False
 
         self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
@@ -89,6 +90,17 @@ class TVAE(TVEMModel):
         )
         # number of datapoints processed in a training epoch
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
+        self._config = dict(
+            net_shape=self._net_shape,
+            precision=self.precision,
+            min_lr=self._min_lr,
+            max_lr=self._max_lr,
+            step_size_up=self._step_size_up,
+            analytical_sigma_updates=self._analytical_sigma_updates,
+            analytical_pi_updates=self._analytical_pi_updates,
+            clamp_sigma_updates=self._clamp_sigma,
+            device=tvem.get_device(),
+        )
 
     def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
         if shape is not None:
@@ -149,7 +161,7 @@ class TVAE(TVEMModel):
             requires_grad
         )
 
-    def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:  # type: ignore
+    def _log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         with to.no_grad():
             lpj, _ = self._lpj_and_mlpout(data, states)
         return lpj
@@ -177,7 +189,7 @@ class TVAE(TVEMModel):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = self._net_shape[-1]
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, states)
+            lpj = self._log_pseudo_joint(data, states)
         # TODO: could pre-evaluate the constant factor once per epoch
         logjoints = lpj - D / 2 * to.log(2 * MATH_PI * sigma2) + to.log(1 - pi).sum()
         return logjoints
@@ -336,18 +348,3 @@ class TVAE(TVEMModel):
             means = self.forward(K)  # N,S,D
 
         return mean_posterior(means, lpj)  # N, D
-
-    @property
-    def config(self):
-        config = dict(
-            net_shape=self._net_shape,
-            precision=self.precision,
-            min_lr=self._min_lr,
-            max_lr=self._max_lr,
-            step_size_up=self._step_size_up,
-            analytical_sigma_updates=self._analytical_sigma_updates,
-            analytical_pi_updates=self._analytical_pi_updates,
-            clamp_sigma_updates=self._clamp_sigma,
-            device=tvem.get_device().type,
-        )
-        return config
