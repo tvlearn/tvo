@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.models import TVEMModel
+from tvem.models.protocols import Trainable, Optimized, Reconstructor
 from tvem.variational import TVEMVariationalStates
 from tvem.utils.data import TVEMDataLoader
 from tvem.utils.parallel import all_reduce
@@ -13,7 +13,7 @@ import torch as to
 class Trainer:
     def __init__(
         self,
-        model: TVEMModel,
+        model: Trainable,
         train_data: Union[TVEMDataLoader, to.Tensor] = None,
         train_states: TVEMVariationalStates = None,
         test_data: Union[TVEMDataLoader, to.Tensor] = None,
@@ -23,9 +23,9 @@ class Trainer:
         eval_F_at_epoch_end: bool = False,
         data_transform: Callable[[to.Tensor], to.Tensor] = None,
     ):
-        """Train and/or test a given TVEMModel.
+        """Train and/or test a given model.
 
-        :param model: an object of a concrete type inheriting from TVEMModel
+        :param model: an object of a concrete type satisfying the Trainable protocol
         :param train_data: the contained dataset should have shape (N,D)
         :param train_states: TVEMVariationalStates with shape (N,S,H)
         :param test_data: validation or test dataset. The contained dataset should have shape (M,D)
@@ -87,12 +87,12 @@ class Trainer:
     def _do_e_step(
         data: TVEMDataLoader,
         states: TVEMVariationalStates,
-        model: TVEMModel,
+        model: Trainable,
         N: int,
         data_transform,
         reconstruction: to.Tensor = None,
     ):
-        if reconstruction is not None and model.data_estimator is NotImplemented:
+        if reconstruction is not None and not isinstance(model, Reconstructor):
             raise NotImplementedError(
                 f"reconstruction not implemented for model {type(model).__name__}"
             )
@@ -248,10 +248,7 @@ class Trainer:
         m = self.model
         train_data, train_states = self.train_data, self.train_states
         test_data, test_states = self.test_data, self.test_states
-        if m.log_pseudo_joint is NotImplemented:
-            lpj_fn: Callable = m.log_joint
-        else:
-            lpj_fn = m.log_pseudo_joint
+        lpj_fn = m.log_pseudo_joint if isinstance(m, Optimized) else m.log_joint
         ret = {}
 
         if self.can_train:
@@ -291,10 +288,7 @@ class Trainer:
             return
 
         m = self.model
-        if m.log_pseudo_joint is NotImplemented:
-            lpj_fn: Callable = m.log_joint
-        else:
-            lpj_fn = m.log_pseudo_joint
+        lpj_fn = m.log_pseudo_joint if isinstance(m, Optimized) else m.log_joint
 
         assert self.train_data is not None and self.train_states is not None  # to make mypy happy
         all_data = self.train_data.dataset.tensors[1]
