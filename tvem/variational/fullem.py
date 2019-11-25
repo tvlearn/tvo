@@ -7,8 +7,11 @@ import torch as to
 from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
-from tvem.models.TVEMModel import TVEMModel
 import tvem
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tvem.models.TVEMModel import TVEMModel
 
 
 def state_matrix(H: int, device: to.device = None):
@@ -40,7 +43,7 @@ class FullEM(TVEMVariationalStates):
         conf = dict(N=N, S=2 ** H, H=H, precision=precision)
         super().__init__(conf, state_matrix(H)[None, :, :].expand(N, -1, -1))
 
-    def update(self, idx: Tensor, batch: Tensor, model: TVEMModel) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
         lpj_fn = (
             model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
         )

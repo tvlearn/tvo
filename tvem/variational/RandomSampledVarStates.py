@@ -4,12 +4,14 @@
 
 import torch as to
 
-from typing import Dict, Any
+from typing import Dict, Any, TYPE_CHECKING
 from torch import Tensor
 
-from tvem.models.TVEMModel import TVEMModel
 from ._utils import update_states_for_batch
 from .TVEMVariationalStates import TVEMVariationalStates
+
+if TYPE_CHECKING:
+    from tvem.models.TVEMModel import TVEMModel
 
 
 class RandomSampledVarStates(TVEMVariationalStates):
@@ -25,7 +27,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
         self.n_new_states = n_new_states
         self.sparsity = sparsity
 
-    def update(self, idx: Tensor, batch: Tensor, model: TVEMModel) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
         """See :func:`TVEMVariationalStates.update <tvem.variational.TVEMVariationalStates.update>`.
         """
         lpj_fn = (

@@ -6,14 +6,16 @@ import numpy as np
 import torch as to
 
 from itertools import combinations
-from typing import Callable, Tuple, Optional
+from typing import Callable, Tuple, Optional, TYPE_CHECKING
 from torch import Tensor
 
 import tvem
 from tvem.utils import get
-from tvem.models.TVEMModel import TVEMModel
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import update_states_for_batch, set_redundant_lpj_to_low
+
+if TYPE_CHECKING:
+    from tvem.models.TVEMModel import TVEMModel
 
 
 class EEMVariationalStates(TVEMVariationalStates):
@@ -28,7 +30,7 @@ class EEMVariationalStates(TVEMVariationalStates):
             assert c in conf and conf[c] is not None
         self.required_keys = required_keys
 
-    def update(self, idx: Tensor, batch: Tensor, model: TVEMModel) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
 
         lpj_fn = (
             model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
