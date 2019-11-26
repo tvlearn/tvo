@@ -48,7 +48,7 @@ class ExpConfig:
                                 If one of these names appears in `log_blacklist`, the corresponing
                                 quantity will not be logged.
         :param rollback_if_F_decreases: names of model parameters (corresponding to those in
-                                        TVEMModel.theta) that should be rolled back (i.e. not
+                                        model.theta) that should be rolled back (i.e. not
                                         updated) if the free energy value before and after
                                         `model.update_param_epoch` decreases for a given epoch.
                                         This is only useful for models that perform the actual
