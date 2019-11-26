@@ -49,7 +49,7 @@ def write_dataset(fname, N, D, dtype, model):
 
 @pytest.fixture(scope="function", params=("BSC", "NoisyOR"))
 def model_and_data(request, hyperparams, estep_conf):
-    """Return a tuple of a TVEMModel and a filename (dataset for the model).
+    """Return a tuple of a model and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
     """

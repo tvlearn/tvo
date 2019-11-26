@@ -9,11 +9,11 @@ from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import generate_unique_states
 from tvem.variational import eem
-from tvem.models import TVEMModel
 import tvem
 import pytest
 from itertools import combinations
 import numpy as np
+from tvem.models.protocols import Trainable
 
 
 def reset_rng_state(seed):
@@ -23,16 +23,7 @@ def reset_rng_state(seed):
     np.random.seed(seed)
 
 
-class DummyModel(TVEMModel):
-    def __init__(self):
-        super().__init__({})
-
-    def shape(self):
-        pass
-
-    def generate_from_hidden(self):
-        pass
-
+class DummyModel(Trainable):
     def update_param_batch(self):
         pass
 

@@ -5,22 +5,13 @@
 import pytest
 import torch as to
 from tvem.variational import RandomSampledVarStates
-from tvem.models import TVEMModel
 import tvem
+from tvem.models.protocols import Trainable
 
 
-class DummyModel(TVEMModel):
-    def __init__(self):
-        super().__init__({})
-
+class DummyModel(Trainable):
     def log_joint(self, data, states):
         return states.sum(dim=2, dtype=to.float32)
-
-    def generate_from_hidden(self):
-        pass
-
-    def shape(self):
-        pass
 
     def update_param_batch(self):
         pass

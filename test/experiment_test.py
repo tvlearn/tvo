@@ -4,7 +4,8 @@
 
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, EEMConfig, FullEMConfig, Training, Testing as _Testing
-from tvem.models import NoisyOR, BSC, TVAE, TVEMModel
+from tvem.models import NoisyOR, BSC, TVAE
+from tvem.models.protocols import Trainable, Reconstructor
 from tvem.utils.parallel import init_processes, broadcast
 from tvem.utils import get
 import tvem
@@ -19,14 +20,16 @@ from contextlib import suppress
 from tvem.trainer import Trainer
 
 
-class LogJointOnly(TVEMModel):
-    """A dummy TVEMModel that only implements log_joint."""
+class LogJointOnly(Trainable):
+    """A dummy model that only implements log_joint."""
 
     def __init__(self, H, D, precision):
         self._H = H
         self._D = D
-        self.precision = precision
-        self.theta = dict(pies=to.zeros(H), W=to.zeros(D, H))
+        self._precision = precision
+        self._theta = dict(pies=to.zeros(H), W=to.zeros(D, H))
+        self._shape = (D, H)
+        self._config = {}
 
     def log_joint(self, data, states):
         N, S = data.shape[0], states.shape[1]
@@ -34,14 +37,6 @@ class LogJointOnly(TVEMModel):
 
     def update_param_batch(self, *args, **kwargs):
         pass
-
-    @property
-    def shape(self):
-        return (self._H, self._D)
-
-    def generate_from_hidden(self, hidden_state):
-        N, D = hidden_state.shape[0], self._D
-        return to.zeros(N, D, dtype=self.precision, device=tvem.device())
 
 
 gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
@@ -125,7 +120,7 @@ def batch_size(request):
 
 @pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE", "LogJointOnly"))
 def model_and_data(request, hyperparams, input_files, precision):
-    """Return a tuple of a TVEMModel and a filename (dataset for the model).
+    """Return a tuple of a model and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
     """
@@ -220,7 +215,7 @@ def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
 
 def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks, warmup_Esteps):
     model, input_file = model_and_data
-    if model.data_estimator is NotImplemented:
+    if not isinstance(model, Reconstructor):
         return
 
     exp_conf.reco_epochs = range(10)

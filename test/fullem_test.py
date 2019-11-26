@@ -6,25 +6,16 @@ import pytest
 import torch as to
 from tvem.variational import FullEM
 import tvem
-from tvem.models import TVEMModel
+from tvem.models.protocols import Trainable
 from munch import Munch
 
 
-class DummyModel(TVEMModel):
-    def __init__(self):
-        super().__init__({})
+class DummyModel(Trainable):
+    def log_joint(self, data, states):
+        return states.sum(dim=2, dtype=to.float32)
 
     def update_param_batch(self):
         pass
-
-    def generate_from_hidden(self):
-        pass
-
-    def shape(self):
-        pass
-
-    def log_joint(self, data, states):
-        return states.sum(dim=2, dtype=to.float32)
 
 
 @pytest.fixture(
