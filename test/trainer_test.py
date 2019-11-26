@@ -28,11 +28,12 @@ def setup(request):
             "N": N,
             "H": H,
             "S": S,
+            "S_new": 10,
             "precision": to.float32,
             "device": tvem.get_device(),
         }
-        var_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
-        test_states = RandomSampledVarStates(n_new_states=10, conf=_varstates_conf)
+        var_states = RandomSampledVarStates(_varstates_conf)
+        test_states = RandomSampledVarStates(_varstates_conf)
 
     return Setup
 
