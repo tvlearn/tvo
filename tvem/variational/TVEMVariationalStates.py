@@ -20,12 +20,12 @@ class TVEMVariationalStates(ABC):
         :param conf: dictionary with hyper-parameters. Required keys: N, H, S, dtype, device
         :param K_init: if specified, self.K will be initialized with this Tensor of shape (N,S,H)
         """
-        required_keys = ("N", "H", "S", "precision")
+        required_keys = ("N", "H", "S", "S_new", "precision")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.config = conf
 
-        N, H, S, precision = get(conf, *required_keys)
+        N, H, S, _, precision = get(conf, *required_keys)
 
         if K_init is not None:
             assert K_init.shape == (N, S, H)
