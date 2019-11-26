@@ -40,7 +40,7 @@ class FullEM(TVEMVariationalStates):
         :param precision: The floating point precision of the lpj values.
                           Must be one of to.float32 or to.float64
         """
-        conf = dict(N=N, S=2 ** H, H=H, precision=precision)
+        conf = dict(N=N, S=2 ** H, S_new=0, H=H, precision=precision)
         super().__init__(conf, state_matrix(H)[None, :, :].expand(N, -1, -1))
 
     def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
