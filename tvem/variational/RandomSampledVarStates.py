@@ -6,7 +6,7 @@ import torch as to
 
 from typing import Dict, Any
 from torch import Tensor
-from tvem.models.protocols import Trainable, Optimized
+from tvem.utils.model_protocols import Trainable, Optimized
 
 from ._utils import update_states_for_batch
 from .TVEMVariationalStates import TVEMVariationalStates

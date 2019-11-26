@@ -5,7 +5,7 @@
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, EEMConfig, FullEMConfig, Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC, TVAE
-from tvem.models.protocols import Trainable, Reconstructor
+from tvem.utils.model_protocols import Trainable, Reconstructor
 from tvem.utils.parallel import init_processes, broadcast
 from tvem.utils import get
 import tvem

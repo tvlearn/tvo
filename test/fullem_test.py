@@ -6,7 +6,7 @@ import pytest
 import torch as to
 from tvem.variational import FullEM
 import tvem
-from tvem.models.protocols import Trainable
+from tvem.utils.model_protocols import Trainable
 from munch import Munch
 
 

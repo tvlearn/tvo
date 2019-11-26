@@ -1,7 +1,9 @@
 from typing_extensions import Protocol, runtime_checkable
-from typing import Tuple, Dict, Any, Optional, Union
-from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
+from typing import Tuple, Dict, Any, Optional, Union, TYPE_CHECKING
 import torch as to
+
+if TYPE_CHECKING:
+    from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 
 
 @runtime_checkable
@@ -22,7 +24,7 @@ class Trainable(Protocol):
         ...
 
     def update_param_batch(
-        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
+        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
     ) -> Optional[float]:
         """Execute batch-wise M-step or batch-wise section of an M-step computation.
 
@@ -47,7 +49,9 @@ class Trainable(Protocol):
         """
         ...
 
-    def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
+    def free_energy(
+        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
+    ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
         :param idx: indeces of the datapoints in batch within the full dataset
@@ -127,7 +131,9 @@ class Optimized(Trainable, Protocol):
         """
         ...
 
-    def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
+    def free_energy(
+        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
+    ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
         :param idx: indeces of the datapoints in batch within the full dataset
@@ -201,7 +207,7 @@ class Sampler(Protocol):
 class Reconstructor(Protocol):
     """Implements data_estimator."""
 
-    def data_estimator(self, idx: to.Tensor, states: TVEMVariationalStates) -> to.Tensor:
+    def data_estimator(self, idx: to.Tensor, states: "TVEMVariationalStates") -> to.Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
         as follows:""" r"""

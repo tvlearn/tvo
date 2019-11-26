@@ -2,7 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.models.protocols import Trainable, Optimized, Reconstructor
+from tvem.utils.model_protocols import Trainable, Optimized, Reconstructor
 from tvem.variational import TVEMVariationalStates
 from tvem.utils.data import TVEMDataLoader
 from tvem.utils.parallel import all_reduce

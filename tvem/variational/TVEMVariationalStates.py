@@ -11,7 +11,7 @@ from typing import Dict, Any
 from tvem.variational._utils import generate_unique_states
 from tvem.utils import get
 import tvem
-from tvem.models.protocols import Trainable
+from tvem.utils.model_protocols import Trainable
 
 
 class TVEMVariationalStates(ABC):

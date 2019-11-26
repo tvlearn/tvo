@@ -8,7 +8,7 @@ from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 import tvem
-from tvem.models.protocols import Trainable, Optimized
+from tvem.utils.model_protocols import Trainable, Optimized
 
 
 def state_matrix(H: int, device: to.device = None):

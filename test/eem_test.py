@@ -13,7 +13,7 @@ import tvem
 import pytest
 from itertools import combinations
 import numpy as np
-from tvem.models.protocols import Trainable
+from tvem.utils.model_protocols import Trainable
 
 
 def reset_rng_state(seed):

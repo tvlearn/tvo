@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 
-from tvem.models.protocols import Optimized, Sampler
+from tvem.utils.model_protocols import Optimized, Sampler
 from tvem.variational import TVEMVariationalStates  # type: ignore
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast

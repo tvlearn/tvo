@@ -14,7 +14,7 @@ from tvem.utils import get
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import update_states_for_batch, set_redundant_lpj_to_low
 
-from tvem.models.protocols import Optimized, Trainable
+from tvem.utils.model_protocols import Optimized, Trainable
 
 
 class EEMVariationalStates(TVEMVariationalStates):
