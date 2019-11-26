@@ -247,9 +247,9 @@ class TVAE(Trainable, Sampler, Reconstructor):
     def generate_data(
         self, N: int, hidden_state: to.Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
+        H = self.shape[-1]
         if hidden_state is None:
             pies = self.theta["pies"]
-            H = pies.numel()
             hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
             must_return_hidden_state = True
         else:

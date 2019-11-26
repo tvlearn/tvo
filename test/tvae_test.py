@@ -98,7 +98,7 @@ def test_lpj(simple_tvae):
     data = to.tensor([[0.0], [1.0]], device=tvem.get_device(), dtype=simple_tvae.precision)
     assert data.shape == (N, D)
 
-    lpj = simple_tvae.log_pseudo_joint(data, states.K)
+    lpj = simple_tvae._log_pseudo_joint(data, states.K)
     expected_lpj = true_lpj(simple_tvae, data, states)
 
     assert expected_lpj.shape == lpj.shape
@@ -113,7 +113,7 @@ def test_free_energy(simple_tvae):
     data = to.tensor([[0.0], [1.0]], device=tvem.get_device(), dtype=simple_tvae.precision)
     assert data.shape == (N, D)
 
-    states.lpj[:] = simple_tvae.log_pseudo_joint(data, states.K)
+    states.lpj[:] = simple_tvae.log_joint(data, states.K)
     tvae_F = simple_tvae.free_energy(to.arange(data.shape[0]), data, states)
     true_F = true_free_energy(simple_tvae, data, states)
     assert math.isclose(tvae_F, true_F)
@@ -153,7 +153,7 @@ def test_same_as_bsc(tvae_and_corresponding_bsc):
     states.lpj[:] = bsc.log_pseudo_joint(data, states.K)
     F_bsc = bsc.free_energy(to.arange(N), data, states)
 
-    states.lpj[:] = tvae.log_pseudo_joint(data, states.K)
+    states.lpj[:] = tvae.log_joint(data, states.K)
     F_tvae = tvae.free_energy(to.arange(N), data, states)
 
     assert math.isclose(F_bsc, F_tvae, abs_tol=1e-5)
@@ -192,14 +192,12 @@ def test_train(train_setup, tvae):
     states = fullem_for(tvae, N)
     data = train_setup.data
 
-    states.lpj[:] = tvae.log_pseudo_joint(data, states.K)
+    states.lpj[:] = tvae.log_joint(data, states.K)
     first_F = tvae.free_energy(idx=to.arange(N), batch=data, states=states)
 
-    tvae.init_epoch()
-    tvae.init_batch()
     tvae.update_param_batch(idx=to.arange(N), batch=data, states=states)
     tvae.update_param_epoch()
-    states.lpj[:] = tvae.log_pseudo_joint(data, states.K)
+    states.lpj[:] = tvae.log_joint(data, states.K)
     new_F = tvae.free_energy(idx=to.arange(N), batch=data, states=states)
 
     assert new_F > first_F
@@ -237,8 +235,6 @@ def test_gradients_independent_of_estep(train_setup, tvae):
     data = train_setup.data
 
     def epoch_with_esteps(tvae, n_esteps):
-        tvae.init_epoch()
-        tvae.init_batch()
         for _ in range(n_esteps):
             states.update(idx=to.arange(N), batch=data, model=tvae)
         tvae.update_param_batch(idx=to.arange(N), batch=data, states=states)
@@ -255,13 +251,13 @@ def test_generate_from_hidden(tvae):
     N = 1
     D, H0 = tvae.shape
     S = to.zeros(N, H0, dtype=to.uint8, device=tvem.get_device())
-    data = tvae.generate_from_hidden(S)
+    data = tvae.generate_data(N, S)
     assert data.shape == (N, D)
 
 
 def test_generate_data(tvae):
     N = 3
     D, H0 = tvae.shape
-    d = tvae.generate_data(N)
-    assert d["data"].shape == (N, D)
-    assert d["hidden_state"].shape == (N, H0)
+    data, hidden_state = tvae.generate_data(N)
+    assert data.shape == (N, D)
+    assert hidden_state.shape == (N, H0)
