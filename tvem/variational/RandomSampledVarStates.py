@@ -15,13 +15,15 @@ if TYPE_CHECKING:
 
 
 class RandomSampledVarStates(TVEMVariationalStates):
-    def __init__(self, conf: Dict[str, Any], sparsity: float = 0.5):
+    def __init__(self, S_new: int, conf: Dict[str, Any], sparsity: float = 0.5):
         """A TVEMVariationalStates implementation that performs random sampling.
 
+        :param S_new: number of states to be sampled at every call to ~update
         :param conf: dictionary with hyper-parameters. See\
           :func:`~tvem.variational.TVEMVariationalStates` for a list of required keys.
         :param sparsity: average fraction of active units in sampled states.
         """
+        conf["S_new"] = S_new
         super().__init__(conf)
         self.sparsity = sparsity
 
