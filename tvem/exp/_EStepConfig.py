@@ -63,11 +63,6 @@ class EEMConfig(EStepConfig):
             mutation != "sparsity" or bitflip_frequency is not None
         ), "bitflip_frequency is required for mutation algorithm 'sparsity'"
 
-        self.n_new_states = (
-            n_parents * (n_parents - 1) * n_children * n_generations
-            if crossover
-            else n_parents * n_children * n_generations
-        )
         self.n_parents = n_parents
         self.n_children = n_children
         self.n_generations = n_generations
@@ -85,8 +80,6 @@ class EEMConfig(EStepConfig):
 class FullEMConfig(EStepConfig):
     def __init__(self, n_latents: int):
         """Full EM configuration."""
-        self.n_new_states = 0
-
         super().__init__(2 ** n_latents)
 
     def as_dict(self) -> Dict[str, Any]:
