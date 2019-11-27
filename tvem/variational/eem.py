@@ -24,11 +24,14 @@ class EEMVariationalStates(TVEMVariationalStates):
 
         :param conf: dictionary with hyper-parameters
         """
-        super().__init__(conf)
         required_keys = ("parent_selection", "mutation", "n_parents", "n_children", "n_generations")
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.required_keys = required_keys
+        conf["S_new"] = get_n_new_states(
+            conf["mutation"], conf["n_parents"], conf["n_children"], conf["n_generations"]
+        )
+        super().__init__(conf)
 
     def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
 
