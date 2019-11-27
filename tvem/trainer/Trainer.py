@@ -48,6 +48,7 @@ class Trainer:
             raise RuntimeError("Please provide at least one pair of dataset and variational states")
 
         _d, _s = (train_data, train_states) if self.can_train else (test_data, test_states)
+        assert _d is not None and _s is not None
         model.init_storage(_s.config["S"], _s.config["S_new"], _d.batch_size)
 
         self.model = model
