@@ -29,8 +29,8 @@ class DummyModel(TVEMModel):
 @pytest.mark.gpu
 def test_update():
     device = tvem.get_device()
-    conf = {"N": 10, "H": 8, "S": 4, "S_new": 10, "precision": to.float32, "device": device}
-    var_states = RandomSampledVarStates(conf)
+    conf = {"N": 10, "H": 8, "S": 4, "precision": to.float32, "device": device}
+    var_states = RandomSampledVarStates(10, conf)
     data = to.rand(conf["N"], 1, device=device)
     idx = to.arange(data.shape[0], device=device)
 

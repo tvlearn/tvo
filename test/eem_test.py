@@ -216,12 +216,6 @@ class TestEEM(unittest.TestCase):
         }
 
         device = tvem.get_device()
-        eem_conf["S_new"] = eem.get_n_new_states(
-            eem_conf["mutation"],
-            eem_conf["n_parents"],
-            eem_conf["n_children"],
-            eem_conf["n_generations"],
-        )
 
         for x in range(self.n_runs):
 
