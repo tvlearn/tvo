@@ -47,6 +47,9 @@ class Trainer:
         if not self.can_train and not self.can_test:  # pragma: no cover
             raise RuntimeError("Please provide at least one pair of dataset and variational states")
 
+        _d, _s = (train_data, train_states) if self.can_train else (test_data, test_states)
+        model.init_storage(_s.config["S"], _s.config["S_new"], _d.batch_size)
+
         self.model = model
         self.train_data = train_data
         self.train_states = train_states
