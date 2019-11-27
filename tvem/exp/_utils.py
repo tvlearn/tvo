@@ -36,7 +36,6 @@ def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
         "n_children": conf.n_children,
         "n_generations": conf.n_generations,
         "S": conf.n_states,
-        "S_new": conf.n_new_states,
         "N": N,
         "H": H,
         "precision": precision,
