@@ -19,17 +19,59 @@ if TYPE_CHECKING:
 
 
 class EEMVariationalStates(TVEMVariationalStates):
-    def __init__(self, conf):
+    def __init__(
+        self,
+        N: int,
+        H: int,
+        S: int,
+        precision: to.dtype,
+        parent_selection: str,
+        mutation: str,
+        n_parents: int,
+        n_generations: int,
+        n_children: int = None,
+        crossover: bool = False,
+        bitflip_frequency: float = None,
+    ):
         """Evolutionary Expectation Maximization class.
 
-        :param conf: dictionary with hyper-parameters
+        :param N: number of datapoints
+        :param H: number of latents
+        :param S: number of variational states
+        :param precision: floating point precision to be used for log_joint values.
+                          Must be one of to.float32 or to.float64.
+        :param selection: one of "batch_fitparents" or "randparents"
+        :param mutation: one of "randflip" or "sparseflip"
+        :param n_parents: number of parent states to select
+        :param n_generations: number of EA generations to produce
+        :param n_children: if crossover is False, number of children states to produce per
+                           generation. Must be None if crossover is True.
+        :param crossover: if True, apply crossover. Must be False if n_children is specified.
+        :param bitflip_frequency: Probability of flipping a bit during the mutation step (e.g.
+                                  2/H for an average of 2 bitflips per mutation). Required when
+                                  using the 'sparsity' mutation algorithm.
         """
-        required_keys = ("parent_selection", "mutation", "n_parents", "n_children", "n_generations")
-        for c in required_keys:
-            assert c in conf and conf[c] is not None
-        self.required_keys = required_keys
-        conf["S_new"] = get_n_new_states(
-            conf["mutation"], conf["n_parents"], conf["n_children"], conf["n_generations"]
+        assert (
+            not crossover or n_children is None
+        ), "Exactly one of n_children and crossover may be provided."
+        if crossover:
+            mutation = f"cross_{mutation}"
+            n_children = n_parents - 1
+        assert n_children is not None  # make mypy happy
+        S_new = get_n_new_states(mutation, n_parents, n_children, n_generations)
+
+        conf = dict(
+            N=N,
+            H=H,
+            S=S,
+            S_new=S_new,
+            precision=precision,
+            parent_selection=parent_selection,
+            mutation=mutation,
+            n_parents=n_parents,
+            n_children=n_children,
+            n_generations=n_generations,
+            p_bf=bitflip_frequency,
         )
         super().__init__(conf)
 
@@ -39,12 +81,12 @@ class EEMVariationalStates(TVEMVariationalStates):
             model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
         )
         sort_by_lpj = model.sorted_by_lpj
-        conf = self.config
         K = self.K
         lpj = self.lpj
-        required_keys = self.required_keys
 
-        parent_selection, mutation, n_parents, n_children, n_generations = get(conf, *required_keys)
+        parent_selection, mutation, n_parents, n_children, n_generations = get(
+            self.config, "parent_selection", "mutation", "n_parents", "n_children", "n_generations"
+        )
 
         lpj[idx] = lpj_fn(batch, K[idx])
 

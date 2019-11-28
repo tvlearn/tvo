@@ -27,21 +27,20 @@ def make_var_states(
 def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
     selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
     mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
-    if conf.crossover:
-        mutation = "cross_" + mutation
     eem_conf = {
         "parent_selection": selection,
         "mutation": mutation,
         "n_parents": conf.n_parents,
-        "n_children": conf.n_children,
+        "n_children": conf.n_children if not conf.crossover else None,
         "n_generations": conf.n_generations,
         "S": conf.n_states,
         "N": N,
         "H": H,
+        "crossover": conf.crossover,
         "precision": precision,
-        "p_bf": conf.bitflip_frequency,
+        "bitflip_frequency": conf.bitflip_frequency,
     }
-    return EEMVariationalStates(eem_conf)
+    return EEMVariationalStates(**eem_conf)
 
 
 def get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> to.Tensor:

@@ -104,14 +104,15 @@ def estep_conf(request, hyperparams):
     # (testing all combinations for every model and experiment takes too much)
     parent_selection = ["fitness", "uniform"][np.random.randint(2)]
     mutation = ["sparsity", "uniform"][np.random.randint(2)]
+    crossover = request.param
     return EEMConfig(
         n_states=hyperparams.S,
         n_parents=3,
-        n_children=2,
+        n_children=2 if not crossover else None,
         n_generations=2,
         parent_selection=parent_selection,
         mutation=mutation,
-        crossover=request.param,
+        crossover=crossover,
         bitflip_frequency=1 / hyperparams.H if mutation == "sparsity" else None,
     )
 

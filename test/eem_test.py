@@ -222,7 +222,7 @@ class TestEEM(unittest.TestCase):
             idx = to.arange(eem_conf["N"], device=device)
             data_dummy = to.empty((1,), device=device)
 
-            var_states = eem.EEMVariationalStates(conf=eem_conf)
+            var_states = eem.EEMVariationalStates(**eem_conf)
 
             # is (batch_size, n_candidates)
             var_states.lpj[:] = DummyModel().log_joint(data=data_dummy, states=var_states.K[idx])

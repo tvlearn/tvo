@@ -24,10 +24,10 @@ class EEMConfig(EStepConfig):
         self,
         n_states: int,
         n_parents: int,
-        n_children: int,
         n_generations: int,
         parent_selection: str = "fitness",
         crossover: bool = True,
+        n_children: int = None,
         mutation: str = "uniform",
         bitflip_frequency: float = None,
     ):
@@ -36,13 +36,14 @@ class EEMConfig(EStepConfig):
         :param n_states: Number of variational states per datapoint to keep in memory.
         :param n_parents: Number of parent states to select at each EEM generation.
                           Must be <= n_states.
-        :param n_children: Number of children per parent to generate via mutation
-                           at each EEM generation.
         :param parent_selection: Parent selection algorithm for EEM. Must be one of:
 
                                  - 'fitness': fitness-proportional parent selection
                                  - 'uniform': random uniform parent selection
         :param crossover: Whether crossover should be applied or not.
+                          Must be False if n_children is specified.
+        :param n_children: Number of children per parent to generate via mutation
+                           at each EEM generation. Required if crossover is False.
         :param mutation: Mutation algorithm for EEM. Must be one of:
 
                          - 'sparsity': bits are flipped so that states tend
@@ -52,6 +53,9 @@ class EEMConfig(EStepConfig):
                                   2/H for an average of 2 bitflips per mutation). Required when
                                   using the 'sparsity' mutation algorithm.
         """
+        assert (
+            not crossover or n_children is None
+        ), "Exactly one of n_children and crossover may be provided."
         valid_selections = ("fitness", "uniform")
         assert parent_selection in valid_selections, f"Unknown parent selection {parent_selection}"
         valid_mutations = ("sparsity", "uniform")
