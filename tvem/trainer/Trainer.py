@@ -6,7 +6,7 @@ from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 from tvem.utils.data import TVEMDataLoader
 from tvem.utils.parallel import all_reduce
-from typing import Dict, Any, Sequence
+from typing import Dict, Any, Sequence, Union
 import torch as to
 
 
@@ -14,9 +14,9 @@ class Trainer:
     def __init__(
         self,
         model: TVEMModel,
-        train_data: TVEMDataLoader = None,
+        train_data: Union[TVEMDataLoader, to.Tensor] = None,
         train_states: TVEMVariationalStates = None,
-        test_data: TVEMDataLoader = None,
+        test_data: Union[TVEMDataLoader, to.Tensor] = None,
         test_states: TVEMVariationalStates = None,
         rollback_if_F_decreases: Sequence[str] = [],
         will_reconstruct: bool = False,
@@ -42,6 +42,8 @@ class Trainer:
             assert (data is not None) == (
                 states is not None
             ), "Please provide both dataset and variational states, or neither"
+            if type(data) is to.Tensor:
+                data = TVEMDataLoader(data)
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:  # pragma: no cover
