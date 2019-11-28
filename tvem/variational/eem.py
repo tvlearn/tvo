@@ -168,7 +168,7 @@ def evolve_states(
 
 def get_n_new_states(mutation: str, n_parents: int, n_children: int, n_gen: int) -> int:
     if mutation[:5] == "cross":
-        return n_parents * (n_parents - 1) * n_children * n_gen
+        return n_parents * (n_parents - 1) * n_gen
     else:
         return n_parents * n_children * n_gen
 
@@ -313,12 +313,12 @@ def cross(parents: Tensor) -> Tensor:
 def cross_randflip(
     parents: Tensor, n_children: int, sparsity: float = None, p_bf: float = None
 ) -> Tensor:
-    children = randflip(cross(parents), n_children)
+    children = randflip(cross(parents), 1)
     return children
 
 
 def cross_sparseflip(parents: Tensor, n_children: int, sparsity: float, p_bf: float) -> Tensor:
-    children = sparseflip(cross(parents), n_children, sparsity, p_bf)
+    children = sparseflip(cross(parents), 1, sparsity, p_bf)
     return children
 
 
