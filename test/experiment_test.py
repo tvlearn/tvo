@@ -15,6 +15,7 @@ import pytest
 import torch as to
 import torch.distributed as dist
 from munch import Munch
+from contextlib import suppress
 
 
 class LogJointOnly(TVEMModel):
@@ -91,9 +92,10 @@ def input_files(hyperparams):
     yield Munch(binary_data=binary_fname, continuous_data=continuous_fname)
 
     if rank == 0:
-        os.remove(binary_fname)
-        os.remove(continuous_fname)
-        os.remove("tvem_exp.h5")  # default experiment output file
+        with suppress(FileNotFoundError):
+            os.remove(binary_fname)
+            os.remove(continuous_fname)
+            os.remove("tvem_exp.h5")  # default experiment output file
 
 
 @pytest.fixture(scope="function", params=(True, False), ids=("cross", "nocross"))
