@@ -267,3 +267,9 @@ def broadcast(tensor: Tensor, src: int = 0):
     """Equivalent to torch's broadcast if tvem.get_run_policy() is 'mpi', no-op otherwise."""
     if tvem.get_run_policy() == "mpi":
         dist.broadcast(tensor, src)
+
+
+def barrier():
+    """Equivalent to torch's dist.barrier if tvem.get_run_policy() is 'mpi', no-op otherwise."""
+    if tvem.get_run_policy() == "mpi":
+        dist.barrier()
