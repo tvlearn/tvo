@@ -112,7 +112,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
 @pytest.fixture(scope="module")
 def exp_conf(hyperparams):
-    return ExpConfig(batch_size=hyperparams.batch_size, precision=hyperparams.precision)
+    return ExpConfig(batch_size=hyperparams.batch_size)
 
 
 def check_file(input_file):

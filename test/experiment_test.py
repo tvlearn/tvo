@@ -146,7 +146,7 @@ def warmup_Esteps(request):
 
 @pytest.fixture(scope="module")
 def exp_conf(precision, batch_size, warmup_Esteps):
-    return ExpConfig(batch_size=batch_size, precision=precision, warmup_Esteps=warmup_Esteps)
+    return ExpConfig(batch_size=batch_size, warmup_Esteps=warmup_Esteps)
 
 
 def check_file(fname, *prefixes: str):
@@ -222,11 +222,11 @@ def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_ma
     if rank == 0:
         f = h5py.File(exp_conf.output, "r")
         assert "train_reconstruction" in f.keys()
-        train_reconstruction = to.tensor(f["train_reconstruction"], dtype=exp_conf.precision)
+        train_reconstruction = to.tensor(f["train_reconstruction"], dtype=model.precision)
         f.close()
 
         f = h5py.File(input_file, "r")
-        train_data = to.tensor(f["data"], dtype=exp_conf.precision)
+        train_data = to.tensor(f["data"], dtype=model.precision)
         f.close()
         assert train_reconstruction.shape == train_data.shape
         assert (train_reconstruction != train_data).any()

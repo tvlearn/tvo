@@ -54,24 +54,24 @@ class _TrainingAndOrValidation(Experiment):
         self._estep_conf = Munch(estep_conf.as_dict())
         self.train_data = None
         self.train_states = None
+        self._precision = model.precision
         if train_dataset is not None:
             self.train_data = self._make_dataloader(train_dataset, conf)
             # might differ between processes: last process might have smaller N and less states
             # (but TVEMDataLoader+ShufflingSampler make sure the number of batches is the same)
             N = train_dataset.shape[0]
-            self.train_states = self._make_states(N, H, conf.precision, estep_conf)
+            self.train_states = self._make_states(N, H, self._precision, estep_conf)
 
         self.test_data = None
         self.test_states = None
         if test_dataset is not None:
             self.test_data = self._make_dataloader(test_dataset, conf)
             N = test_dataset.shape[0]
-            self.test_states = self._make_states(N, H, conf.precision, estep_conf)
+            self.test_states = self._make_states(N, H, self._precision, estep_conf)
 
     def _make_dataloader(self, dataset: to.Tensor, conf: ExpConfig) -> TVEMDataLoader:
         if dataset.dtype is not to.uint8:
-            dataset = dataset.to(dtype=conf.precision)
-            assert dataset.dtype is self.model.precision
+            dataset = dataset.to(dtype=self._precision)
         dataset = dataset.to(device=tvem.get_device())
         return TVEMDataLoader(
             dataset, batch_size=conf.batch_size, shuffle=conf.shuffle, drop_last=conf.drop_last
@@ -81,7 +81,6 @@ class _TrainingAndOrValidation(Experiment):
         self, N: int, H: int, precision: to.dtype, estep_conf: EStepConfig
     ) -> TVEMVariationalStates:
         states = make_var_states(estep_conf, N, H, precision)
-        assert states.precision is self.model.precision
         return states
 
     @property
