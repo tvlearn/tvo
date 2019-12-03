@@ -2,6 +2,9 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
+import os
+import torch as to
+
 from typing import Iterable, Sequence, Dict, Any
 
 
@@ -12,7 +15,7 @@ class ExpConfig:
         shuffle: bool = True,
         drop_last: bool = False,
         warmup_Esteps: int = 0,
-        output: str = "tvem_exp.h5",
+        output: str = None,
         log_blacklist: Iterable[str] = [],
         rollback_if_F_decreases: Sequence[str] = [],
         warmup_reco_epochs: Iterable[int] = None,
@@ -58,7 +61,7 @@ class ExpConfig:
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.warmup_Esteps = warmup_Esteps
-        self.output = output
+        self.output = output if output is not None else "tvem_exp_" + str(os.getpid()) + ".h5"
         self.log_blacklist = log_blacklist
         self.rollback_if_F_decreases = rollback_if_F_decreases
         self.warmup_reco_epochs = warmup_reco_epochs
