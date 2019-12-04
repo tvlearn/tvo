@@ -335,22 +335,35 @@ def sparseflip(
 
 
 def cross(parents: Tensor) -> Tensor:
-    # Parents are crossed in any possible way leading to
-    # n_parents * ( n_parents - 1 ) children.
+    """Each pair of parents is crossed generating two children,
+       for a total of n_parents * ( n_parents - 1 ) children.
 
-    # Initialization
-    device = parents.device
+    The crossover is performed by selecting a "cut point" and switching the
+    contents of the parents after the cut point.
+    """
     n_parents, H = parents.shape
-    ind_children = to.arange(2, device=device)
+    n_children = n_parents * (n_parents - 1)
+    cutting_points = np.random.randint(low=1, high=H, size=(n_children // 2,))
+    parent_pairs = np.array(list(combinations(range(n_parents), 2)), dtype=np.int64)
 
-    # All combinations of parents lead to n_parents*(n_parents-1) new children
-    children = to.empty((n_parents * (n_parents - 1), H), dtype=to.uint8, device=device)
-    for p in combinations(range(n_parents), 2):
-        # Cross tails
-        cp = to.randint(low=1, high=H, size=(1,), device=device).item()
-        children[ind_children] = parents[p, :]
-        children[ind_children, cp:] = parents[p[-1::-1], cp:]
-        ind_children += 2
+    # The next lines build (n_children, H) indexes that swap parent entries to produce
+    # the desired crossover.
+    crossed_idxs = np.empty(n_children * H, dtype=np.int64)
+    parent_pair_idxs = np.arange(n_children // 2)
+    parent1_starts = parent_pair_idxs * 2 * H
+    cutting_points_1 = parent1_starts + cutting_points
+    cutting_points_2 = cutting_points_1 + H
+    parent2_ends = parent1_starts + 2 * H
+    for pp_idx, o1, o2, o3, o4 in zip(
+        parent_pair_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+    ):
+        parent1, parent2 = parent_pairs[pp_idx]
+        crossed_idxs[o1:o2] = parent1
+        crossed_idxs[o2:o3] = parent2
+        crossed_idxs[o3:o4] = parent1
+    crossed_idxs = crossed_idxs.reshape(n_children, H)
+
+    children = parents[crossed_idxs, range(H)]
     return children
 
 
