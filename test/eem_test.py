@@ -13,6 +13,7 @@ from tvem.models import TVEMModel
 import tvem
 import pytest
 from itertools import combinations
+import numpy as np
 
 
 class DummyModel(TVEMModel):
@@ -112,9 +113,10 @@ class TestEEM(unittest.TestCase):
     def test_cross_randflip(self):
 
         H, n_parents = 5, 4
-        seed = 7
 
         for x in range(self.n_runs):
+
+            seed = np.random.randint(10000)
 
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
