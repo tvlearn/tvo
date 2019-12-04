@@ -277,6 +277,37 @@ def randflip(
     return children
 
 
+def batch_randflip(
+    parents: Tensor, n_children: int, sparsity: Optional[float] = None, p_bf: Optional[float] = None
+) -> Tensor:
+    """Generate n_children new states from parents by flipping one different bit per children.
+
+    :param parents: Tensor with shape (N, n_parents, H)
+    :param n_children: How many children to generate per parent per datapoint
+    :returns: children, a Tensor with shape (N, n_parents * n_children, H)
+    """
+    device = parents.device
+
+    # Select k indices to be flipped by generating H random numbers per parent
+    # and taking the indexes of the largest k.
+    # This ensures that, per parent, each child is different.
+    N, n_parents, H = parents.shape
+    ind_flip = to.topk(
+        to.rand((N, n_parents, H), device=device), k=n_children, dim=2, sorted=False
+    )[1]
+    ind_flip = ind_flip.view(N, n_parents * n_children)
+
+    # Each parent is "repeated" n_children times and inserted in children.
+    # We then flips bits in the children states
+    children = parents.repeat(1, 1, n_children).view(N, -1, H)  # is (N, n_parents*n_children, H)
+
+    n_idx = to.arange(N)[:, None]  # broadcastable to ind_flip shape
+    s_idx = to.arange(n_parents * n_children)[None, :]  # broadcastable to ind_flip shape
+    children[n_idx, s_idx, ind_flip] = 1 - children[n_idx, s_idx, ind_flip]
+
+    return children
+
+
 def sparseflip(
     parents: Tensor, n_children: int, sparsity: Optional[float], p_bf: Optional[float]
 ) -> Tensor:
