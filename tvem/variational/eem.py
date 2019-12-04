@@ -335,8 +335,10 @@ def sparseflip(
 
 
 def cross(parents: Tensor) -> Tensor:
-    """Each pair of parents is crossed generating two children,
-       for a total of n_parents * ( n_parents - 1 ) children.
+    """Each pair of parents is crossed generating two children.
+
+    :param parents: Tensor with shape (n_parents, H)
+    :returns: Tensor with shape (n_parents*(n_parents - 1), H)
 
     The crossover is performed by selecting a "cut point" and switching the
     contents of the parents after the cut point.
