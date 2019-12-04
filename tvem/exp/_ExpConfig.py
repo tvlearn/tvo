@@ -29,7 +29,8 @@ class ExpConfig:
         :param drop_last: set to True to drop the last incomplete batch, if the dataset size is not
                           divisible by the batch size. See also torch's `DataLoader docs`_.
         :param warmup_Esteps: Number of warm-up E-steps to perform.
-        :param output: Name or path of output HDF5 file. It is overwritten if it already exists.
+        :param output: Name or path of output HDF5 file. The default filename is "tvem_exp_<PID>.h5",
+                       where PID is the process ID. It is overwritten if it already exists.
         :param log_blacklist: By default, experiments log all available quantities. These are:
 
                               - "{train,valid,test}_F": one or more of training/validation/test
@@ -61,7 +62,7 @@ class ExpConfig:
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.warmup_Esteps = warmup_Esteps
-        self.output = output if output is not None else "tvem_exp_" + str(os.getpid()) + ".h5"
+        self.output = output if output is not None else f"tvem_exp_{os.getpid()}.h5"
         self.log_blacklist = log_blacklist
         self.rollback_if_F_decreases = rollback_if_F_decreases
         self.warmup_reco_epochs = warmup_reco_epochs
