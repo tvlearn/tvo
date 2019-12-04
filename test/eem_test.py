@@ -303,11 +303,11 @@ class TestEEM(unittest.TestCase):
         candidates = generate_unique_states(n_states=n_candidates, H=H).repeat(batch_size, 1, 1)
 
         # check that parents have the expected shape
-        parents = eem.randparents(candidates, n_parents, lpj=None)
+        parents = eem.batch_randparents(candidates, n_parents, lpj=None)
         self.assertTrue(parents.shape == (batch_size, n_parents, H))
 
         # check that the parents we selected for each batch were in candidates in the first place
-        parents = eem.randparents(candidates, n_candidates, lpj=None)
+        parents = eem.batch_randparents(candidates, n_candidates, lpj=None)
         for batch in range(batch_size):
             for p in parents[batch]:
                 self.assertTrue(any(to.equal(p, c) for c in candidates[batch]))

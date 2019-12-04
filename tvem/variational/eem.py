@@ -216,7 +216,7 @@ def get_n_new_states(mutation: str, n_parents: int, n_children: int, n_gen: int)
 
 def get_EA(parent_selection: str, mutation: str) -> Tuple:
     """Refer to the doc of `evolve_states` for the list of valid arguments"""
-    parent_sel_dict = {"batch_fitparents": batch_fitparents, "randparents": randparents}
+    parent_sel_dict = {"batch_fitparents": batch_fitparents, "randparents": batch_randparents}
     mutation_dict = {
         "randflip": batch_randflip,
         "sparseflip": batch_sparseflip,
@@ -429,7 +429,7 @@ def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     return choices
 
 
-def randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) -> Tensor:
+def batch_randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) -> Tensor:
     device = candidates.device
     batch_size, n_candidates, H = candidates.shape
     # for each batch, choose n_parents random idxs, concatenate all idxs together
