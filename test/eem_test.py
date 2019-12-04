@@ -108,6 +108,32 @@ class TestEEM(unittest.TestCase):
                 > 0
             )  # TODO Find better test
 
+    def test_batch_sparseflip(self):
+
+        N, H, n_parents, n_children = 3, 5, 4, 2
+        sparsity, p_bf = 1 / H, 0.5
+
+        for x in range(self.n_runs):
+
+            # parents have shape (N, n_parents, H)
+            parents = generate_unique_states(n_states=n_parents, H=H)
+            parents = parents.unsqueeze(0).expand((N, -1, -1))
+            # children have shape (N, n_parents*n_children, H)
+            children = eem.batch_sparseflip(parents, n_children, sparsity, p_bf)
+
+            self.assertEqual(children.shape, (N, n_parents * n_children, H))
+            for n in range(N):
+                # TODO Find better test
+                self.assertTrue(
+                    (
+                        (parents[n].repeat(1, n_children).view(-1, H) == children[n])
+                        .sum(dim=1)
+                        .sum()
+                        / (n_parents * n_children)
+                    ).item()
+                    > 0
+                )
+
     def test_cross(self):
 
         H, n_parents = 5, 4

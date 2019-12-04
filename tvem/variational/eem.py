@@ -365,6 +365,58 @@ def sparseflip(
     return children
 
 
+def batch_sparseflip(
+    parents: Tensor, n_children: int, sparsity: Optional[float], p_bf: Optional[float]
+) -> Tensor:
+    """ Take a set of parent bitstrings, generate n_children new bitstrings
+        by performing bitflips on each of the parents.
+
+    :param parents: Tensor with shape (N, n_parents, H)
+    :param n_children: number of children to produce per parent per datapoint
+    :param sparsity: the algorithm will strive to produce children with the given sparsity
+    :param p_bf: overall probability that a bit is flipped. the average number
+                 of bitflips per children is p_bf*parents.shape[1]
+    :returns: Tensor with shape (N, n_parents*n_children, H)
+    """
+    # Initialization
+    precision, device = to.float64, parents.device
+    N, n_parents, H = parents.shape
+    eps = 1e-100
+    crowdedness = sparsity * H
+
+    H = float(H)
+    s_abs = parents.sum(dim=2).to(dtype=precision)  # is (N, n_parents)
+
+    # # Probability to flip a 1 to a 0 and vice versa (Joerg's idea)
+    # p_0 = H / ( 2 * ( H - s_abs) + eps) * p_bf,  # is (n_parents,)
+    # p_1 = H / ( 2 * s_abs + eps) * p_bf # is (n_parents,)
+
+    # Probability to flip a 1 to a 0 and vice versa (modification of Joerg's idea)
+    # is (n_parents)
+    alpha = (
+        (H - s_abs)
+        * ((H * p_bf) - (crowdedness - s_abs))
+        / ((crowdedness - s_abs + H * p_bf) * s_abs + eps)
+    )
+    p_0 = (H * p_bf) / (H + (alpha - 1.0) * s_abs) + eps  # is (N, n_parents)
+    p_1 = alpha * p_0
+    p_0 = p_0[:, :, None].expand(-1, -1, int(H)).repeat(1, 1, n_children).view(N, -1, int(H))
+    p_1 = p_1[:, :, None].expand(-1, -1, int(H)).repeat(1, 1, n_children).view(N, -1, int(H))
+
+    # start from children equal to the parents (with each parent repeated n_children times)
+    children = parents.repeat(1, 1, n_children).view(N, n_parents * n_children, int(H))
+    assert children.shape == (N, n_parents * n_children, H)
+    bool_or_byte = (to.empty(0) < 0).dtype  # BoolTensor in pytorch>=1.2, ByteTensor otherwise
+    children_idx = children.to(bool_or_byte)
+    p = to.where(children_idx, p_1, p_0)
+
+    # Determine bits to be flipped and do the bitflip
+    flips = to.rand((N, n_parents * n_children, int(H)), dtype=precision, device=device) < p
+    children[flips] = 1 - children[flips]
+
+    return children
+
+
 def cross(parents: Tensor) -> Tensor:
     """Each pair of parents is crossed generating two children.
 
