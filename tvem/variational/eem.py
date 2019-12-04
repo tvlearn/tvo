@@ -194,8 +194,7 @@ def evolve_states(
             parents[:] = select(new_states[:, old_gen_idx], n_parents, new_lpj[:, old_gen_idx])
 
         # children generation
-        for n in range(N):
-            new_states[n, gen_idx] = mutate(parents[n], n_children, sparsity, p_bf)
+        new_states[:, gen_idx] = mutate(parents, n_children, sparsity, p_bf)
 
         # children fitness evaluation
         # new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
@@ -219,11 +218,11 @@ def get_EA(parent_selection: str, mutation: str) -> Tuple:
     """Refer to the doc of `evolve_states` for the list of valid arguments"""
     parent_sel_dict = {"batch_fitparents": batch_fitparents, "randparents": randparents}
     mutation_dict = {
-        "randflip": randflip,
-        "sparseflip": sparseflip,
-        "cross": cross,
-        "cross_randflip": cross_randflip,
-        "cross_sparseflip": cross_sparseflip,
+        "randflip": batch_randflip,
+        "sparseflip": batch_sparseflip,
+        "cross": batch_cross,
+        "cross_randflip": batch_cross_randflip,
+        "cross_sparseflip": batch_cross_sparseflip,
     }
     # input validation
     valid_parent_sel = parent_sel_dict.keys()
@@ -511,8 +510,22 @@ def cross_randflip(
     return children
 
 
+def batch_cross_randflip(
+    parents: Tensor, n_children: int, sparsity: float = None, p_bf: float = None
+) -> Tensor:
+    children = batch_randflip(batch_cross(parents), 1)
+    return children
+
+
 def cross_sparseflip(parents: Tensor, n_children: int, sparsity: float, p_bf: float) -> Tensor:
     children = sparseflip(cross(parents), 1, sparsity, p_bf)
+    return children
+
+
+def batch_cross_sparseflip(
+    parents: Tensor, n_children: int, sparsity: float, p_bf: float
+) -> Tensor:
+    children = batch_sparseflip(batch_cross(parents), 1, sparsity, p_bf)
     return children
 
 
