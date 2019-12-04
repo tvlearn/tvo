@@ -61,19 +61,13 @@ class TestEEM(unittest.TestCase):
         H, n_parents, n_children = 5, 4, 2
 
         for x in range(self.n_runs):
-
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-            # is (n_parents*n_children, H)
-            children = eem.randflip(parents, n_children)
+            children = eem.randflip(parents, n_children)  # is (n_parents*n_children, H)
 
             self.assertEqual(children.shape[0], n_parents * n_children)
-            self.assertEqual(
-                (
-                    (parents.repeat(1, n_children).view(-1, H) == children).sum(dim=1).sum()
-                    / (n_parents * n_children)
-                ).item(),
-                H - 1,
-            )
+
+            flips_per_child = (parents.repeat(1, n_children).view(-1, H) != children).sum(dim=1)
+            self.assertTrue(to.all(flips_per_child == 1))
 
     def test_sparseflip(self):
 
@@ -107,7 +101,7 @@ class TestEEM(unittest.TestCase):
 
     def test_cross_randflip(self):
 
-        H, n_parents, n_children_ = 5, 4, 1
+        H, n_parents = 5, 4
         seed = 7
 
         for x in range(self.n_runs):
@@ -120,18 +114,11 @@ class TestEEM(unittest.TestCase):
 
             to.manual_seed(seed)
             to.cuda.manual_seed_all(seed)
-            children_w_flip = eem.cross_randflip(
-                parents, n_children_
-            )  # is (n_parents*n_children, H)
+            children_w_flip = eem.cross_randflip(parents, n_children=1)  # (n_parents*n_children, H)
 
-            self.assertEqual(children_w_flip.shape[0], n_parents * (n_parents - 1) * n_children_)
-            self.assertEqual(
-                (
-                    (children_wth_flip == children_w_flip).sum(dim=1).sum()
-                    / (n_parents * (n_parents - 1) * n_children_)
-                ).item(),
-                H - 1,
-            )
+            self.assertEqual(children_w_flip.shape[0], n_parents * (n_parents - 1))
+            flips_per_child = (children_wth_flip != children_w_flip).sum(dim=1)
+            self.assertTrue(to.all(flips_per_child == 1))
 
     def test_cross_sparseflip(self):
 
@@ -155,7 +142,7 @@ class TestEEM(unittest.TestCase):
             self.assertEqual(children_w_flip.shape[0], n_parents * (n_parents - 1) * n_children_)
             self.assertTrue(
                 (
-                    (children_wth_flip == children_w_flip).sum(dim=1).sum()
+                    (children_wth_flip == children_w_flip).sum()
                     / (n_parents * (n_parents - 1) * n_children_)
                 ).item()
                 > 0
