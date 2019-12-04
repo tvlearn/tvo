@@ -12,6 +12,7 @@ from tvem.variational import eem
 from tvem.models import TVEMModel
 import tvem
 import pytest
+from itertools import combinations
 
 
 class DummyModel(TVEMModel):
@@ -97,7 +98,16 @@ class TestEEM(unittest.TestCase):
             children = eem.cross(parents)  # is (n_parents*n_children, H)
 
             self.assertEqual(children.shape[0], n_parents * (n_parents - 1))
-            # TODO Find more tests
+            # The sum of the two crossover children must be equal, element by element,
+            # to the sum of the parents.
+            # The check assumes that children are ordered as if parents were crossed
+            # two by two following the order of `combinations`.
+            child_idx = 0
+            for p1, p2 in combinations(range(n_parents), 2):
+                sum_parents = parents[p1] + parents[p2]
+                sum_children = children[child_idx] + children[child_idx + 1]
+                self.assertTrue(to.equal(sum_parents, sum_children))
+                child_idx += 2
 
     def test_cross_randflip(self):
 
