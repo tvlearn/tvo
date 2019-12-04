@@ -114,18 +114,22 @@ class TestEEM(unittest.TestCase):
 
         H, n_parents = 5, 4
 
+        def reset_rng_state(seed):
+            # to be sure to get the same behavior
+            to.manual_seed(seed)
+            to.cuda.manual_seed_all(seed)
+            np.random.seed(seed)
+
         for x in range(self.n_runs):
 
             seed = np.random.randint(10000)
 
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
-            to.manual_seed(seed)
-            to.cuda.manual_seed_all(seed)
+            reset_rng_state(seed)
             children_wth_flip = eem.cross(parents)
 
-            to.manual_seed(seed)
-            to.cuda.manual_seed_all(seed)
+            reset_rng_state(seed)
             children_w_flip = eem.cross_randflip(parents, n_children=1)  # (n_parents*n_children, H)
 
             self.assertEqual(children_w_flip.shape[0], n_parents * (n_parents - 1))
