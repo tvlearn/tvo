@@ -83,7 +83,7 @@ class TestEEM(unittest.TestCase):
             self.assertEqual(children.shape[0], n_parents * n_children)
             self.assertTrue(
                 (
-                    (parents.repeat(1, n_children).view(-1, H) == children).sum(dim=1).sum()
+                    (parents.repeat(1, n_children).view(-1, H) == children).sum()
                     / (n_parents * n_children)
                 ).item()
                 > 0
@@ -161,7 +161,7 @@ class TestEEM(unittest.TestCase):
             )  # TODO Find better test
             self.assertTrue(
                 (
-                    (children_wth_flip == children_w_flip).sum(dim=1).sum()
+                    (children_wth_flip == children_w_flip).sum()
                     / (n_parents * (n_parents - 1) * n_children_)
                 ).item()
                 <= H
