@@ -245,11 +245,13 @@ supported. Valid options: {list(valid_mutations)}'
 def randflip(
     parents: Tensor, n_children: int, sparsity: Optional[float] = None, p_bf: Optional[float] = None
 ) -> Tensor:
+    """Generate n_children new states from parents by flipping one different bit per children."""
 
     precision, device = to.float64, parents.device
 
-    # Indices to be flipped. Bitflips for a given parent are ensured
-    # to be unique.
+    # Select k indices to be flipped by generating H random numbers per parent
+    # and taking the indexes of the largest k.
+    # This ensures that, per parent, each child is different.
     n_parents, H = parents.shape
     ind_flip = to.topk(
         to.rand((n_parents, H), dtype=precision, device=device),
