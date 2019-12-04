@@ -16,6 +16,13 @@ from itertools import combinations
 import numpy as np
 
 
+def reset_rng_state(seed):
+    # to be sure to get the same behavior
+    to.manual_seed(seed)
+    to.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+
+
 class DummyModel(TVEMModel):
     def __init__(self):
         super().__init__({})
@@ -90,6 +97,20 @@ class TestEEM(unittest.TestCase):
                 )
                 self.assertTrue(to.all(flips_per_child == 1))
 
+    def test_randflip_vs_batch_randflip(self):
+        # make sure they return the same thing for N == 1
+        N, H, n_parents, n_children = 1, 5, 4, 2
+
+        parents = generate_unique_states(n_states=n_parents, H=H)
+        parents = parents.unsqueeze(0).expand((N, -1, -1))
+        seed = np.random.randint(10000)
+        reset_rng_state(seed)
+        children_batch = eem.batch_randflip(parents, n_children)
+        reset_rng_state(seed)
+        children = eem.randflip(parents[0], n_children)
+
+        self.assertTrue(to.equal(children, children_batch[0]))
+
     def test_sparseflip(self):
 
         H, n_parents, n_children, sparsity, p_bf = 5, 4, 2, 1.0 / 5, 0.5
@@ -133,6 +154,18 @@ class TestEEM(unittest.TestCase):
                     ).item()
                     > 0
                 )
+
+    def test_sparseflip_vs_batch_sparseflip(self):
+        N, H, n_parents, n_children = 1, 5, 4, 2
+        sparsity, p_bf = 1 / H, 0.5
+        parents = generate_unique_states(n_states=n_parents, H=H)
+        parents = parents.unsqueeze(0).expand((N, -1, -1))
+        seed = np.random.randint(10000)
+        reset_rng_state(seed)
+        children_batch = eem.batch_sparseflip(parents, n_children, sparsity, p_bf)
+        reset_rng_state(seed)
+        children = eem.sparseflip(parents[0], n_children, sparsity, p_bf)
+        self.assertTrue(to.equal(children_batch[0], children))
 
     def test_cross(self):
 
@@ -180,15 +213,20 @@ class TestEEM(unittest.TestCase):
                     self.assertTrue(to.equal(sum_parents, sum_children))
                     child_idx += 2
 
+    def test_cross_vs_batch_cross(self):
+        N, H, n_parents = 1, 5, 4
+        parents = generate_unique_states(n_states=n_parents, H=H)
+        parents = parents.unsqueeze(0).expand((N, -1, -1))
+        seed = np.random.randint(10000)
+        reset_rng_state(seed)
+        children_batch = eem.batch_cross(parents)
+        reset_rng_state(seed)
+        children = eem.cross(parents[0])
+        self.assertTrue(to.equal(children_batch[0], children))
+
     def test_cross_randflip(self):
 
         H, n_parents = 5, 4
-
-        def reset_rng_state(seed):
-            # to be sure to get the same behavior
-            to.manual_seed(seed)
-            to.cuda.manual_seed_all(seed)
-            np.random.seed(seed)
 
         for x in range(self.n_runs):
 

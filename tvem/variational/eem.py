@@ -293,7 +293,10 @@ def batch_randflip(
     # This ensures that, per parent, each child is different.
     N, n_parents, H = parents.shape
     ind_flip = to.topk(
-        to.rand((N, n_parents, H), device=device), k=n_children, dim=2, sorted=False
+        to.rand((N, n_parents, H), dtype=to.float64, device=device),
+        k=n_children,
+        dim=2,
+        sorted=False,
     )[1]
     ind_flip = ind_flip.view(N, n_parents * n_children)
 
