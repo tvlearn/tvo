@@ -110,6 +110,31 @@ class TestEEM(unittest.TestCase):
                 self.assertTrue(to.equal(sum_parents, sum_children))
                 child_idx += 2
 
+    def test_batch_cross(self):
+
+        N, H, n_parents = 3, 5, 4
+
+        for x in range(self.n_runs):
+
+            # parents have shape (N, n_parents, H)
+            parents = generate_unique_states(n_states=n_parents, H=H)
+            parents = parents.unsqueeze(0).expand((N, -1, -1))
+            # children have shape (N, n_parents*n_children, H)
+            children = eem.batch_cross(parents)
+
+            self.assertEqual(children.shape, (N, n_parents * (n_parents - 1), H))
+            # The sum of the two crossover children must be equal, element by element,
+            # to the sum of the parents.
+            # The check assumes that children are ordered as if parents were crossed
+            # two by two following the order of `combinations`.
+            for n in range(N):
+                child_idx = 0
+                for p1, p2 in combinations(range(n_parents), 2):
+                    sum_parents = parents[n, p1] + parents[n, p2]
+                    sum_children = children[n, child_idx] + children[n, child_idx + 1]
+                    self.assertTrue(to.equal(sum_parents, sum_children))
+                    child_idx += 2
+
     def test_cross_randflip(self):
 
         H, n_parents = 5, 4

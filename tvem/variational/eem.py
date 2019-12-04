@@ -352,7 +352,7 @@ def cross(parents: Tensor) -> Tensor:
     # the desired crossover.
     crossed_idxs = np.empty(n_children * H, dtype=np.int64)
     parent_pair_idxs = np.arange(n_children // 2)
-    parent1_starts = parent_pair_idxs * 2 * H
+    parent1_starts = parent_pair_idxs * (2 * H)
     cutting_points_1 = parent1_starts + cutting_points
     cutting_points_2 = cutting_points_1 + H
     parent2_ends = parent1_starts + 2 * H
@@ -366,6 +366,55 @@ def cross(parents: Tensor) -> Tensor:
     crossed_idxs = crossed_idxs.reshape(n_children, H)
 
     children = parents[crossed_idxs, range(H)]
+    return children
+
+
+# TODO probably to be made a cython helper function for performance
+def _fill_crossed_idxs_for_batch(
+    parent_pairs, crossed_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+):
+    n_pairs = parent_pairs.shape[0]
+    N = parent1_starts.shape[0]
+    for n in range(N):
+        for pp_idx in range(n_pairs):
+            parent1, parent2 = parent_pairs[pp_idx]
+            o1 = parent1_starts[n, pp_idx]
+            o2 = cutting_points_1[n, pp_idx]
+            o3 = cutting_points_2[n, pp_idx]
+            o4 = parent2_ends[n, pp_idx]
+            crossed_idxs[n, o1:o2] = parent1
+            crossed_idxs[n, o2:o3] = parent2
+            crossed_idxs[n, o3:o4] = parent1
+
+
+def batch_cross(parents: Tensor) -> Tensor:
+    """For each datapoint, each pair of parents is crossed generating two children.
+
+    :param parents: Tensor with shape (N, n_parents, H)
+    :returns: Tensor with shape (N, n_parents*(n_parents - 1), H)
+
+    The crossover is performed by selecting a "cut point" and switching the
+    """
+    N, n_parents, H = parents.shape
+    parent_pairs = np.array(list(combinations(range(n_parents), 2)), dtype=np.int64)
+    n_pairs = parent_pairs.shape[0]
+    cutting_points = np.random.randint(low=1, high=H, size=(N, n_pairs))
+    n_children = n_pairs * 2  # will produce 2 children per pair
+
+    # The next lines build (N, n_children, H) indexes that swap
+    # parent elements to produce the desired crossover.
+    crossed_idxs = np.empty((N, n_children * H), dtype=np.int64)
+    parent_pair_idxs = np.arange(n_pairs)
+    parent1_starts = np.tile(parent_pair_idxs * (2 * H), (N, 1))  # (N, n_children * H)
+    cutting_points_1 = parent1_starts + cutting_points
+    cutting_points_2 = cutting_points_1 + H
+    parent2_ends = parent1_starts + 2 * H
+    _fill_crossed_idxs_for_batch(
+        parent_pairs, crossed_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+    )
+    crossed_idxs = crossed_idxs.reshape(N, n_children, H)
+
+    children = parents[np.arange(N)[:, None, None], crossed_idxs, np.arange(H)[None, None, :]]
     return children
 
 
