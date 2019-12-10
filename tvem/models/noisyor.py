@@ -182,4 +182,5 @@ class NoisyOR(TVEMModel):
     @property
     def config(self) -> Dict[str, Any]:
         D, H = self.theta["W"].shape
-        return dict(H=H, D=D, precision=self.precision)
+        device = tvem.get_device().type
+        return dict(H=H, D=D, precision=self.precision, device=device)

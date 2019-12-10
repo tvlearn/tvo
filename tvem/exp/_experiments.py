@@ -51,6 +51,7 @@ class _TrainingAndOrValidation(Experiment):
         self.model = model
         self._conf = Munch(conf.as_dict())
         self._conf.model = type(model).__name__
+        self._conf.device = tvem.get_device().type
         self._estep_conf = Munch(estep_conf.as_dict())
         self.train_data = None
         self.train_states = None

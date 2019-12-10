@@ -345,5 +345,6 @@ class TVAE(TVEMModel):
             analytical_sigma_updates=self._analytical_sigma_updates,
             analytical_pi_updates=self._analytical_pi_updates,
             clamp_sigma_updates=self._clamp_sigma,
+            device=tvem.get_device().type,
         )
         return config
