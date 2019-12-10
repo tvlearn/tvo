@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
+import os
 
 from typing import Iterable, Sequence, Dict, Any
-
 
 class ExpConfig:
     def __init__(
