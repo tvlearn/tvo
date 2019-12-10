@@ -29,7 +29,7 @@ class ExpConfig:
         :param drop_last: set to True to drop the last incomplete batch, if the dataset size is not
                           divisible by the batch size. See also torch's `DataLoader docs`_.
         :param warmup_Esteps: Number of warm-up E-steps to perform.
-        :param output: Name or path of output HDF5 file. The default filename is "tvem_exp_<PID>.h5",
+        :param output: Name or path of output HDF5 file. The default filename is "tvem_exp_<PID>.h5"
                        where PID is the process ID. It is overwritten if it already exists.
         :param log_blacklist: By default, experiments log all available quantities. These are:
 
