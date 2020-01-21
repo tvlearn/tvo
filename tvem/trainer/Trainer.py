@@ -42,8 +42,8 @@ class Trainer:
             assert (data is not None) == (
                 states is not None
             ), "Please provide both dataset and variational states, or neither"
-            if type(data) is to.Tensor:
-                data = TVEMDataLoader(data)
+        train_data = TVEMDataLoader(train_data) if isinstance(train_data, to.Tensor) else train_data
+        test_data = TVEMDataLoader(test_data) if isinstance(test_data, to.Tensor) else test_data
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:  # pragma: no cover
