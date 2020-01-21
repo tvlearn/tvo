@@ -46,6 +46,16 @@ def test_training(setup):
     assert d1["train_F"] < d2["train_F"]
 
 
+def test_training_with_tensor(setup):
+    data = to.randint(2, size=(setup.N, setup.D)).byte()
+    trainer = Trainer(setup.model, data, setup.var_states)
+    d1 = trainer.em_step()
+    d2 = trainer.em_step()
+    assert "train_F" in d1 and "train_subs" in d1
+    assert "test_F" not in d1 and "test_subs" not in d1
+    assert d1["train_F"] < d2["train_F"]
+
+
 def test_training_with_valid(setup):
     trainer = Trainer(
         setup.model,
