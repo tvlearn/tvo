@@ -19,6 +19,7 @@ class ExpConfig:
         rollback_if_F_decreases: Sequence[str] = [],
         warmup_reco_epochs: Iterable[int] = None,
         reco_epochs: Iterable[int] = None,
+        keep_best_states: bool = False,
     ):
         """Configuration object for Experiment classes.
 
@@ -56,6 +57,10 @@ class ExpConfig:
         :param warmup_reco_epochs: List of warmup_Estep indices at which to compute data
                                    reconstructions.
         :param reco_epochs: List of epoch indices at which to compute data reconstructions.
+        :param keep_best_states: If true, the experiment log will contain extra entries "best_*_F"
+                                 and "best_*_states" (where * is one of "train", "valid", "test")
+                                 corresponding to the best free energy value reached during training
+                                 and the variational states at that epoch respectively.
         """
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -66,6 +71,7 @@ class ExpConfig:
         self.rollback_if_F_decreases = rollback_if_F_decreases
         self.warmup_reco_epochs = warmup_reco_epochs
         self.reco_epochs = reco_epochs
+        self.keep_best_states = keep_best_states
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)

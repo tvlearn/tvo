@@ -186,11 +186,24 @@ class _TrainingAndOrValidation(Experiment):
 
             # log latest states and lpj to file
             states = getattr(self, f"{data_kind}_states")
+            K = gather_from_processes(states.K)
             states_and_lpj_dict = {
-                f"{log_kind}_states": gather_from_processes(states.K),
+                f"{log_kind}_states": K,
                 f"{log_kind}_lpj": gather_from_processes(states.lpj),
             }
             logger.set(**states_and_lpj_dict)
+
+            if self._conf.keep_best_states:
+                best_F_name = f"best_{log_kind}_F"
+                best_F = getattr(self, f"_{best_F_name}", None)
+                if best_F is None or F > best_F:
+                    assert isinstance(K, to.Tensor)  # to make mypy happy
+                    best_states_dict = {
+                        best_F_name: to.tensor(F),
+                        f"best_{log_kind}_states": K.clone(),
+                    }
+                    logger.set(**best_states_dict)
+                    setattr(self, f"_{best_F_name}", F)
 
             # log data reconstructions
             reco_dict = {}
