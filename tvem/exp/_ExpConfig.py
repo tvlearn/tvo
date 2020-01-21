@@ -20,6 +20,7 @@ class ExpConfig:
         warmup_reco_epochs: Iterable[int] = None,
         reco_epochs: Iterable[int] = None,
         keep_best_states: bool = False,
+        eval_F_at_epoch_end: bool = False,
     ):
         """Configuration object for Experiment classes.
 
@@ -61,6 +62,10 @@ class ExpConfig:
                                  and "best_*_states" (where * is one of "train", "valid", "test")
                                  corresponding to the best free energy value reached during training
                                  and the variational states at that epoch respectively.
+        :param eval_F_at_epoch_end: By default, the framework evaluates the model free energy batch
+                                    by batch during training, accumulating the values over the
+                                    course of the epoch. If this option is set to `True`, the free
+                                    energy will be evaluated at the end of each epoch instead.
         """
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -72,6 +77,7 @@ class ExpConfig:
         self.warmup_reco_epochs = warmup_reco_epochs
         self.reco_epochs = reco_epochs
         self.keep_best_states = keep_best_states
+        self.eval_F_at_epoch_end = eval_F_at_epoch_end
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)

@@ -108,6 +108,7 @@ class _TrainingAndOrValidation(Experiment):
             self.test_states,
             rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
             will_reconstruct=will_reconstruct,
+            eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
         )
         logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 

@@ -20,6 +20,7 @@ class Trainer:
         test_states: TVEMVariationalStates = None,
         rollback_if_F_decreases: Sequence[str] = [],
         will_reconstruct: bool = False,
+        eval_F_at_epoch_end: bool = False,
     ):
         """Train and/or test a given TVEMModel.
 
@@ -30,6 +31,10 @@ class Trainer:
         :param test_states: TVEMVariationalStates with shape (M,Z,H)
         :param rollback_if_F_decreases: see ExpConfig docs
         :param will_reconstruct: True if data will be reconstructed by the Trainer
+        :param eval_F_at_epoch_end: By default, the trainer evaluates the model free energy batch
+                                    by batch, accumulating the values over the course of the epoch.
+                                    If this option is set to `True`, the free energy will be
+                                    evaluated at the end of an epoch instead.
 
         Both train_data and train_states must be provided, or neither.
         The same holds for test_data and test_states.
@@ -59,6 +64,7 @@ class Trainer:
         self.test_data = test_data
         self.test_states = test_states
         self.will_reconstruct = will_reconstruct
+        self.eval_F_at_epoch_end = eval_F_at_epoch_end
         if train_data is not None:
             self.N_train = to.tensor(len(train_data.dataset))
             all_reduce(self.N_train)
@@ -193,16 +199,20 @@ class Trainer:
                         idx, train_states
                     )  # full data estimation
                 batch_F = model.update_param_batch(idx, batch, train_states)
-                if batch_F is None:
-                    batch_F = model.free_energy(idx, batch, train_states)
-                F += batch_F
+                if not self.eval_F_at_epoch_end:
+                    if batch_F is None:
+                        batch_F = model.free_energy(idx, batch, train_states)
+                    F += batch_F
             if len(self._to_rollback) > 0:
                 self._update_parameters_with_rollback()
             else:
                 model.update_param_epoch()
-            all_reduce(F)
+            if self.eval_F_at_epoch_end:
+                ret_dict.update(self.eval_free_energies())
+            else:
+                all_reduce(F)
+                ret_dict["train_F"] = F.item() / self.N_train
             all_reduce(subs)
-            ret_dict["train_F"] = F.item() / self.N_train
             ret_dict["train_subs"] = subs.item() / self.N_train
             if train_reconstruction is not None:
                 ret_dict["train_rec"] = train_reconstruction
