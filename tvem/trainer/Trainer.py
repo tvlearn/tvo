@@ -203,10 +203,7 @@ class Trainer:
                     if batch_F is None:
                         batch_F = model.free_energy(idx, batch, train_states)
                     F += batch_F
-            if len(self._to_rollback) > 0:
-                self._update_parameters_with_rollback()
-            else:
-                model.update_param_epoch()
+            self._update_parameters_with_rollback()
             if self.eval_F_at_epoch_end:
                 ret_dict.update(self.eval_free_energies())
             else:
@@ -266,6 +263,13 @@ class Trainer:
         return ret
 
     def _update_parameters_with_rollback(self) -> None:
+        """Update model parameters calling `update_param_epoch`, roll back if F decreases."""
+
+        if len(self._to_rollback) == 0:
+            # nothing to rollback, fall back to simple parameter update
+            self.model.update_param_epoch()
+            return
+
         m = self.model
         lpj_fn = m.log_joint if m.log_pseudo_joint is NotImplemented else m.log_pseudo_joint
 
