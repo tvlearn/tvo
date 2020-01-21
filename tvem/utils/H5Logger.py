@@ -54,7 +54,11 @@ class H5Logger:
                 for name, tensor in v.items():
                     append_to_dict(data[k], name, tensor)
             else:  # pragma: no cover
-                raise TypeError("Arguments must be torch.Tensors or dictionaries thereof.")
+                msg = (
+                    "Arguments must be torch.Tensors or dictionaries thereof "
+                    f"but '{k}' is {type(v)}."
+                )
+                raise TypeError(msg)
 
     def set(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
         """Set or reset arguments to desired value in log.
@@ -71,7 +75,11 @@ class H5Logger:
                 continue
 
             if not isinstance(v, to.Tensor) and not isinstance(v, dict):  # pragma: no cover
-                raise TypeError("Arguments must be torch.Tensors or dictionaries thereof.")
+                msg = (
+                    "Arguments must be torch.Tensors or dictionaries thereof "
+                    f"but '{k}' is {type(v)}."
+                )
+                raise TypeError(msg)
 
             self._data[k] = v
 
