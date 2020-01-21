@@ -8,7 +8,7 @@ import math
 import torch
 import torch.distributed as dist
 from torch import Tensor
-from typing import Iterable
+from typing import Iterable, Union
 
 import tvem
 
@@ -198,7 +198,7 @@ def _append_dummy_rows(tensor: Tensor, to_add: int, comm_rank: int, comm_size: i
     return tensor
 
 
-def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Iterable[Tensor]:
+def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Union[Tensor, Iterable[Tensor]]:
     """Gather tensors from process group.
 
     :param my_tensors: List of tensors to be gathered from local process on process dst.
