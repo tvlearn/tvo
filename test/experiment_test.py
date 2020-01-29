@@ -144,9 +144,17 @@ def warmup_Esteps(request):
     return request.param
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def exp_conf(precision, batch_size, warmup_Esteps):
-    return ExpConfig(batch_size=batch_size, warmup_Esteps=warmup_Esteps)
+    # randomly activate some toggle options
+    keep_best_states = np.random.rand() < 0.5
+    eval_F_at_epoch_end = np.random.rand() < 0.5
+    return ExpConfig(
+        batch_size=batch_size,
+        warmup_Esteps=warmup_Esteps,
+        keep_best_states=keep_best_states,
+        eval_F_at_epoch_end=eval_F_at_epoch_end,
+    )
 
 
 def check_file(fname, *prefixes: str):
