@@ -6,7 +6,7 @@
 # Run as `mpirun -n N bash run_mpi_tests.sh` where N is the desired number of processes.
 
 if [[ ! -v OMPI_COMM_WORLD_RANK ]]; then
-   echo 'Usage: mpirun -n <N> bash $0 [coverage_rank]' >&2
+   echo "Usage: mpirun -n <N> bash $0 [coverage_rank]" >&2
    echo 'coverage_rank: optionally, specify for which rank to record coverage information (default is 0)' >&2
    exit 1
 fi
