@@ -5,7 +5,7 @@
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC, TVAE, TVEMModel
-from tvem.utils.parallel import init_processes
+from tvem.utils.parallel import init_processes, broadcast
 from tvem.utils import get
 import tvem
 import os
@@ -147,8 +147,14 @@ def warmup_Esteps(request):
 @pytest.fixture(scope="function")
 def exp_conf(precision, batch_size, warmup_Esteps):
     # randomly activate some toggle options
-    keep_best_states = np.random.rand() < 0.5
-    eval_F_at_epoch_end = np.random.rand() < 0.5
+    keep_best_states = to.rand((1,))
+    broadcast(keep_best_states)
+    keep_best_states = (keep_best_states < 0.5).item()
+
+    eval_F_at_epoch_end = to.rand((1,))
+    broadcast(eval_F_at_epoch_end)
+    eval_F_at_epoch_end = (eval_F_at_epoch_end < 0.5).item()
+
     return ExpConfig(
         batch_size=batch_size,
         warmup_Esteps=warmup_Esteps,
