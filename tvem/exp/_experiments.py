@@ -198,12 +198,14 @@ class _TrainingAndOrValidation(Experiment):
                 best_F_name = f"best_{log_kind}_F"
                 best_F = getattr(self, f"_{best_F_name}", None)
                 if best_F is None or F > best_F:
-                    assert isinstance(K, to.Tensor)  # to make mypy happy
-                    best_states_dict = {
-                        best_F_name: to.tensor(F),
-                        f"best_{log_kind}_states": K.clone(),
-                    }
-                    logger.set(**best_states_dict)
+                    rank = dist.get_rank() if dist.is_initialized() else 0
+                    if rank == 0:
+                        assert isinstance(K, to.Tensor)  # to make mypy happy
+                        best_states_dict = {
+                            best_F_name: to.tensor(F),
+                            f"best_{log_kind}_states": K.clone(),
+                        }
+                        logger.set(**best_states_dict)
                     setattr(self, f"_{best_F_name}", F)
 
             # log data reconstructions
