@@ -203,7 +203,7 @@ class _TrainingAndOrValidation(Experiment):
                         assert isinstance(K, to.Tensor)  # to make mypy happy
                         best_states_dict = {
                             best_F_name: to.tensor(F),
-                            f"best_{log_kind}_states": K.clone(),
+                            f"best_{log_kind}_states": K.cpu().clone(),
                         }
                         logger.set(**best_states_dict)
                     setattr(self, f"_{best_F_name}", F)
