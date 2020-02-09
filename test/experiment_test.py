@@ -123,7 +123,7 @@ def batch_size(request):
 
 
 @pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE", "LogJointOnly"))
-def model_and_data(request, hyperparams, input_files, precision, estep_conf, batch_size):
+def model_and_data(request, hyperparams, input_files, precision):
     """Return a tuple of a TVEMModel and a filename (dataset for the model).
 
     Parametrized fixture, use it to test on several models.
@@ -221,13 +221,11 @@ def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_ma
     model, input_file = model_and_data
     if model.data_estimator is NotImplemented:
         return
-    from copy import deepcopy
 
-    _exp_conf = deepcopy(exp_conf)
-    _exp_conf.reco_epochs = range(10)
-    _exp_conf.warmup_Esteps = 0
+    exp_conf.reco_epochs = range(10)
+    exp_conf.warmup_Esteps = 0
     exp = Training(
-        _exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
+        exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
     )
     for log in exp.run(10):
         log.print()
