@@ -17,6 +17,7 @@ def make_var_states(
     conf: EStepConfig, N: int, H: int, precision: to.dtype
 ) -> Union[EEMVariationalStates, FullEM]:
     if isinstance(conf, FullEMConfig):
+        assert conf.n_states == 2 ** H, "FullEMConfig and model have different H"
         return FullEM(N, H, precision)
     elif isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, precision)
