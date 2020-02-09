@@ -21,6 +21,7 @@ class Trainer:
         rollback_if_F_decreases: Sequence[str] = [],
         will_reconstruct: bool = False,
         eval_F_at_epoch_end: bool = False,
+        data_transform: Callable[[to.Tensor], to.Tensor] = None,
     ):
         """Train and/or test a given TVEMModel.
 
@@ -35,6 +36,8 @@ class Trainer:
                                     by batch, accumulating the values over the course of the epoch.
                                     If this option is set to `True`, the free energy will be
                                     evaluated at the end of an epoch instead.
+        :param data_transform: A transformation to be applied to datapoints before they are passed
+                               to the model for training/evaluation.
 
         Both train_data and train_states must be provided, or neither.
         The same holds for test_data and test_states.
@@ -78,6 +81,7 @@ class Trainer:
             if self.will_reconstruct:
                 self.test_reconstruction = test_data.dataset.tensors[1].clone()
         self._to_rollback = rollback_if_F_decreases
+        self.data_transform = data_transform if data_transform is not None else lambda x: x
 
     @staticmethod
     def _do_e_step(
@@ -85,6 +89,7 @@ class Trainer:
         states: TVEMVariationalStates,
         model: TVEMModel,
         N: int,
+        data_transform,
         reconstruction: to.Tensor = None,
     ):
         if reconstruction is not None and model.data_estimator is NotImplemented:
@@ -95,6 +100,7 @@ class Trainer:
         subs = to.tensor(0)
         model.init_epoch()
         for idx, batch in data:
+            batch = data_transform(batch)
             model.init_batch()
             subs += states.update(idx, batch, model)
             F += model.free_energy(idx, batch, states)
@@ -132,7 +138,12 @@ class Trainer:
         if self.can_train:
             assert train_data is not None and train_states is not None  # to make mypy happy
             ret["train_F"], ret["train_subs"], train_rec = self._do_e_step(
-                train_data, train_states, model, self.N_train, train_reconstruction
+                train_data,
+                train_states,
+                model,
+                self.N_train,
+                self.data_transform,
+                train_reconstruction,
             )
             if train_rec is not None:
                 ret["train_rec"] = train_rec
@@ -141,7 +152,7 @@ class Trainer:
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
             ret["test_F"], ret["test_subs"], test_rec = self._do_e_step(
-                test_data, test_states, model, self.N_test, test_reconstruction
+                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
             )
             if test_rec is not None:
                 ret["test_rec"] = test_rec
@@ -193,6 +204,7 @@ class Trainer:
             subs = to.tensor(0)
             model.init_epoch()
             for idx, batch in train_data:
+                batch = self.data_transform(batch)
                 model.init_batch()
                 subs += train_states.update(idx, batch, model)
                 if train_reconstruction is not None:
@@ -218,7 +230,9 @@ class Trainer:
         # Validation/Testing #
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
-            res = self._do_e_step(test_data, test_states, model, self.N_test, test_reconstruction)
+            res = self._do_e_step(
+                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+            )
             ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
             if test_reconstruction is not None:
                 ret_dict["test_rec"] = test_reconstruction
@@ -245,6 +259,7 @@ class Trainer:
             F = to.tensor(0.0)
             m.init_epoch()
             for idx, batch in train_data:
+                batch = self.data_transform(batch)
                 m.init_batch()
                 train_states.lpj[idx] = lpj_fn(batch, train_states.K[idx])
                 F += m.free_energy(idx, batch, train_states)
@@ -257,6 +272,7 @@ class Trainer:
             F = to.tensor(0.0)
             m.init_epoch()
             for idx, batch in test_data:
+                batch = self.data_transform(batch)
                 m.init_batch()
                 test_states.lpj[idx] = lpj_fn(batch, test_states.K[idx])
                 F += m.free_energy(idx, batch, test_states)

@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import ExpConfig, EEMConfig, Training, Testing as _Testing
+from tvem.exp import ExpConfig, EEMConfig, FullEMConfig, Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC, TVAE, TVEMModel
 from tvem.utils.parallel import init_processes, broadcast
 from tvem.utils import get
@@ -16,6 +16,7 @@ import torch as to
 import torch.distributed as dist
 from munch import Munch
 from contextlib import suppress
+from tvem.trainer import Trainer
 
 
 class LogJointOnly(TVEMModel):
@@ -242,3 +243,19 @@ def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_ma
         f.close()
         assert train_reconstruction.shape == train_data.shape
         assert (train_reconstruction != train_data).any()
+
+
+def test_data_transform(model_and_data):
+    model, input_file = model_and_data
+    exp_conf = ExpConfig(data_transform=lambda x: to.zeros_like(x))
+    estep_conf = FullEMConfig(n_latents=model.shape[1])
+    exp = _Testing(exp_conf, estep_conf, model, input_file)
+    with h5py.File(input_file, "r") as f:
+        data = to.from_numpy(f["data"][...])
+    zeros = to.zeros_like(data).to(model.precision if data.dtype is not to.uint8 else to.uint8)
+    t = Trainer(model, test_data=zeros, test_states=exp.test_states)
+    model_F_for_zeros = t.eval_free_energies()["test_F"]
+    print(model_F_for_zeros)
+    for log in exp.run(1):
+        log.print()
+        assert log._results["test_F"] == model_F_for_zeros

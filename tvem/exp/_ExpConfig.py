@@ -4,7 +4,8 @@
 
 import os
 
-from typing import Iterable, Sequence, Dict, Any
+from typing import Iterable, Sequence, Dict, Any, Callable
+import torch as to
 
 
 class ExpConfig:
@@ -21,6 +22,7 @@ class ExpConfig:
         reco_epochs: Iterable[int] = None,
         keep_best_states: bool = False,
         eval_F_at_epoch_end: bool = False,
+        data_transform: Callable[[to.Tensor], to.Tensor] = None,
     ):
         """Configuration object for Experiment classes.
 
@@ -66,6 +68,8 @@ class ExpConfig:
                                     by batch during training, accumulating the values over the
                                     course of the epoch. If this option is set to `True`, the free
                                     energy will be evaluated at the end of each epoch instead.
+        :param data_transform: A transformation to be applied to datapoints before they are passed
+                               to the model for training or evaluation.
         """
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -78,6 +82,7 @@ class ExpConfig:
         self.reco_epochs = reco_epochs
         self.keep_best_states = keep_best_states
         self.eval_F_at_epoch_end = eval_F_at_epoch_end
+        self.data_transform = data_transform
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
