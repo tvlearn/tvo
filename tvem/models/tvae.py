@@ -258,7 +258,7 @@ class TVAE(TVEMModel):
         :returns: F and mlp_output _before_ the weight update
         """
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
-        F = self._free_energy_from_logjoints(self.log_joint(data, states, lpj))
+        F = self._free_energy_from_logjoints(self.log_joint(data, states.K[idx], lpj))
         loss = -F / data.shape[0]
         loss.backward()
 
