@@ -145,7 +145,7 @@ def update_states_for_batch(
     return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
 
 
-def _lpj2pjc(lpj: to.Tensor):
+def lpj2pjc(lpj: to.Tensor):
     """Shift log-pseudo-joint and convert log- to actual probability
 
     :param lpj: log-pseudo-joint tensor
@@ -164,7 +164,7 @@ def _mean_post_einsum(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
     :param lpj: Log-pseudo-joint with shape (N,S).
     :returns: tensor with shape (N,...).
     """
-    return to.einsum("ns...,ns->n...", (g, _lpj2pjc(lpj)))
+    return to.einsum("ns...,ns->n...", (g, lpj2pjc(lpj)))
 
 
 def _mean_post_mul(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
@@ -176,7 +176,7 @@ def _mean_post_mul(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
     """
     # reshape lpj from (N,S) to (N,S,1,...), to match dimensionality of g
     lpj = lpj.view(*lpj.shape, *(1 for _ in range(g.ndimension() - 2)))
-    return _lpj2pjc(lpj).mul(g).sum(dim=1)
+    return lpj2pjc(lpj).mul(g).sum(dim=1)
 
 
 def mean_posterior(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
