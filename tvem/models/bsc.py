@@ -11,7 +11,7 @@ from typing import Dict, Tuple, Any
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
-from tvem.variational._utils import mean_posterior
+from tvem.variational._utils import mean_posterior, _lpj2pjc as lpj2pjc
 from tvem.models.TVEMModel import TVEMModel
 from tvem.utils.sanity import fix_theta
 
@@ -192,7 +192,7 @@ class BSC(TVEMModel):
         ].unsqueeze(
             1
         )  # is (batch_size,D,H)
-        Kq = Kfloat.mul(tvem.variational._utils._lpj2pjc(lpj)[:, :, None])
+        Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
         storage["batch_Wq"][:, :] = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
         storage["batch_sigma"][:batch_size] = mean_posterior(
             to.sum(
