@@ -1,6 +1,7 @@
 from typing_extensions import Protocol, runtime_checkable
 from typing import Tuple, Dict, Any, Optional, Union, TYPE_CHECKING
 import torch as to
+from abc import abstractmethod
 
 if TYPE_CHECKING:
     from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
@@ -14,6 +15,7 @@ class Trainable(Protocol):
     Provides default implementation of free_energy.
     """
 
+    @abstractmethod
     def log_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
 
@@ -104,6 +106,7 @@ class Trainable(Protocol):
 class Optimized(Trainable, Protocol):
     """Additionally implements log_pseudo_joint, init_storage, init_batch, init_epoch."""
 
+    @abstractmethod
     def log_joint(self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
 
@@ -116,6 +119,7 @@ class Optimized(Trainable, Protocol):
         """
         ...
 
+    @abstractmethod
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """Evaluate log-pseudo-joint probabilities for this model.
 
@@ -156,7 +160,7 @@ class Optimized(Trainable, Protocol):
         Concrete models can optionally override this method if it's convenient.
         By default, it does nothing.
         """
-        ...
+        pass
 
     def init_epoch(self) -> None:
         """This method is called once at the beginning of each training epoch.
@@ -164,11 +168,11 @@ class Optimized(Trainable, Protocol):
         Concrete models can optionally override this method if it's convenient.
         By default, it does nothing.
         """
-        ...
+        pass
 
     def init_batch(self) -> None:
         """Model-specific initializations per batch."""
-        ...
+        pass
 
     @property
     def sorted_by_lpj(self) -> Dict[str, to.Tensor]:
@@ -187,6 +191,7 @@ class Optimized(Trainable, Protocol):
 class Sampler(Protocol):
     """Implements generate_data (hidden_state is an optional parameter)."""
 
+    @abstractmethod
     def generate_data(
         self, N: int, hidden_state: to.Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
@@ -207,6 +212,7 @@ class Sampler(Protocol):
 class Reconstructor(Protocol):
     """Implements data_estimator."""
 
+    @abstractmethod
     def data_estimator(self, idx: to.Tensor, states: "TVEMVariationalStates") -> to.Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
