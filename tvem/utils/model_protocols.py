@@ -100,9 +100,17 @@ class Trainable(Protocol):
     def precision(self) -> to.dtype:
         """The floating point precision the model works at (either to.float32 or to.float64).
 
-        The default implementation returns self._precision.
+        The default implementation returns self._precision or, if not present, the precision of
+        model parameters self.theta (expected to be identical for all floating point parameters).
         """
-        return getattr(self, "_precision")
+        if hasattr(self, "_precision"):
+            return getattr(self, "_precision")
+        assert len(self.theta) != 0
+        prec: to.dtype = None
+        for dt in (p.dtype for p in self.theta.values() if p.dtype.is_floating_point):
+            assert prec is None or dt == prec
+            prec = dt
+        return prec
 
 
 @runtime_checkable
