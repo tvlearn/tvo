@@ -72,13 +72,22 @@ class Trainable(Protocol):
 
     @property
     def shape(self) -> Tuple[int, ...]:
-        """The model shape.
+        """The model shape, i.e. number of observables D and latents H as tuple (D,H)
 
-        :returns: the model shape, observable layer followed by the hidden layers: (D, H1, H2, ...)
+        :returns: the model shape: observable layer size followed by hidden layer size, e.g. (D, H)
 
-        The default implementation returns self._shape.
+        The default implementation returns self._shape if present, otherwise it tries to infer the
+        model's shape from the parameters self.theta: the number of latents is assumed to be equal
+        to the first dimension of the first tensor in self.theta, and the number of observables is
+        assumed to be equal to the last dimension of the last parameter in self.theta.
         """
-        return getattr(self, "_shape")
+        if hasattr(self, "_shape"):
+            return getattr(self, "_shape")
+        assert (
+            len(self.theta) != 0
+        ), "Cannot infer the model shape from self.theta and self._shape is not defined"
+        th = list(self.theta.values())
+        return (th[-1].shape[-1], th[0].shape[0])
 
     @property
     def config(self) -> Dict[str, Any]:

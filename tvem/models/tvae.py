@@ -55,13 +55,13 @@ class TVAE(Trainable, Sampler, Reconstructor):
         self._net_shape = self._get_net_shape(shape, W_init)
         self.W = self._init_W(W_init)
         self.b = self._init_b(b_init)
-        self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
-        self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
         H0 = self._net_shape[0]
         self._theta["pies"] = self._init_pi(pi_init, H0, requires_grad=not analytical_pi_updates)
         self._theta["sigma2"] = self._init_sigma2(
             sigma2_init, requires_grad=not analytical_sigma_updates
         )
+        self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
+        self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
         self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
 
         gd_parameters = self.W + self.b
