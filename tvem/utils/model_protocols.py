@@ -15,6 +15,8 @@ class Trainable(Protocol):
     Provides default implementation of free_energy.
     """
 
+    _theta: Dict[str, to.Tensor]
+
     @abstractmethod
     def log_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
@@ -91,7 +93,7 @@ class Trainable(Protocol):
 
         The default implementation returns self._theta.
         """
-        return getattr(self, "_theta")
+        return self._theta
 
     @property
     def precision(self) -> to.dtype:
