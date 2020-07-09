@@ -33,7 +33,7 @@ class Trainable(Protocol):
     ) -> Optional[float]:
         """Execute batch-wise M-step or batch-wise section of an M-step computation.
 
-        :param idx: indeces of the datapoints that compose the batch within the dataset
+        :param idx: indexes of the datapoints that compose the batch within the dataset
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all variational states for this dataset
         :param mstep_factors: optional dictionary containing the Tensors that were evaluated\
@@ -59,7 +59,7 @@ class Trainable(Protocol):
     ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
-        :param idx: indeces of the datapoints in batch within the full dataset
+        :param idx: indexes of the datapoints in batch within the full dataset
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all TVEMVariationalStates states for this dataset
 
@@ -133,7 +133,7 @@ class Optimized(Trainable, Protocol):
         :param data: shape is (N,D)
         :param states: shape is (N,S,H)
         :param lpj: shape is (N,S). When lpj is not None it must contain pre-evaluated
-                    log-pseudo joints for the given data and statss. The implementation can take
+                    log-pseudo joints for the given data and stats. The implementation can take
                     advantage of the extra argument to save computation.
         :returns: log-joints for data and states - shape is (N,S)
         """
@@ -160,7 +160,7 @@ class Optimized(Trainable, Protocol):
     ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
-        :param idx: indeces of the datapoints in batch within the full dataset
+        :param idx: indexes of the datapoints in batch within the full dataset
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all TVEMVariationalStates states for this dataset
 
@@ -202,7 +202,7 @@ class Optimized(Trainable, Protocol):
         log-pseudo-joints are during an E-step.
         Tensors must have shapes (batch_size, S, ...) where S is the number of variational
         states per datapoint used during training.
-        By default the dictionary is empy. Concrete models can override this property if need be.
+        By default the dictionary is empty. Concrete models can override this property if need be.
         """
         return {}
 
@@ -222,7 +222,7 @@ class Sampler(Protocol):
                              first latent layer.
         :returns: if hidden_state was not provided, a tuple (data, hidden_state) where data is
                   a Tensor with shape (N, D) where D is the number of observables for this model
-                  and hidden_state is a the corresponding tensor of hidden variables with shape
+                  and hidden_state is the corresponding tensor of hidden variables with shape
                   (N, H) where H is the number of hidden variables for this model.
         """
         ...
