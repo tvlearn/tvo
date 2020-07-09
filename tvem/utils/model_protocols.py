@@ -16,6 +16,7 @@ class Trainable(Protocol):
     """
 
     _theta: Dict[str, to.Tensor]
+    _config: Dict[str, Any] = {}
 
     @abstractmethod
     def log_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
@@ -85,7 +86,7 @@ class Trainable(Protocol):
 
         The default implementation returns self._config.
         """
-        return getattr(self, "_config")
+        return self._config
 
     @property
     def theta(self) -> Dict[str, to.Tensor]:
