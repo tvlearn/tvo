@@ -6,9 +6,9 @@
 
 # FIXME switch back when we go back to self-hosted runners
 image: registry.gitlab.com/mloldenburg/tvem
-#before_script:
-#    - source /home/gitlab-runner/anaconda3/etc/profile.d/conda.sh
-#    - conda activate tvem
+before_script:
+    - source /opt/conda/etc/profile.d/conda.sh
+    - conda activate tvem
 
 test:
   stage: test
