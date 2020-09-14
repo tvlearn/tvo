@@ -4,9 +4,11 @@
 # Documentation generation with sphinx additionally requires
 # `conda install -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints`
 
-before_script:
-    - source /home/gitlab-runner/anaconda3/etc/profile.d/conda.sh
-    - conda activate tvem
+# FIXME switch back when we go back to self-hosted runners
+image: registry.gitlab.com/mloldenburg/tvem
+#before_script:
+#    - source /home/gitlab-runner/anaconda3/etc/profile.d/conda.sh
+#    - conda activate tvem
 
 test:
   stage: test
@@ -24,7 +26,8 @@ test:
     # CPU tests
     - pytest --cov=tvem -v test
     # GPU tests
-    - env TVEM_GPU=0 pytest --cov=tvem --cov-append -v -m gpu test
+    # FIXME: re-enable when we go back to self-hosted runners
+    #- env TVEM_GPU=0 pytest --cov=tvem --cov-append -v -m gpu test
     # mpi tests (force a timeout because mpi might hang in case of python runtime errors)
     # FIXME: re-enable when we have a working pytorch+MPI environment
     # - module load python/3.6.4-ompi
