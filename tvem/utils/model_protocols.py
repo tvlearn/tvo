@@ -133,7 +133,7 @@ class Optimized(Trainable, Protocol):
         :param data: shape is (N,D)
         :param states: shape is (N,S,H)
         :param lpj: shape is (N,S). When lpj is not None it must contain pre-evaluated
-                    log-pseudo joints for the given data and stats. The implementation can take
+                    log-pseudo joints for the given data and states. The implementation can take
                     advantage of the extra argument to save computation.
         :returns: log-joints for data and states - shape is (N,S)
         """
