@@ -245,7 +245,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
         self._train_datapoints[:] = 0
 
     def generate_data(
-        self, N: int, hidden_state: to.Tensor = None
+        self, N: int = None, hidden_state: to.Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
         H = self.shape[-1]
         if hidden_state is None:
@@ -253,8 +253,9 @@ class TVAE(Trainable, Sampler, Reconstructor):
             hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
             must_return_hidden_state = True
         else:
-            shape = hidden_state.shape
-            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            if N is not None:
+                shape = hidden_state.shape
+                assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         with to.no_grad():

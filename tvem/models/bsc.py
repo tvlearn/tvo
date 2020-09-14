@@ -107,7 +107,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         return {"batch_Wbar": self.storage["batch_Wbar"]}
 
     def generate_data(
-        self, N: int, hidden_state: to.Tensor = None
+        self, N: int = None, hidden_state: to.Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
         theta = self.theta
         W = theta["W"]
@@ -118,8 +118,9 @@ class BSC(Optimized, Sampler, Reconstructor):
             hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
             must_return_hidden_state = True
         else:
-            shape = hidden_state.shape
-            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            if N is not None:
+                shape = hidden_state.shape
+                assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         precision, device = W.dtype, W.device

@@ -162,7 +162,7 @@ class NoisyOR(Optimized, Sampler):
         return to.sum(to.log(1 - pi)) + lpj
 
     def generate_data(
-        self, N: int, hidden_state: Tensor = None
+        self, N: int = None, hidden_state: Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
         """Use hidden states to sample datapoints according to the NoisyOR generative model.
 
@@ -179,8 +179,9 @@ class NoisyOR(Optimized, Sampler):
             hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
             must_return_hidden_state = True
         else:
-            shape = hidden_state.shape
-            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            if N is not None:
+                shape = hidden_state.shape
+                assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)

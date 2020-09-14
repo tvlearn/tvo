@@ -213,12 +213,12 @@ class Sampler(Protocol):
 
     @abstractmethod
     def generate_data(
-        self, N: int, hidden_state: to.Tensor = None
+        self, N: int = None, hidden_state: to.Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
-        """Sample N datapoints from this model.
+        """Sample N datapoints from this model. At least one of N or hidden_state must be provided.
 
         :param N: number of data points to be generated.
-        :param hidden_state: optional Tensor with shape (N,H) where H is the number of units in the
+        :param hidden_state: Tensor with shape (N,H) where H is the number of units in the
                              first latent layer.
         :returns: if hidden_state was not provided, a tuple (data, hidden_state) where data is
                   a Tensor with shape (N, D) where D is the number of observables for this model
