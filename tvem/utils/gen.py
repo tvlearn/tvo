@@ -10,7 +10,7 @@ def generate_bars(
     add_unit: float = None,
     precision: to.dtype = to.float64,
 ):
-    """ Generate a ground-truth dictionary W suitable for a std. bars test
+    """Generate a ground-truth dictionary W suitable for a std. bars test
 
     Creates H bases vectors with horizontal and vertival bars on a R*R pixel grid,
     (wth R = H // 2).

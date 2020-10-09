@@ -278,7 +278,7 @@ def batch_randflip(
 def batch_sparseflip(
     parents: Tensor, n_children: int, sparsity: Optional[float], p_bf: Optional[float]
 ) -> Tensor:
-    """ Take a set of parent bitstrings, generate n_children new bitstrings
+    """Take a set of parent bitstrings, generate n_children new bitstrings
         by performing bitflips on each of the parents.
 
     :param parents: Tensor with shape (N, n_parents, H)
@@ -553,7 +553,7 @@ def cross(parents: Tensor) -> Tensor:
 def sparseflip(
     parents: Tensor, n_children: int, sparsity: Optional[float], p_bf: Optional[float]
 ) -> Tensor:
-    """ Take a set of parent bitstrings, generate n_children new bitstrings
+    """Take a set of parent bitstrings, generate n_children new bitstrings
         by performing bitflips on each of the parents.
 
     The returned object has shape(parents.shape[0]*n_children,
