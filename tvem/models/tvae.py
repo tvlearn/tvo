@@ -100,17 +100,18 @@ class TVAE(TVEMModel):
     def _init_W(self, init: Optional[Sequence[to.Tensor]]) -> List[to.Tensor]:
         """Return weights initialized with Xavier or to specified init values.
 
-        This method also makes sure that device and precision are the ones required by the model.
+        This method also makes sure that device and precision are the ones required by
+        the model.
         """
         shape = self._net_shape
         if init is None:
             n_layers = len(shape) - 1
-            W_shapes = ((shape[l], shape[l + 1]) for l in range(n_layers))
+            W_shapes = ((shape[ln], shape[ln + 1]) for ln in range(n_layers))
             W = list(map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes)))
         else:
             assert len(init) == len(shape) - 1, f"Shape is {shape} but {len(init)} weights passed"
             Wshapes = [w.shape for w in init]
-            expected_Wshapes = [(shape[l], shape[l + 1]) for l in range(len(init))]
+            expected_Wshapes = [(shape[ln], shape[ln + 1]) for ln in range(len(init))]
             err_msg = f"Input W shapes: {Wshapes}\nExpected W shapes {expected_Wshapes}"
             assert all(ws == exp_s for ws, exp_s in zip(Wshapes, expected_Wshapes)), err_msg
             W = list(w.clone() for w in init)
@@ -128,7 +129,7 @@ class TVAE(TVEMModel):
         if init is None:
             B = [to.zeros(s) for s in self._net_shape[1:]]
         else:
-            assert all(b.shape == (self._net_shape[l + 1],) for l, b in enumerate(init))
+            assert all(b.shape == (self._net_shape[ln + 1],) for ln, b in enumerate(init))
             B = [b.clone() for b in init]
         return [
             b.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for b in B

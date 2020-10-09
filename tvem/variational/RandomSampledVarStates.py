@@ -28,7 +28,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
         self.sparsity = sparsity
 
     def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
-        """See :func:`TVEMVariationalStates.update <tvem.variational.TVEMVariationalStates.update>`."""
+        """See :func:`tvem.variational.TVEMVariationalStates.update`."""
         lpj_fn = (
             model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
         )
