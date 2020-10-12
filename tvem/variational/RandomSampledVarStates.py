@@ -26,7 +26,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
         self.sparsity = sparsity
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
-        """See :func:`TVEMVariationalStates.update <tvem.variational.TVEMVariationalStates.update>`."""
+        """See :func:`tvem.variational.TVEMVariationalStates.update`."""
         if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
             sort_by_lpj = model.sorted_by_lpj
