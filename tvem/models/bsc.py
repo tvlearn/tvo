@@ -114,13 +114,15 @@ class BSC(Optimized, Sampler, Reconstructor):
         D, H = W.shape
 
         if hidden_state is None:
+            assert N is not None
             pies = theta["pies"]
             hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
             must_return_hidden_state = True
         else:
-            if N is not None:
-                shape = hidden_state.shape
-                assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            shape = hidden_state.shape
+            if N is None:
+                N = shape[0]
+            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         precision, device = W.dtype, W.device
