@@ -147,7 +147,7 @@ class BSC(TVEMModel):
         """Reset counter for how many states tensors in sorted_by_lpj have been evaluated."""
         self.storage["indS_filled"] = 0
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
+    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
         """Evaluate log-pseudo-joints for BSC."""
         batch_size, S, _ = states.shape
         indS_filled = self.storage["indS_filled"]
@@ -246,7 +246,7 @@ class BSC(TVEMModel):
     def shape(self) -> Tuple[int, ...]:
         return self.theta["W"].shape
 
-    def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:
+    def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:  # type: ignore
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
         as follows:""" r"""

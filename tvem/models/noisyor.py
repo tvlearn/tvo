@@ -63,7 +63,7 @@ class NoisyOR(TVEMModel):
         # number of datapoints processed in a training epoch
         self._train_datapoints = to.tensor([0], dtype=to.int, device=device)
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:
+    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
         """Evaluate log-pseudo-joints for NoisyOR."""
         K = states
         Y = data

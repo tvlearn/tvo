@@ -77,9 +77,10 @@ class EEMVariationalStates(TVEMVariationalStates):
 
     def update(self, idx: Tensor, batch: Tensor, model: "TVEMModel") -> int:
 
-        lpj_fn = (
-            model.log_joint if model.log_pseudo_joint is NotImplemented else model.log_pseudo_joint
-        )
+        if model.log_pseudo_joint is NotImplemented:
+            lpj_fn: Callable = model.log_joint
+        else:
+            lpj_fn = model.log_pseudo_joint
         sort_by_lpj = model.sorted_by_lpj
         K = self.K
         lpj = self.lpj

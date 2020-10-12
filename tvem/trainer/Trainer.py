@@ -6,7 +6,7 @@ from tvem.models import TVEMModel
 from tvem.variational import TVEMVariationalStates
 from tvem.utils.data import TVEMDataLoader
 from tvem.utils.parallel import all_reduce
-from typing import Dict, Any, Sequence, Union
+from typing import Dict, Any, Sequence, Union, Callable
 import torch as to
 
 
@@ -99,7 +99,8 @@ class Trainer:
             subs += states.update(idx, batch, model)
             F += model.free_energy(idx, batch, states)
             if reconstruction is not None:
-                reconstruction[idx] = model.data_estimator(idx, states)  # full data estimation
+                # full data estimation
+                reconstruction[idx] = model.data_estimator(idx, states)  # type: ignore
         all_reduce(F)
         all_reduce(subs)
         return F.item() / N, subs.item() / N, reconstruction
@@ -195,7 +196,7 @@ class Trainer:
                 model.init_batch()
                 subs += train_states.update(idx, batch, model)
                 if train_reconstruction is not None:
-                    train_reconstruction[idx] = model.data_estimator(
+                    train_reconstruction[idx] = model.data_estimator(  # type:ignore
                         idx, train_states
                     )  # full data estimation
                 batch_F = model.update_param_batch(idx, batch, train_states)
@@ -233,7 +234,10 @@ class Trainer:
         m = self.model
         train_data, train_states = self.train_data, self.train_states
         test_data, test_states = self.test_data, self.test_states
-        lpj_fn = m.log_joint if m.log_pseudo_joint is NotImplemented else m.log_pseudo_joint
+        if m.log_pseudo_joint is NotImplemented:
+            lpj_fn: Callable = m.log_joint
+        else:
+            lpj_fn = m.log_pseudo_joint
         ret = {}
 
         if self.can_train:
@@ -271,7 +275,10 @@ class Trainer:
             return
 
         m = self.model
-        lpj_fn = m.log_joint if m.log_pseudo_joint is NotImplemented else m.log_pseudo_joint
+        if m.log_pseudo_joint is NotImplemented:
+            lpj_fn: Callable = m.log_joint
+        else:
+            lpj_fn = m.log_pseudo_joint
 
         assert self.train_data is not None and self.train_states is not None  # to make mypy happy
         all_data = self.train_data.dataset.tensors[1]

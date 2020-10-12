@@ -149,7 +149,7 @@ class TVAE(TVEMModel):
             requires_grad
         )
 
-    def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
+    def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:  # type: ignore
         with to.no_grad():
             lpj, _ = self._lpj_and_mlpout(data, states)
         return lpj
@@ -324,7 +324,7 @@ class TVAE(TVEMModel):
                 all_reduce(p.grad)
                 p.grad /= n_procs
 
-    def data_estimator(self, idx: to.Tensor, states: TVEMVariationalStates) -> to.Tensor:
+    def data_estimator(self, idx: to.Tensor, states: TVEMVariationalStates):  # type: ignore
         r"""
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
         """
