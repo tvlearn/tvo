@@ -285,6 +285,8 @@ class TVAE(Trainable, Sampler, Reconstructor):
 
         :returns: F and mlp_output _before_ the weight update
         """
+        assert self._optimizer is not None  # to make mypy happy
+
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
         F = self._free_energy_from_logjoints(self.log_joint(data, states.K[idx], lpj))
         loss = -F / data.shape[0]

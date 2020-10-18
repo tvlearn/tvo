@@ -234,12 +234,13 @@ class Trainer:
             batch = self.data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
-            subs += train_states.update(idx, batch, model)
-            if train_reconstruction is not None:
-                assert isinstance(model, Reconstructor)
-                train_reconstruction[idx] = model.data_estimator(
-                    idx, train_states
-                )  # full data estimation
+            with to.no_grad():
+                subs += train_states.update(idx, batch, model)
+                if train_reconstruction is not None:
+                    assert isinstance(model, Reconstructor)
+                    train_reconstruction[idx] = model.data_estimator(
+                        idx, train_states
+                    )  # full data estimation
             batch_F = model.update_param_batch(idx, batch, train_states)
             if not self.eval_F_at_epoch_end:
                 if batch_F is None:

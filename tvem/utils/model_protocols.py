@@ -17,6 +17,7 @@ class Trainable(Protocol):
 
     _theta: Dict[str, to.Tensor]
     _config: Dict[str, Any] = {}
+    _optimizer: Optional[to.optim.Optimizer] = None
 
     @abstractmethod
     def log_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
@@ -43,7 +44,20 @@ class Trainable(Protocol):
         evaluated _before_ the model parameter update. If the batch's free energy is returned here,
         Trainers will skip a direct per-batch call to the free_energy method.
         """
-        ...
+        # by default, perform gradient-based parameter updates
+        if self._optimizer is None:
+            for t in self._theta.values():
+                t.requires_grad_(True)
+            self._optimizer = to.optim.Adam(self._theta.values())
+        assert self._optimizer is not None  # to make mypy happy
+        log_joints = self.log_joint(batch, states.K)
+        F = to.logsumexp(log_joints, dim=1).sum(dim=0)
+        loss = -F / batch.shape[0]
+        loss.backward()
+        self._optimizer.step()
+        self._optimizer.zero_grad()
+
+        return F.item()
 
     def update_param_epoch(self) -> None:
         """Execute epoch-wise M-step or epoch-wise section of an M-step computation.
@@ -52,7 +66,8 @@ class Trainable(Protocol):
         Implementing this method is optional: models can leave the body empty (just a `pass`)
         or even not implement it at all.
         """
-        ...
+        # by default, do nothing
+        pass
 
     def free_energy(
         self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
@@ -137,7 +152,7 @@ class Optimized(Trainable, Protocol):
                     advantage of the extra argument to save computation.
         :returns: log-joints for data and states - shape is (N,S)
         """
-        ...
+        raise NotImplementedError
 
     @abstractmethod
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
@@ -167,7 +182,8 @@ class Optimized(Trainable, Protocol):
         .. note::
         This default implementation of free_energy is only appropriate for Optimized models.
         """
-        log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx])
+        with to.no_grad():
+            log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx])
         return to.logsumexp(log_joints, dim=1).sum(dim=0).item()
 
     def init_storage(self, S: int, Snew: int, batch_size: int) -> None:
