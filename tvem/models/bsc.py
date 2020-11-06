@@ -6,7 +6,7 @@ import math
 import torch as to
 
 from torch import Tensor
-from typing import Dict, Union, Tuple
+from typing import Union, Tuple
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
@@ -25,7 +25,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         H: int,
         D: int,
         W_init: Tensor = None,
-        sigma_init: Tensor = None,
+        sigma2_init: Tensor = None,
         pies_init: Tensor = None,
         precision: to.dtype = to.float64,
     ):
@@ -57,13 +57,13 @@ class BSC(Optimized, Sampler, Reconstructor):
         else:
             pies_init = to.full((H,), 1.0 / H, dtype=precision, device=device)
 
-        if sigma_init is not None:
-            assert sigma_init.shape == (1,)
-            sigma_init = sigma_init.to(dtype=precision, device=device)
+        if sigma2_init is not None:
+            assert sigma2_init.shape == (1,)
+            sigma2_init = sigma2_init.to(dtype=precision, device=device)
         else:
-            sigma_init = to.tensor([1.0], dtype=precision, device=device)
+            sigma2_init = to.tensor([1.0], dtype=precision, device=device)
 
-        self._theta = {"pies": pies_init, "W": W_init, "sigma": sigma_init}
+        self._theta = {"pies": pies_init, "W": W_init, "sigma2": sigma2_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
             "W": [None, to.full_like(self._theta["W"], -inf), to.full_like(self._theta["W"], inf)],
@@ -72,51 +72,127 @@ class BSC(Optimized, Sampler, Reconstructor):
                 to.full_like(self._theta["pies"], eps),
                 to.full_like(self._theta["pies"], 1.0 - eps),
             ],
-            "sigma": [
+            "sigma2": [
                 None,
-                to.full_like(self._theta["sigma"], eps),
-                to.full_like(self._theta["sigma"], inf),
+                to.full_like(self._theta["sigma2"], eps),
+                to.full_like(self._theta["sigma2"], inf),
             ],
         }
-        self._config = dict(H=H, D=D, precision=self.precision, device=device)
+
+        self.my_Wp = to.zeros((D, H), dtype=precision, device=device)
+        self.my_Wq = to.zeros((H, H), dtype=precision, device=device)
+        self.my_pies = to.zeros(H, dtype=precision, device=device)
+        self.my_sigma2 = to.zeros(1, dtype=precision, device=device)
+        self.my_N = to.tensor([0], dtype=to.int, device=device)
+        self._config = dict(H=H, D=D, precision=precision, device=device)
         self._shape = self.theta["W"].shape
 
-    def init_storage(self, S: int, Snew: int, batch_size: int):
-        """Allocate tensors used in E- and M-step."""
-        device = tvem.get_device()
-        precision = self.precision
-        D, H = self._theta["W"].shape
-        self.storage = {
-            "my_Wp": to.empty((D, H), dtype=precision, device=device),
-            "my_Wq": to.empty((H, H), dtype=precision, device=device),
-            "my_pies": to.empty(H, dtype=precision, device=device),
-            "my_sigma": to.empty(1, dtype=precision, device=device),
-            "pil_bar": to.empty(H, dtype=precision, device=device),
-            "WT": to.empty((H, D), dtype=precision, device=device),
-            "batch_Wbar": to.empty((batch_size, S + Snew, D), dtype=precision, device=device),
-            "batch_s_pjc": to.empty((batch_size, H), dtype=precision, device=device),
-            "batch_Wp": to.empty((batch_size, D, H), dtype=precision, device=device),
-            "batch_Wq": to.empty((H, H), dtype=precision, device=device),
-            "batch_sigma": to.empty((batch_size,), dtype=precision, device=device),
-            "indS_filled": 0,
-            "my_N": to.tensor([0], dtype=to.int, device=device),
-        }
+    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
+        """Evaluate log-pseudo-joints for BSC."""
+        Kfloat = states.to(
+            dtype=self.theta["W"].dtype
+        )  # TODO Find solution to avoid byte->float casting
+        Wbar = to.matmul(
+            Kfloat, self.theta["W"].t()
+        )  # TODO Pre-allocate tensor and use `out` argument of to.matmul
+        lpj = to.mul(
+            to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
+        ) + to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
+        return lpj.to(device=states.device)
+
+    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
+        """Evaluate log-joints for BSC."""
+        if lpj is None:
+            lpj = self.log_pseudo_joint(data, states)
+        D = self.shape[0]
+        return (
+            lpj
+            + to.log(1 - self.theta["pies"]).sum()
+            - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
+        )
+
+    def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
+        lpj = states.lpj[idx]
+        K = states.K[idx]
+        batch_size, S, _ = K.shape
+
+        Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
+        Wbar = to.matmul(
+            Kfloat, self.theta["W"].t()
+        )  # TODO Find solution to re-use evaluations from E-step
+
+        batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
+        batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
+        Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
+        batch_Wq = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
+        batch_sigma2 = mean_posterior(
+            to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
+        )  # is (batch_size,)
+
+        self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
+        self.my_Wp.add_(to.sum(batch_Wp, dim=0))
+        self.my_Wq.add_(batch_Wq)
+        self.my_sigma2.add_(to.sum(batch_sigma2))
+        self.my_N.add_(batch_size)
+
+        return None
+
+    def update_param_epoch(self) -> None:
+        theta = self.theta
+        policy = self.policy
+
+        all_reduce(self.my_Wp)
+        all_reduce(self.my_Wq)
+        all_reduce(self.my_pies)
+        all_reduce(self.my_sigma2)
+        all_reduce(self.my_N)
+
+        N = self.my_N.item()
+        D = self.shape[0]
+
+        # Calculate updated W
+        Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
+        broadcast(Wold_noisy)
+        theta_new = {}
+        try:
+            theta_new["W"] = lstsq(self.my_Wp.t(), self.my_Wq)[0].t()
+        except RuntimeError:
+            pprint("Inversion error. Will not update W but add some noise instead.")
+            theta_new["W"] = Wold_noisy
+
+        # Calculate updated pi
+        theta_new["pies"] = self.my_pies / N
+
+        # Calculate updated sigma^2
+        theta_new["sigma2"] = self.my_sigma2 / N / D
+
+        policy["W"][0] = Wold_noisy
+        policy["pies"][0] = theta["pies"]
+        policy["sigma2"][0] = theta["sigma2"]
+        fix_theta(theta_new, policy)
+        for key in theta:
+            theta[key] = theta_new[key]
+
+        self.my_Wp[:] = 0.0
+        self.my_Wq[:] = 0.0
+        self.my_pies[:] = 0.0
+        self.my_sigma2[:] = 0.0
+        self.my_N[:] = 0.0
 
     @property
-    def sorted_by_lpj(self) -> Dict[str, Tensor]:
-        return {"batch_Wbar": self.storage["batch_Wbar"]}
+    def shape(self) -> Tuple[int, ...]:
+        return self.theta["W"].shape
 
     def generate_data(
         self, N: int = None, hidden_state: to.Tensor = None
     ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
-        theta = self.theta
-        W = theta["W"]
-        D, H = W.shape
+        precision, device = self.precision, tvem.get_device()
+        D, H = self.shape
 
         if hidden_state is None:
             assert N is not None
-            pies = theta["pies"]
-            hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
+            pies = self.theta["pies"]
+            hidden_state = to.rand((N, H), dtype=precision, device=device) < pies
             must_return_hidden_state = True
         else:
             shape = hidden_state.shape
@@ -125,138 +201,18 @@ class BSC(Optimized, Sampler, Reconstructor):
             assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
-        precision, device = W.dtype, W.device
-
         Wbar = to.zeros((N, D), dtype=precision, device=device)
 
         # Linear superposition
         for n in range(N):
             for h in range(H):
                 if hidden_state[n, h]:
-                    Wbar[n] += theta["W"][:, h]
+                    Wbar[n] += self.theta["W"][:, h]
 
         # Add noise according to the model parameters
-        Y = Wbar + theta["sigma"] * to.randn((N, D), dtype=precision, device=device)
+        Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn((N, D), dtype=precision, device=device)
 
         return (Y, hidden_state) if must_return_hidden_state else Y
-
-    def init_epoch(self):
-        """Initialize tensors used in E- and M-step."""
-        theta = self.theta
-        storage = self.storage
-        D = theta["W"].shape[0]
-
-        for k in ("my_Wp", "my_Wq", "my_pies", "my_sigma"):
-            storage[k].fill_(0.0)
-        storage["pil_bar"][:] = to.log(theta["pies"] / (1.0 - theta["pies"]))
-        storage["WT"][:, :] = theta["W"].t()
-        storage["pre1"] = -1.0 / 2.0 / theta["sigma"] / theta["sigma"]
-        storage["fenergy_const"] = to.log(1.0 - theta["pies"]).sum() - D / 2 * to.log(
-            2 * math.pi * theta["sigma"] ** 2
-        )
-
-    def init_batch(self):
-        """Reset counter for how many states tensors in sorted_by_lpj have been evaluated."""
-        self.storage["indS_filled"] = 0
-
-    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
-        """Evaluate log-pseudo-joints for BSC."""
-        batch_size, S, _ = states.shape
-        indS_filled = self.storage["indS_filled"]
-
-        # Type casting for compatibility with float tensors
-        # TODO Find solution to avoid byte->float casting
-        Kfloat = states.to(dtype=self.theta["W"].dtype)
-
-        # Pre-compute Ws
-        # TODO Use `out` argument of to.matmul, e.g.
-        # to.matmul(tensor1=Kfloat, tensor2=self.storage['WT'], out=Wbar)
-        Wbar = self.sorted_by_lpj["batch_Wbar"][:batch_size, indS_filled : (indS_filled + S), :]
-        Wbar[:, :, :] = to.matmul(Kfloat, self.storage["WT"])
-        self.storage["indS_filled"] += S
-
-        # Compute lpj, is (batch_size, S)
-        lpj = to.mul(
-            to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), self.storage["pre1"]
-        ) + to.matmul(Kfloat, self.storage["pil_bar"])
-        return lpj.to(device=states.device)
-
-    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
-        """Evaluate log-joints for BSC."""
-        if lpj is None:
-            lpj = self.log_pseudo_joint(data, states)
-        return lpj + self.storage["fenergy_const"]
-
-    def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
-        storage = self.storage
-        sorted_by_lpj = self.sorted_by_lpj
-        lpj = states.lpj[idx]
-        K = states.K[idx]
-        batch_size, S, _ = K.shape
-
-        # Type casting for compatibility with float tensors
-        # TODO Find solution to avoid byte->float casting
-        Kfloat = K.to(dtype=lpj.dtype)
-
-        storage["batch_s_pjc"][:batch_size, :] = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
-        storage["batch_Wp"][:batch_size, :, :] = batch.unsqueeze(2) * storage["batch_s_pjc"][
-            :batch_size
-        ].unsqueeze(
-            1
-        )  # is (batch_size,D,H)
-        Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
-        storage["batch_Wq"][:, :] = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
-        storage["batch_sigma"][:batch_size] = mean_posterior(
-            to.sum(
-                (batch[:, None, :] - sorted_by_lpj["batch_Wbar"][:batch_size, :S, :]) ** 2, dim=2
-            ),
-            lpj,
-        )  # is (batch_size,)
-
-        storage["my_pies"].add_(to.sum(storage["batch_s_pjc"][:batch_size, :], dim=0))
-        storage["my_Wp"].add_(to.sum(storage["batch_Wp"][:batch_size, :, :], dim=0))
-        storage["my_Wq"].add_(storage["batch_Wq"])
-        storage["my_sigma"].add_(to.sum(storage["batch_sigma"][:batch_size]))
-        storage["my_N"].add_(batch_size)
-
-        return None
-
-    def update_param_epoch(self) -> None:
-        theta = self.theta
-        storage = self.storage
-        policy = self.policy
-
-        for k in ("my_pies", "my_Wp", "my_Wq", "my_sigma", "my_N"):
-            all_reduce(storage[k])
-        N = storage["my_N"].item()
-        storage["my_N"][:] = 0
-
-        theta_new = {}
-        # Calculate updated W
-        Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
-        broadcast(Wold_noisy)
-        try:
-            theta_new["W"] = lstsq(storage["my_Wp"].t(), storage["my_Wq"])[0].t()
-        except RuntimeError:
-            pprint("Inversion error. Will not update W but add some noise instead.")
-            theta_new["W"] = Wold_noisy
-
-        # Calculate updated pi
-        theta_new["pies"] = storage["my_pies"] / N
-
-        # Calculate updated sigma
-        theta_new["sigma"] = to.sqrt(storage["my_sigma"] / N / theta["W"].shape[0])
-
-        policy["W"][0] = Wold_noisy
-        policy["pies"][0] = theta["pies"]
-        policy["sigma"][0] = theta["sigma"]
-        fix_theta(theta_new, policy)
-        for key in theta:
-            theta[key] = theta_new[key]
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        return self.theta["W"].shape
 
     def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
@@ -264,8 +220,9 @@ class BSC(Optimized, Sampler, Reconstructor):
         as follows:""" r"""
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
         """
-        lpj = states.lpj[idx]
         K = states.K[idx]
-        batch_size, S, _ = K.shape
-
-        return mean_posterior(self.sorted_by_lpj["batch_Wbar"][:batch_size, :S, :], lpj)
+        # TODO Find solution to avoid byte->float casting of `K`
+        # TODO Pre-allocate tensor and use `out` argument of to.matmul
+        return mean_posterior(
+            to.matmul(K.to(dtype=self.precision), self.theta["W"].t()), states.lpj[idx]
+        )
