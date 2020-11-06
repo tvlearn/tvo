@@ -133,8 +133,8 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
     tvae = TVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2, precision=precision)
 
     bsc_W = W[1].t()
-    bsc_sigma = to.tensor([0.1], dtype=precision, device=d)
-    bsc = BSC(H=H0, D=D, W_init=bsc_W, sigma_init=bsc_sigma, pies_init=pi)
+    bsc_sigma2 = to.tensor([0.01], dtype=precision, device=d)
+    bsc = BSC(H=H0, D=D, W_init=bsc_W, sigma2_init=bsc_sigma2, pies_init=pi)
 
     return tvae, bsc
 
@@ -147,9 +147,6 @@ def test_same_as_bsc(tvae_and_corresponding_bsc):
 
     states = fullem_for(tvae, N)
 
-    bsc.init_storage(S=states.K.shape[1], Snew=0, batch_size=N)
-    bsc.init_epoch()
-    bsc.init_batch()
     states.lpj[:] = bsc.log_pseudo_joint(data, states.K)
     F_bsc = bsc.free_energy(to.arange(N), data, states)
 

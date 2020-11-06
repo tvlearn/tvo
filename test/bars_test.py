@@ -61,7 +61,7 @@ def model_and_data(request, hyperparams, estep_conf):
     if request.param == "BSC":
 
         W_gt = generate_bars(H, bar_amp=10.0, precision=precision)
-        sigma_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
+        sigma2_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
 
         to.manual_seed(999)
@@ -69,11 +69,11 @@ def model_and_data(request, hyperparams, estep_conf):
         W_init = W_init.to(device=tvem.get_device())
         broadcast(W_init)
 
-        sigma_init = to.tensor([1.0], dtype=precision, device=tvem.get_device())
+        sigma2_init = to.tensor([1.0], dtype=precision, device=tvem.get_device())
         pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
 
         model = BSC(
-            H=H, D=D, W_init=W_gt, sigma_init=sigma_gt, pies_init=pies_gt, precision=precision
+            H=H, D=D, W_init=W_gt, sigma2_init=sigma2_gt, pies_init=pies_gt, precision=precision
         )
 
         fname = "bars_test_data_bsc.h5"
@@ -81,7 +81,7 @@ def model_and_data(request, hyperparams, estep_conf):
         write_dataset(fname, N, D, np.float32, model)
 
         model.theta["W"] = W_init
-        model.theta["sigma"] = sigma_init
+        model.theta["sigma2"] = sigma2_init
         model.theta["pies"] = pies_init
 
     elif request.param == "NoisyOR":

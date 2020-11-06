@@ -22,11 +22,15 @@ def setup(request):
         precision = to.float32
         pies_init = to.full((H,), 0.5, dtype=precision, device=_device)
         W_init = to.full((D, H), 1.0, dtype=precision, device=_device)
-        sigma_init = to.tensor([1.0], dtype=precision, device=_device)
+        sigma2_init = to.tensor([1.0], dtype=precision, device=_device)
 
-        conf = {"D": D, "H": H, "S": 2 ** H, "Snew": 0, "batch_size": N, "precision": precision}
         m = BSC(
-            H=H, D=D, W_init=W_init, sigma_init=sigma_init, pies_init=pies_init, precision=precision
+            H=H,
+            D=D,
+            W_init=W_init,
+            sigma2_init=sigma2_init,
+            pies_init=pies_init,
+            precision=precision,
         )
         all_s = FullEM(N, H, precision)
         all_s.lpj = to.zeros_like(all_s.lpj)
@@ -55,8 +59,6 @@ def setup(request):
 
 
 def test_lpj(setup):
-    setup.m.init_storage(S=2 ** setup.H, Snew=0, batch_size=setup.N)
-    setup.m.init_epoch()
     lpj = setup.m.log_pseudo_joint(setup.data, setup.all_s.K)
     assert lpj.device == setup.all_s.K.device
     assert to.allclose(lpj, setup.true_lpj)
@@ -64,10 +66,7 @@ def test_lpj(setup):
 
 def test_free_energy(setup):
     batch, states, m = setup.data, setup.all_s, setup.m
-    m.init_storage(S=2 ** setup.H, Snew=0, batch_size=setup.N)
-    m.init_epoch()
-    m.init_batch()
-    states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
+    states.lpj[:] = m.log_pseudo_joint(batch, states.K)
     f = m.free_energy(idx=to.arange(setup.N), batch=batch, states=states) / setup.N
     assert math.isclose(f, setup.true_free_energy, rel_tol=1e-6)
 
@@ -76,18 +75,14 @@ def test_train(setup):
     m = setup.m
     N = setup.N
     batch, states = setup.data, setup.all_s
-    m.init_storage(S=2 ** setup.H, Snew=0, batch_size=setup.N)
-    m.init_epoch()
-    m.init_batch()
-    states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
+
+    states.lpj[:] = m.log_pseudo_joint(batch, states.K)
     first_F = m.free_energy(idx=to.arange(N), batch=batch, states=states)
+
     m.update_param_batch(idx=to.arange(N), batch=batch, states=states)
     m.update_param_epoch()
-    m.init_epoch()
-    m.init_batch()
-    states.lpj[:] = m.log_pseudo_joint(batch, states.K[:])
+    states.lpj[:] = m.log_pseudo_joint(batch, states.K)
     new_F = m.free_energy(idx=to.arange(N), batch=batch, states=states)
-
     assert new_F > first_F
 
 
