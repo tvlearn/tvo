@@ -142,7 +142,7 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
 def test_same_as_bsc(tvae_and_corresponding_bsc):
     tvae, bsc = tvae_and_corresponding_bsc
 
-    data = to.tensor([[0.0], [1.0]], dtype=tvae.precision, device=tvem.get_device())
+    data = to.tensor([[0.0]*10, [1.0]*10], dtype=tvae.precision, device=tvem.get_device())
     N = data.shape[0]
 
     states = fullem_for(tvae, N)
