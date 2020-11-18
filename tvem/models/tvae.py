@@ -237,6 +237,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
             to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
             self._new_pi.zero_()
 
+        # FIXME in case of missing data there is a correction that should be applied here
         if not sigma2.requires_grad:
             all_reduce(self._new_sigma2)
             # disallow arbitrary growth of sigma. at each iteration, it can grow by at most 1%
