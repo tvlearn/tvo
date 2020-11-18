@@ -206,6 +206,8 @@ class TVAE(Trainable, Sampler, Reconstructor):
     def update_param_batch(
         self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
     ) -> float:
+        if batch.isnan().any():
+            raise RuntimeError("There are NaNs in this batch")
         F, mlp_out = self._optimize_nn_params(idx, batch, states)
         with to.no_grad():
             self._accumulate_param_updates(idx, batch, states, mlp_out)
