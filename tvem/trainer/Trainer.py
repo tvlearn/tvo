@@ -245,6 +245,7 @@ class Trainer:
             if batch.isnan().any():
                 missing_data_mask = batch.isnan()
                 batch[missing_data_mask] = train_reconstruction[idx][missing_data_mask]
+                train_reconstruction[idx] = batch
             batch_F = model.update_param_batch(idx, batch, train_states)
             if not self.eval_F_at_epoch_end:
                 if batch_F is None:
