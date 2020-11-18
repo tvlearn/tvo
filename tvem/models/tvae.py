@@ -167,14 +167,16 @@ class TVAE(Trainable, Sampler, Reconstructor):
         return lpj
 
     def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
-        N, D = data.shape
+        N = data.shape[0]
         N_, S, H = states.shape
         assert N == N_, "Shape mismatch between data and states"
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         states = states.to(dtype=self.precision)
 
         mlp_out = self.forward(states)  # (N, S, D)
-        s1 = (data.unsqueeze(1) - mlp_out).pow_(2).sum(dim=2).div_(2 * sigma2)  # (N, S)
+
+        # nansum used to automatically ignore missing data
+        s1 = (data.unsqueeze(1) - mlp_out).pow_(2).nansum(dim=2).div_(2 * sigma2)  # (N, S)
         s2 = states @ to.log(pi / (1.0 - pi))  # (N, S)
         lpj = s2 - s1
         assert lpj.shape == (N, S)
@@ -187,7 +189,8 @@ class TVAE(Trainable, Sampler, Reconstructor):
 
     def log_joint(self, data, states, lpj=None):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
-        D = self._net_shape[-1]
+        D = data.shape[1] - data.isnan().sum(dim=1)  # (N,): ignores missing data
+        D = D.unsqueeze(1) # (N, 1)
         if lpj is None:
             lpj = self._log_pseudo_joint(data, states)
         # TODO: could pre-evaluate the constant factor once per epoch
