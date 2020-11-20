@@ -50,7 +50,7 @@ class Trainable(Protocol):
                 t.requires_grad_(True)
             self._optimizer = to.optim.Adam(self._theta.values())
         assert self._optimizer is not None  # to make mypy happy
-        log_joints = self.log_joint(batch, states.K)
+        log_joints = self.log_joint(batch, states.K[idx])
         F = to.logsumexp(log_joints, dim=1).sum(dim=0)
         loss = -F / batch.shape[0]
         loss.backward()
