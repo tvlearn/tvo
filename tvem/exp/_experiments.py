@@ -111,7 +111,8 @@ class _TrainingAndOrValidation(Experiment):
             eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
             data_transform=self._conf.data_transform,
         )
-        logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
+        self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
+        logger = self.logger
 
         self._log_confs(logger)
 
