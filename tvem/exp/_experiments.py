@@ -102,7 +102,7 @@ class _TrainingAndOrValidation(Experiment):
         will_reconstruct = (
             self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
         )
-        trainer = Trainer(
+        self.trainer = Trainer(
             self.model,
             self.train_data,
             self.train_states,
@@ -113,6 +113,7 @@ class _TrainingAndOrValidation(Experiment):
             eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
             data_transform=self._conf.data_transform,
         )
+        trainer = self.trainer
         logger = self.logger
 
         self._log_confs(logger)
