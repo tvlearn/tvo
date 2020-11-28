@@ -70,6 +70,20 @@ class _TrainingAndOrValidation(Experiment):
             N = test_dataset.shape[0]
             self.test_states = self._make_states(N, H, self._precision, estep_conf)
 
+        will_reconstruct = (
+            self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
+        )
+        self.trainer = Trainer(
+            self.model,
+            self.train_data,
+            self.train_states,
+            self.test_data,
+            self.test_states,
+            rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
+            will_reconstruct=will_reconstruct,
+            eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
+            data_transform=self._conf.data_transform,
+        )
         self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 
     def _make_dataloader(self, dataset: to.Tensor, conf: ExpConfig) -> TVEMDataLoader:
@@ -99,20 +113,6 @@ class _TrainingAndOrValidation(Experiment):
 
         :param epochs: Number of epochs to train for
         """
-        will_reconstruct = (
-            self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
-        )
-        self.trainer = Trainer(
-            self.model,
-            self.train_data,
-            self.train_states,
-            self.test_data,
-            self.test_states,
-            rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
-            will_reconstruct=will_reconstruct,
-            eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
-            data_transform=self._conf.data_transform,
-        )
         trainer = self.trainer
         logger = self.logger
 
@@ -150,6 +150,9 @@ class _TrainingAndOrValidation(Experiment):
         leftover_logfile = self._conf.output + ".old"
         if rank == 0 and Path(leftover_logfile).is_file():
             os.remove(leftover_logfile)
+
+        # put trainer into undefined state after the experiment is finished
+        self.trainer = None  # type: ignore
 
     def _log_confs(self, logger: H5Logger):
         """Dump experiment+estep configuration to screen and save it to output file."""
