@@ -70,6 +70,8 @@ class _TrainingAndOrValidation(Experiment):
             N = test_dataset.shape[0]
             self.test_states = self._make_states(N, H, self._precision, estep_conf)
 
+        self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
+
     def _make_dataloader(self, dataset: to.Tensor, conf: ExpConfig) -> TVEMDataLoader:
         if dataset.dtype is not to.uint8:
             dataset = dataset.to(dtype=self._precision)
@@ -111,7 +113,6 @@ class _TrainingAndOrValidation(Experiment):
             eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
             data_transform=self._conf.data_transform,
         )
-        self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
         logger = self.logger
 
         self._log_confs(logger)
