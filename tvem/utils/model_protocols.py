@@ -1,6 +1,7 @@
 from typing_extensions import Protocol, runtime_checkable
 from typing import Tuple, Dict, Any, Optional, Union, TYPE_CHECKING
 import torch as to
+from tvem.utils.parallel import mpi_average_grads
 from abc import abstractmethod
 
 if TYPE_CHECKING:
@@ -54,6 +55,7 @@ class Trainable(Protocol):
         F = to.logsumexp(log_joints, dim=1).sum(dim=0)
         loss = -F / batch.shape[0]
         loss.backward()
+        mpi_average_grads(self.theta)
         self._optimizer.step()
         self._optimizer.zero_grad()
 
