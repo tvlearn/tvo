@@ -8,7 +8,7 @@ import math
 import torch
 import torch.distributed as dist
 from torch import Tensor
-from typing import Iterable, Union
+from typing import Iterable, Union, Dict
 
 import tvem
 
@@ -273,3 +273,20 @@ def barrier():
     """Equivalent to torch's dist.barrier if tvem.get_run_policy() is 'mpi', no-op otherwise."""
     if tvem.get_run_policy() == "mpi":
         dist.barrier()
+
+
+def mpi_average_grads(theta: Dict[str, torch.Tensor]) -> None:
+    """Gather tensors from process group.
+
+    :param theta: dictionary with torch.tensors storing TVEM model parameters
+    """
+    if tvem.get_run_policy() != "mpi":
+        return  # nothing to do
+
+    # Average gradients across processes. See https://bit.ly/2FlJsxS
+    n_procs = dist.get_world_size()
+    parameters = [p for p in theta.values() if p.requires_grad]
+    with torch.no_grad():
+        for p in parameters:
+            all_reduce(p.grad)
+            p.grad /= n_procs
