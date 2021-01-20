@@ -135,12 +135,10 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             total_length = shape[0].item()
             other_length = tuple(shape[1:])
 
-            # no datapoints per process, rounded up if not exactly divisible
-            local_length = (total_length + comm_size - 1) // comm_size
-
-            # in case total_length is not evenly divisible by the number of processes
-            # `empty_length` dummy rows are used in process with rank comm_rank -1
-            empty_length = local_length * comm_size - total_length
+            # logic to ensure that input to `dist.scatter` is evenly divisible by comm_size
+            local_length_ceiled = math.ceil(total_length / comm_size)
+            no_dummy = local_length_ceiled * comm_size - total_length
+            local_length = local_length_ceiled - 1 if comm_rank < no_dummy else local_length_ceiled
 
             # split into chunks and scatter
             chunks = []  # type: ignore
@@ -151,7 +149,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                             (
                                 data.to(dtype=this_dtype, device=this_device),
                                 torch.zeros(
-                                    (empty_length,) + other_length,
+                                    (no_dummy,) + other_length,
                                     dtype=this_dtype,
                                     device=this_device,
                                 ),
@@ -164,38 +162,19 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                 )
 
             my_data = torch.zeros(
-                (local_length,) + other_length, dtype=this_dtype, device=this_device
+                (local_length_ceiled,) + other_length, dtype=this_dtype, device=this_device
             )
 
             dist.scatter(my_data, src=src, scatter_list=chunks)
 
-            # remove dummy rows
-            if empty_length != 0:
-                if comm_rank == comm_size - 1:
-                    my_data = my_data[: local_length - empty_length, :]
+            my_data = my_data[:local_length]
+
+            local_N = my_data.shape[0]
+            assert dist.allreduce(local_N) == total_length
 
             my_tensors.append(my_data)
 
     return my_tensors[0] if len(my_tensors) == 1 else my_tensors
-
-
-def _append_dummy_rows(tensor: Tensor, to_add: int, comm_rank: int, comm_size: int):
-    """Increase length of dimension 0 of tensor by to_add.
-    :param tensor: Input tensor
-    :param tensor: Number of entries to add in dimension 0
-    :param tensor: Local MPI rank
-    :param tensor: Size of MPI process group
-    """
-    if comm_rank == comm_size - 1:
-        tensor = torch.cat(
-            (
-                tensor,
-                torch.zeros(
-                    (to_add,) + tuple(tensor.shape[1:]), dtype=tensor.dtype, device=tensor.device
-                ),
-            )
-        )
-    return tensor
 
 
 def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Union[Tensor, Iterable[Tensor]]:
@@ -223,35 +202,39 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Union[Tensor, It
             other_length = tuple(my_data.shape[1:])
             total_length = torch.tensor([local_length])
             all_reduce(total_length)
-            total_length = int(total_length)
+            total_length = total_length.item()
+            local_length_ceiled = math.ceil(total_length / comm_size)
+            no_dummy = local_length_ceiled * comm_size - total_length
 
-            # no datapoints per process including dummy rows
-            local_length_ = math.ceil(total_length / comm_size)
-            # determine number of and eventually add dummy rows for scatter/gather compatibility
-            empty_length = local_length_ * comm_size - total_length
-
-            chunks = []
-            if comm_rank == 0:
-                for r in range(comm_size):
-                    chunks.append(
-                        torch.zeros(
-                            (local_length_,) + other_length,
-                            dtype=my_data.dtype,
-                            device=my_data.device,
-                        )
+            chunks = (
+                [
+                    torch.zeros(
+                        (local_length_ceiled,) + other_length,
+                        dtype=my_data.dtype,
+                        device=my_data.device,
                     )
+                    for r in range(comm_size)
+                ]
+                if comm_rank == 0
+                else []
+            )
 
             dist.gather(
-                tensor=_append_dummy_rows(my_data, empty_length, comm_rank, comm_size),
+                tensor=torch.cat(
+                    my_data,
+                    torch.zeros((1,) + other_length, dtype=my_data.dtype, device=my_data.device),
+                )
+                if comm_rank < no_dummy
+                else my_data,
                 gather_list=chunks,
                 dst=dst,
             )
 
             if comm_rank == 0:
-                chunks[comm_size - 1] = chunks[comm_size - 1][
-                    : (local_length_ - empty_length)
-                ]  # remove dummy rows again
+                for r in range(no_dummy):
+                    chunks[r] = chunks[r][:-1]
                 data = torch.cat(chunks)
+                assert data.shape[0] == total_length
                 tensors.append(data)
 
     return tensors[0] if len(tensors) == 1 else tensors
