@@ -2,6 +2,7 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
+import tvem
 from tvem.utils.model_protocols import Trainable, Optimized, Reconstructor
 from tvem.variational import TVEMVariationalStates
 from tvem.utils.data import TVEMDataLoader
@@ -226,7 +227,7 @@ class Trainer:
         )
 
         assert train_data is not None and train_states is not None  # to make mypy happy
-        F = to.tensor(0.0)
+        F = to.tensor(0.0, device=tvem.get_device())
         subs = to.tensor(0)
         if isinstance(model, Optimized):
             model.init_epoch()
