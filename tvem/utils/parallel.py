@@ -170,7 +170,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             my_data = my_data[:local_length]
 
             local_N = my_data.shape[0]
-            assert dist.allreduce(local_N) == total_length
+            assert all_reduce(local_N) == total_length
 
             my_tensors.append(my_data)
 
