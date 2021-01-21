@@ -222,8 +222,12 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Union[Tensor, It
 
             dist.gather(
                 tensor=torch.cat(
-                    my_data,
-                    torch.zeros((1,) + other_length, dtype=my_data.dtype, device=my_data.device),
+                    (
+                        my_data,
+                        torch.zeros(
+                            (1,) + other_length, dtype=my_data.dtype, device=my_data.device
+                        ),
+                    )
                 )
                 if comm_rank < no_dummy
                 else my_data,
