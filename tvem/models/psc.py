@@ -213,8 +213,6 @@ class PSC(Sampler, Optimized, Reconstructor):
         if self._optimizer is not None:
             loss = -F / batch.shape[0]
             self._gd_step(loss)
-        else:
-            F = None
 
         with to.no_grad():
             self._analytical_msteps(idx, states)
