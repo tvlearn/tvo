@@ -136,6 +136,9 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             other_length = tuple(shape[1:])
 
             # logic to ensure that input to `dist.scatter` is evenly divisible by comm_size
+            assert (
+                total_length / comm_size
+            ) >= 1, "number of data points must be greater or equal to number of MPI processes"
             local_length_ceiled = math.ceil(total_length / comm_size)
             no_dummy = local_length_ceiled * comm_size - total_length
             local_length = local_length_ceiled - 1 if comm_rank < no_dummy else local_length_ceiled
