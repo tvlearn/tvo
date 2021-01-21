@@ -169,8 +169,9 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
 
             my_data = my_data[:local_length]
 
-            local_N = my_data.shape[0]
-            assert all_reduce(local_N) == total_length
+            N = torch.tensor([local_length])
+            all_reduce(N)
+            assert N.item() == total_length
 
             my_tensors.append(my_data)
 
