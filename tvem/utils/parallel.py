@@ -140,29 +140,24 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                 total_length / comm_size
             ) >= 1, "number of data points must be greater or equal to number of MPI processes"
             local_length_ceiled = math.ceil(total_length / comm_size)
-            no_dummy = local_length_ceiled * comm_size - total_length
+            total_length_ceiled = local_length_ceiled * comm_size
+            no_dummy = total_length_ceiled - total_length
             local_length = local_length_ceiled - 1 if comm_rank < no_dummy else local_length_ceiled
 
             # split into chunks and scatter
             chunks = []  # type: ignore
             if comm_rank == 0:
-                chunks = list(
-                    torch.chunk(
-                        torch.cat(
-                            (
-                                data.to(dtype=this_dtype, device=this_device),
-                                torch.zeros(
-                                    (no_dummy,) + other_length,
-                                    dtype=this_dtype,
-                                    device=this_device,
-                                ),
-                            ),
-                            dim=0,
-                        ),
-                        comm_size,
-                        dim=0,
-                    )
+                to_cut_into_chunks = torch.zeros(
+                    ((total_length_ceiled,) + other_length), dtype=this_dtype, device=this_device
                 )
+                local_start = 0
+                for r in range(comm_size):
+                    local_length_ = local_length_ceiled - 1 if r < no_dummy else local_length_ceiled
+                    to_cut_into_chunks[
+                        r * local_length_ceiled : r * local_length_ceiled + local_length_
+                    ] = data[range(local_start, local_start + local_length_)]
+                    local_start += local_length_
+                chunks = list(torch.chunk(to_cut_into_chunks, comm_size, dim=0))
 
             my_data = torch.zeros(
                 (local_length_ceiled,) + other_length, dtype=this_dtype, device=this_device
