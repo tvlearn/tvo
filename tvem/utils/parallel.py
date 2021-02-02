@@ -262,14 +262,13 @@ def barrier():
 
 
 def mpi_average_grads(theta: Dict[str, torch.Tensor]) -> None:
-    """Gather tensors from process group.
+    """Average gradients across processes. See https://bit.ly/2FlJsxS.
 
     :param theta: dictionary with torch.tensors storing TVEM model parameters
     """
     if tvem.get_run_policy() != "mpi":
         return  # nothing to do
 
-    # Average gradients across processes. See https://bit.ly/2FlJsxS
     n_procs = dist.get_world_size()
     parameters = [p for p in theta.values() if p.requires_grad]
     with torch.no_grad():
