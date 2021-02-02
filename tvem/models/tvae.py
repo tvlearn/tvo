@@ -5,12 +5,11 @@
 from tvem.utils.model_protocols import Trainable, Sampler, Reconstructor
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
-from tvem.utils.parallel import all_reduce, broadcast
+from tvem.utils.parallel import all_reduce, broadcast, mpi_average_grads
 from tvem.utils import get, CyclicLR
 import torch.optim as opt
 import tvem
 import torch as to
-import torch.distributed as dist
 from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union
 from math import pi as MATH_PI
 
@@ -298,7 +297,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
         loss = -F / data.shape[0]
         loss.backward()
 
-        self._mpi_average_grads()
+        mpi_average_grads(self.theta)
         self._optimizer.step()
         self._scheduler.step()
         self._optimizer.zero_grad()
@@ -346,18 +345,6 @@ class TVAE(Trainable, Sampler, Reconstructor):
         output = output @ self.W[-1] + self.b[-1]
 
         return output
-
-    def _mpi_average_grads(self) -> None:
-        if tvem.get_run_policy() != "mpi":
-            return  # nothing to do
-
-        # Average gradients across processes. See https://bit.ly/2FlJsxS
-        n_procs = dist.get_world_size()
-        parameters = [p for p in self.theta.values() if p.requires_grad]
-        with to.no_grad():
-            for p in parameters:
-                all_reduce(p.grad)
-                p.grad /= n_procs
 
     def data_estimator(
         self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
