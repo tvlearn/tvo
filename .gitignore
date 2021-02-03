@@ -8,3 +8,6 @@ __pycache__
 *.h5
 *.old
 tags
+*.c
+*.so
+build/*
