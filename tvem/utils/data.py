@@ -6,7 +6,6 @@ import torch as to
 from torch.utils.data import TensorDataset, DataLoader, Dataset, Sampler
 import numpy as np
 import tvem
-from tvem.utils.parallel import broadcast
 
 
 class TVEMDataLoader(DataLoader):
