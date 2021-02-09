@@ -68,6 +68,7 @@ def input_files(hyperparams):
 
     binary_fname = "experiment_test_data_binary.h5"
     continuous_fname = "experiment_test_data_continous.h5"
+    continuous_fname_distributed_reco = "experiment_test_data_continous_distributed_reco.h5"
 
     if rank == 0:
         N, D = hyperparams.N, hyperparams.D
@@ -82,15 +83,29 @@ def input_files(hyperparams):
         data[:] = np.random.rand(N, D)
         f.close()
 
+        f = h5py.File(continuous_fname_distributed_reco, mode="w")
+        N_ = 17  # cause data points to be unevenly distributed across MPI processes
+        # (assume 4 MPI processes)
+        data = f.create_dataset("data", (N_, D), dtype=np.float32)
+        data_ = np.random.rand(N_, D)
+        data_[data_ < 0.5] = float("nan")
+        data[:] = data_
+        f.close()
+
     if tvem.get_run_policy() == "mpi":
         dist.barrier()
 
-    yield Munch(binary_data=binary_fname, continuous_data=continuous_fname)
+    yield Munch(
+        binary_data=binary_fname,
+        continuous_data=continuous_fname,
+        continuous_data_distributed_reco=continuous_fname_distributed_reco,
+    )
 
     if rank == 0:
         with suppress(FileNotFoundError):
             os.remove(binary_fname)
             os.remove(continuous_fname)
+            os.remove(continuous_fname_distributed_reco)
             os.remove("tvem_exp.h5")  # default experiment output file
 
 
@@ -118,7 +133,7 @@ def batch_size(request):
     return request.param
 
 
-@pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE", "LogJointOnly"))
+@pytest.fixture(scope="function", params=("NoisyOR", "BSC", "TVAE", "TVAE_reco", "LogJointOnly"))
 def model_and_data(request, hyperparams, input_files, precision):
     """Return a tuple of a model and a filename (dataset for the model).
 
@@ -131,6 +146,11 @@ def model_and_data(request, hyperparams, input_files, precision):
         return BSC(H=H, D=D, precision=precision), input_files.continuous_data
     elif request.param == "TVAE":
         return TVAE(shape=(D, H * 2, H), precision=precision), input_files.continuous_data
+    elif request.param == "TVAE_reco":
+        return (
+            TVAE(shape=(D, H * 2, H), precision=precision),
+            input_files.continuous_data_distributed_reco,
+        )
     elif request.param == "LogJointOnly":
         return LogJointOnly(H, D, precision), input_files.continuous_data
 
@@ -189,6 +209,8 @@ def check_file(fname, *prefixes: str):
 
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
+    if input_file == "experiment_test_data_continous_distributed_reco.h5":
+        return
     exp = Training(exp_conf, estep_conf, model, train_data_file=input_file)
     for log in exp.run(10):
         log.print()
@@ -197,6 +219,8 @@ def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
 
 def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
+    if input_file == "experiment_test_data_continous_distributed_reco.h5":
+        return
     exp = Training(
         exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
     )
@@ -207,6 +231,8 @@ def test_training_and_validation(model_and_data, exp_conf, estep_conf, add_gpu_a
 
 def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
+    if input_file == "experiment_test_data_continous_distributed_reco.h5":
+        return
     exp = _Testing(exp_conf, estep_conf, model, data_file=input_file)
     for log in exp.run(10):
         log.print()
@@ -215,6 +241,8 @@ def test_testing(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
 
 def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks, warmup_Esteps):
     model, input_file = model_and_data
+    if input_file == "experiment_test_data_continous_distributed_reco.h5":
+        return
     if not isinstance(model, Reconstructor):
         return
 
@@ -240,8 +268,47 @@ def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_ma
         assert (train_reconstruction != train_data).any()
 
 
+@pytest.mark.mpi
+def test_reconstruction_with_missing_distributed(
+    model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks, warmup_Esteps
+):
+    model, input_file = model_and_data
+    if input_file != "experiment_test_data_continous_distributed_reco.h5":
+        return
+    if not isinstance(model, Reconstructor):
+        return
+    comm_rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    comm_size = dist.get_world_size() if dist.is_initialized() else 1
+    if comm_size != 4:
+        pytest.skip(f"test obsolete for n_procs=={comm_size}")
+
+    exp_conf.reco_epochs = range(10)
+    exp_conf.warmup_Esteps = 0
+    exp = Training(
+        exp_conf, estep_conf, model, train_data_file=input_file, val_data_file=input_file
+    )
+    for log in exp.run(10):
+        log.print()
+
+    if comm_rank == 0:
+        f = h5py.File(exp_conf.output, "r")
+        assert "train_reconstruction" in f.keys()
+        train_reconstruction = to.tensor(f["train_reconstruction"], dtype=model.precision)
+        f.close()
+
+        f = h5py.File(input_file, "r")
+        train_data = to.tensor(f["data"], dtype=model.precision)
+        f.close()
+        assert train_reconstruction.shape == train_data.shape
+        assert (to.logical_not(to.isnan(train_reconstruction))).any()
+        inds_not_is_nan = to.logical_not(to.isnan(train_data))
+        assert to.allclose(train_data[inds_not_is_nan], train_reconstruction[inds_not_is_nan])
+
+
 def test_data_transform(model_and_data):
     model, input_file = model_and_data
+    if input_file == "experiment_test_data_continous_distributed_reco.h5":
+        return
     exp_conf = ExpConfig(data_transform=lambda x: to.zeros_like(x))
     estep_conf = FullEMConfig(n_latents=model.shape[1])
     exp = _Testing(exp_conf, estep_conf, model, input_file)
