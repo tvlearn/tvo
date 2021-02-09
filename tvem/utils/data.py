@@ -42,9 +42,7 @@ class TVEMDataLoader(DataLoader):
             # NOTE: this means that the E-step will sometimes write over a certain K[idx] and
             # lpj[idx] twice over the course of an epoch, even in the same batch (although that
             # will happen rarely). This double writing is not a race condition: the last write wins.
-            n_samples = to.tensor(N)
-            broadcast(n_samples, src=0)
-            kwargs["sampler"] = ShufflingSampler(dataset, int(n_samples))
+            kwargs["sampler"] = ShufflingSampler(dataset, N)
             kwargs["shuffle"] = None
 
         super().__init__(dataset, **kwargs)
