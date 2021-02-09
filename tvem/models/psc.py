@@ -134,7 +134,10 @@ class PSC(Sampler, Optimized, Reconstructor):
         logjoints = (
             lpj
             + to.sum(to.log(1 - pies_))
-            - to.lgamma(data.type_as(pies) + self._tiny).to(data.device).sum(dim=1).unsqueeze(1)
+            - to.lgamma(data.type_as(pies) + 1.0 + self._tiny)
+            .to(data.device)
+            .sum(dim=1)
+            .unsqueeze(1)
         )  # TODO: Evaluate prior term only once per epoch and factorial term only once per run
         assert logjoints.shape == lpj.shape
         assert not to.isnan(logjoints).any() and not to.isinf(logjoints).any()

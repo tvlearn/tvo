@@ -57,7 +57,7 @@ def true_free_energy(model, data, states):
     logjoints = (
         true_lpj(model, data, states)
         + to.sum(to.log(1 - pies_))
-        - to.lgamma(data.type_as(pies)).to(data.device).sum(dim=1).unsqueeze(1)
+        - to.lgamma(data.type_as(pies) + 1.0).to(data.device).sum(dim=1).unsqueeze(1)
     )
     return to.logsumexp(logjoints, dim=1).sum().item()
 
