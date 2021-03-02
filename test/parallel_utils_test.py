@@ -64,7 +64,7 @@ def test_gather_from_processes_uneven_chunks(setup):
     if setup.n_procs != 4:
         pytest.skip("test unreliable for n_procs!=4")
     if setup.rank == 0:
-        my_t = (to.arange(4) + (setup.rank * 4)).view(2, 2)
+        my_t = to.arange(4).view(2, 2)
     else:
         my_t = (to.arange(2) + (setup.rank * 2 + 2))[None, :]
 
