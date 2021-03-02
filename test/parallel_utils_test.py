@@ -63,11 +63,7 @@ def test_scatter_from_processes_uneven_chunks(setup):
 def test_gather_from_processes_uneven_chunks(setup):
     if setup.n_procs != 4:
         pytest.skip("test unreliable for n_procs!=4")
-    if setup.rank == 0:
-        my_t = to.arange(4).view(2, 2)
-    else:
-        my_t = (to.arange(2) + (setup.rank * 2 + 2))[None, :]
-
+    my_t = (to.arange(2) + (setup.rank * 2))[None, :] if setup.rank < setup.n_procs - 1: else (to.arange(4) + (setup.rank * 2)).view(2, 2)
     t = gather_from_processes(my_t)
     if setup.rank == 0:
         assert t.shape == (setup.n_procs + 1, 2)
