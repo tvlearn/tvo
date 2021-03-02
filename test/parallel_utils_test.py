@@ -30,8 +30,6 @@ def setup(request):
 
 @pytest.mark.mpi
 def test_scatter_to_processes(setup):
-    if setup.n_procs == 1:
-        pytest.skip("test obsolete for n_procs==1")
     t = to.arange(setup.n_procs * 2).view(setup.n_procs, 2)
     my_t = scatter_to_processes(t)
     assert my_t.shape == (1, 2)
@@ -40,8 +38,6 @@ def test_scatter_to_processes(setup):
 
 @pytest.mark.mpi
 def test_gather_from_processes(setup):
-    if setup.n_procs == 1:
-        pytest.skip("test obsolete for n_procs==1")
     t = gather_from_processes((to.arange(2) + setup.rank * 2)[None, :])
     if setup.rank == 0:
         assert t.shape == (setup.n_procs, 2)
@@ -50,9 +46,7 @@ def test_gather_from_processes(setup):
 
 @pytest.mark.mpi
 def test_scatter_from_processes_uneven_chunks(setup):
-    if setup.n_procs == 1:
-        pytest.skip("test obsolete for n_procs==1")
-    elif setup.n_procs != 4:
+    if setup.n_procs != 4:
         pytest.skip("test unreliable for n_procs!=4")
     t = to.arange((setup.n_procs + 1) * 2).view(setup.n_procs + 1, 2)
     my_t = scatter_to_processes(t)
@@ -67,9 +61,7 @@ def test_scatter_from_processes_uneven_chunks(setup):
 
 @pytest.mark.mpi
 def test_gather_from_processes_uneven_chunks(setup):
-    if setup.n_procs == 1:
-        pytest.skip("test obsolete for n_procs==1")
-    elif setup.n_procs != 4:
+    if setup.n_procs != 4:
         pytest.skip("test unreliable for n_procs!=4")
     if setup.rank == 0:
         my_t = (to.arange(4) + (setup.rank * 4)).view(2, 2)
@@ -84,8 +76,6 @@ def test_gather_from_processes_uneven_chunks(setup):
 
 @pytest.mark.mpi
 def test_scatter_and_gather(setup):
-    if setup.n_procs == 1:
-        pytest.skip("test obsolete for n_procs==1")
     if setup.rank == 0:
         t = to.arange(5).unsqueeze(1)
     else:
