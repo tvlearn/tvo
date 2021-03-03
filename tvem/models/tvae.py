@@ -176,7 +176,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
         mlp_out = self.forward(states)  # (N, S, D)
 
         # nansum used to automatically ignore missing data
-        s1 = (data.unsqueeze(1) - mlp_out).pow_(2).nansum(dim=2).div_(2 * sigma2)  # (N, S)
+        s1 = to.nansum((data.unsqueeze(1) - mlp_out).pow_(2), dim=2).div_(2 * sigma2)  # (N, S)
         s2 = states @ to.log(pi / (1.0 - pi))  # (N, S)
         lpj = s2 - s1
         assert lpj.shape == (N, S)
