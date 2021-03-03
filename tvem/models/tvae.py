@@ -190,7 +190,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
     def log_joint(self, data, states, lpj=None):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = data.shape[1] - data.isnan().sum(dim=1)  # (N,): ignores missing data
-        D = D.unsqueeze(1) # (N, 1)
+        D = D.unsqueeze(1)  # (N, 1)
         if lpj is None:
             lpj = self._log_pseudo_joint(data, states)
         # TODO: could pre-evaluate the constant factor once per epoch
