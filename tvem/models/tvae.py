@@ -189,7 +189,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
 
     def log_joint(self, data, states, lpj=None):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
-        D = data.shape[1] - data.isnan().sum(dim=1)  # (N,): ignores missing data
+        D = data.shape[1] - to.isnan(data).sum(dim=1)  # (N,): ignores missing data
         D = D.unsqueeze(1)  # (N, 1)
         if lpj is None:
             lpj = self._log_pseudo_joint(data, states)
@@ -206,7 +206,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
     def update_param_batch(
         self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
     ) -> float:
-        if batch.isnan().any():
+        if to.isnan(batch).any():
             raise RuntimeError("There are NaNs in this batch")
         F, mlp_out = self._optimize_nn_params(idx, batch, states)
         with to.no_grad():
