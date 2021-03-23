@@ -49,3 +49,28 @@ class FullEM(TVEMVariationalStates):
         lpj[idx] = lpj_fn(batch, K[idx])
 
         return 0
+
+
+class FullEMSingleCauseModels(FullEM):
+    def __init__(self, N: int, C: int, precision: to.dtype):
+        """Full EM class for single causes models.
+
+        :param N: Number of datapoints
+        :param C: Number of latent variables
+        :param precision: The floating point precision of the lpj values.
+                          Must be one of to.float32 or to.float64
+        """
+        conf = dict(N=N, S=C, S_new=0, precision=precision)
+        super().__init__(conf, to.eye(C, dtype=precision, device=tvem.get_device())[None, :, :].expand(N, -1, -1))
+
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
+        lpj_fn = model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
+
+        K = self.K
+        assert to.any(K.sum(axis=1)==1), 'More than one cause detected. Please use the FullEM class.'
+
+        lpj = self.lpj
+
+        lpj[idx] = lpj_fn(batch, K[idx])
+
+        return 0
