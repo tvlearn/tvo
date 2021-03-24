@@ -21,17 +21,19 @@ class DummyModel(Trainable):
 @pytest.fixture(
     scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
 )
-def setup_fullEM(request):
+def setup(request):
     s = Munch(N=10, H=8, precision=to.float32)
     s.update(var_states=FullEM(s.N, s.H, s.precision))
     return s
 
-def test_fullEM_init(setup):
+
+def test_init(setup):
     var_states = setup.var_states
     assert var_states.K.shape == (setup.N, 2 ** setup.H, setup.H)
     assert to.unique(var_states.K[0], dim=0).shape[0] == 2 ** setup.H
 
-def test_fullEM_update(setup):
+
+def test_update(setup):
     var_states = setup.var_states
     data = to.rand(setup.N, 1, device=tvem.get_device())
     idx = to.arange(data.shape[0], device=tvem.get_device())
@@ -40,19 +42,25 @@ def test_fullEM_update(setup):
     assert n_subs == 0
     assert (var_states.lpj == lpj).all()
 
+
+@pytest.fixture(
+    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+)
 def setup_fullEM_SCM(request):
     s = Munch(N=10, H=8, precision=to.float32)
     s.update(var_states=FullEMSingleCauseModels(s.N, s.H, s.precision))
     return s
 
-def test_fullEM_SCM_init(setup):
-    var_states = setup.var_states
-    assert var_states.K.shape == (setup.N, 2 ** setup.H, setup.H)
-    assert to.unique(var_states.K[0], dim=0).shape[0] == 2 ** setup.H
 
-def test_fullEM_SCM_update(setup):
-    var_states = setup.var_states
-    data = to.rand(setup.N, 1, device=tvem.get_device())
+def test_fullEM_SCM_init(setup_fullEM_SCM):
+    var_states = setup_fullEM_SCM.var_states
+    assert var_states.K.shape == (setup_fullEM_SCM.N, setup_fullEM_SCM.H, setup_fullEM_SCM.H)
+    assert to.unique(var_states.K[0], dim=0).shape[0] == setup_fullEM_SCM.H
+
+
+def test_fullEM_SCM_update(setup_fullEM_SCM):
+    var_states = setup_fullEM_SCM.var_states
+    data = to.rand(setup_fullEM_SCM.N, 1, device=tvem.get_device())
     idx = to.arange(data.shape[0], device=tvem.get_device())
     lpj = DummyModel().log_joint(data=None, states=var_states.K)
     n_subs = var_states.update(idx, data, model=DummyModel())
