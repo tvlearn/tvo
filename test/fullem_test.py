@@ -8,6 +8,9 @@ from tvem.variational import FullEM, FullEMSingleCauseModels, state_matrix  # ty
 import tvem
 from tvem.utils.model_protocols import Trainable
 from munch import Munch
+import sys
+
+print(sys.path)
 
 
 class DummyModel(Trainable):
