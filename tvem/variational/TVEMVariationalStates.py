@@ -46,4 +46,3 @@ class TVEMVariationalStates(ABC):
         :returns: average number of variational state substitutions per datapoint performed
         """
         pass  # pragma: no cover
-
