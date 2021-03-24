@@ -59,7 +59,7 @@ class FullEM(TVEMVariationalStates):
 
 
 class FullEMSingleCauseModels(FullEM):
-    def __init__(self, N: int, C: int, precision: to.dtype):
+    def __init__(self, N: int, H: int, precision: to.dtype):
         """Full EM class for single causes models.
 
         :param N: Number of datapoints
@@ -67,17 +67,13 @@ class FullEMSingleCauseModels(FullEM):
         :param precision: The floating point precision of the lpj values.
                           Must be one of to.float32 or to.float64
         """
-        K_init = to.eye(C, dtype=precision, device=tvem.get_device())[None, :, :].expand(N, -1, -1)
-        super().__init__(N, C, precision, K_init=K_init)
+        K_init = to.eye(H, dtype=precision, device=tvem.get_device())[None, :, :].expand(N, -1, -1)
+        super().__init__(N, H, precision, K_init=K_init)
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
         lpj_fn = model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
-
+        assert to.any(self.K.sum(axis=1) == 1), "Multiple causes detected."
         K = self.K
-        assert to.any(
-            K.sum(axis=1) == 1
-        ), "More than one cause detected. Make sure that the log likelihood is summed in the correct dimensions."
-
         lpj = self.lpj
 
         lpj[idx] = lpj_fn(batch, K[idx])

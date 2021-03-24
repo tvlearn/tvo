@@ -4,7 +4,7 @@
 
 import pytest
 import torch as to
-from tvem.variational import FullEM, FullEMSingleCauseModels
+from tvem.variational import FullEM, FullEMSingleCauseModels, state_matrix
 import tvem
 from tvem.utils.model_protocols import Trainable
 from munch import Munch
@@ -24,45 +24,46 @@ class DummyModel(Trainable):
 def setup(request):
     s = Munch(N=10, H=8, precision=to.float32)
     s.update(var_states=FullEM(s.N, s.H, s.precision))
+    s.update(var_states_SCM=FullEMSingleCauseModels(s.N, s.H, s.precision))
+    s.update(K_multiple_causes=state_matrix(s.H)[None, :, :].expand(s.N, -1, -1))
+    s.update(
+        K_single_cause=to.eye(s.H, dtype=s.precision, device=tvem.get_device())[None, :, :].expand(
+            s.N, -1, -1
+        )
+    )
     return s
 
 
 def test_init(setup):
     var_states = setup.var_states
+    var_states_SCM = setup.var_states_SCM
     assert var_states.K.shape == (setup.N, 2 ** setup.H, setup.H)
     assert to.unique(var_states.K[0], dim=0).shape[0] == 2 ** setup.H
+    assert var_states_SCM.K.shape == (setup.N, setup.H, setup.H)
+    assert to.unique(var_states_SCM.K[0], dim=0).shape[0] == setup.H
 
 
 def test_update(setup):
     var_states = setup.var_states
+    var_states_SCM = setup.var_states_SCM
     data = to.rand(setup.N, 1, device=tvem.get_device())
     idx = to.arange(data.shape[0], device=tvem.get_device())
-    lpj = DummyModel().log_joint(data=None, states=var_states.K)
-    n_subs = var_states.update(idx, data, model=DummyModel())
+    lpj = DummyModel(setup.N, setup.H, setup.precision).log_joint(data=None, states=var_states.K)
+    lpj_SCM = DummyModel(setup.N, setup.H, setup.precision).log_joint(
+        data=None, states=var_states_SCM.K
+    )
+    n_subs = var_states.update(idx, data, model=DummyModel(setup.N, setup.H, setup.precision))
+    n_subs_SCM = var_states_SCM.update(
+        idx, data, model=DummyModel(setup.N, setup.H, setup.precision)
+    )
     assert n_subs == 0
+    assert n_subs_SCM == 0
     assert (var_states.lpj == lpj).all()
+    assert (var_states_SCM.lpj == lpj_SCM).all()
 
-
-@pytest.fixture(
-    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
-)
-def setup_fullEM_SCM(request):
-    s = Munch(N=10, H=8, precision=to.float32)
-    s.update(var_states=FullEMSingleCauseModels(s.N, s.H, s.precision))
-    return s
-
-
-def test_fullEM_SCM_init(setup_fullEM_SCM):
-    var_states = setup_fullEM_SCM.var_states
-    assert var_states.K.shape == (setup_fullEM_SCM.N, setup_fullEM_SCM.H, setup_fullEM_SCM.H)
-    assert to.unique(var_states.K[0], dim=0).shape[0] == setup_fullEM_SCM.H
-
-
-def test_fullEM_SCM_update(setup_fullEM_SCM):
-    var_states = setup_fullEM_SCM.var_states
-    data = to.rand(setup_fullEM_SCM.N, 1, device=tvem.get_device())
-    idx = to.arange(data.shape[0], device=tvem.get_device())
-    lpj = DummyModel().log_joint(data=None, states=var_states.K)
-    n_subs = var_states.update(idx, data, model=DummyModel())
-    assert n_subs == 0
-    assert (var_states.lpj == lpj).all()
+    try:
+        var_states_SCM.K = var_states.K
+        var_states_SCM.update(idx, setup.N, model=DummyModel(setup.N, setup.H, setup.precision))
+        raise Exception("FullEMSingleCauseModels accepted multiple cause K's")
+    except AssertionError:
+        pass
