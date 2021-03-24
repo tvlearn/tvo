@@ -13,9 +13,9 @@ try:
     from tvem.variational import state_matrix
 except ImportError:
     Warning("State matrix not importable")
-    import tvem.variational
+    import tvem.variational as tv
 
-    state_matrix = tvem.variational.state_matrix
+    state_matrix = tv.state_matrix
 
 
 class DummyModel(Trainable):
