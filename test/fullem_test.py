@@ -4,18 +4,10 @@
 
 import pytest
 import torch as to
-from tvem.variational import FullEM, FullEMSingleCauseModels
+from tvem.variational import FullEM, FullEMSingleCauseModels, state_matrix  # type: ignore
 import tvem
 from tvem.utils.model_protocols import Trainable
 from munch import Munch
-
-try:
-    from tvem.variational import state_matrix
-except ImportError:
-    Warning("State matrix not importable")
-    import tvem.variational as tv
-
-    state_matrix = tv.state_matrix
 
 
 class DummyModel(Trainable):
