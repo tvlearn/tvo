@@ -4,13 +4,11 @@
 
 import pytest
 import torch as to
-from tvem.variational import FullEM, FullEMSingleCauseModels, state_matrix  # type: ignore
+from tvem.variational import FullEM, FullEMSingleCauseModels
+from tvem.variational.fullem import state_matrix
 import tvem
 from tvem.utils.model_protocols import Trainable
 from munch import Munch
-import sys
-
-print(sys.path)
 
 
 class DummyModel(Trainable):
