@@ -32,6 +32,7 @@ def setup(request):
                 [-1e30, np.log(1 / 2), np.log(1 / 2), np.log(3 / 4)],
             ],
             device=_device,
+            dtype=to.float32,
         )
 
     return Setup

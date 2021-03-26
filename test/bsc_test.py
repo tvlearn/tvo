@@ -50,6 +50,7 @@ def setup(request):
                 [-(1.0 / 2), np.log(1.0), np.log(1.0), 2.0 * np.log(1.0) - (1.0 / 2)],
             ],
             device=_device,
+            dtype=precision,
         )
         true_const = 2 * np.log(0.5) - 0.5 * np.log(2 * math.pi)
         # per datap.
