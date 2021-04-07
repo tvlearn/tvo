@@ -81,6 +81,35 @@ class EEMConfig(EStepConfig):
         return vars(self)
 
 
+class TVSConfig(EStepConfig):
+    def __init__(
+        self,
+        n_states: int,
+        n_prior_samples: int,
+        n_marginal_samples: int,
+    ):
+        """Configuration object for TVS E-step.
+
+        :param n_states: Number of variational states per datapoint to keep in memory.
+        :param n_prior_samples: Number of new variational states to be sampled from prior.
+        :param n_marginal_samples: Number of new variational states to be sampled from\
+                                   approximated marginal p(s_h=1|vec{y}^{(n)}, Theta).
+        """
+        assert n_states > 0, f"n_states must be positive integer ({n_states})"
+        assert n_prior_samples > 0, f"n_prior_samples must be positive integer ({n_prior_samples})"
+        assert (
+            n_marginal_samples > 0
+        ), f"n_marginal_samples must be positive integer ({n_marginal_samples})"
+
+        self.n_prior_samples = n_prior_samples
+        self.n_marginal_samples = n_marginal_samples
+
+        super().__init__(n_states)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
+
+
 class FullEMConfig(EStepConfig):
     def __init__(self, n_latents: int):
         """Full EM configuration."""
