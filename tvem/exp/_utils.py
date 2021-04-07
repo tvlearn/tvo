@@ -8,19 +8,23 @@ import torch.distributed as dist
 from typing import Tuple, Union
 
 import tvem
-from tvem.variational import FullEM, EEMVariationalStates
-from tvem.exp._EStepConfig import FullEMConfig, EEMConfig, EStepConfig
+from tvem.variational import FullEM, EEMVariationalStates, TVSVariationalStates
+from tvem.exp._EStepConfig import FullEMConfig, EEMConfig, TVSConfig, EStepConfig
 from tvem.utils.parallel import scatter_to_processes
 
 
 def make_var_states(
     conf: EStepConfig, N: int, H: int, precision: to.dtype
-) -> Union[EEMVariationalStates, FullEM]:
+) -> Union[EEMVariationalStates, TVSVariationalStates, FullEM]:
     if isinstance(conf, FullEMConfig):
         assert conf.n_states == 2 ** H, "FullEMConfig and model have different H"
         return FullEM(N, H, precision)
     elif isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, precision)
+    if isinstance(conf, TVSConfig):
+        return TVSVariationalStates(
+            N, H, conf.n_states, precision, conf.n_prior_samples, conf.n_marginal_samples
+        )
     else:  # pragma: no cover
         raise NotImplementedError()
 
