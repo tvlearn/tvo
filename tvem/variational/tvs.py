@@ -6,7 +6,7 @@ import torch as to
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.model_protocols import Trainable, Optimized
-from ._utils import update_states_for_batch
+from ._utils import update_states_for_batch, set_redundant_lpj_to_low
 
 
 class TVSVariationalStates(TVEMVariationalStates):
@@ -49,9 +49,10 @@ class TVSVariationalStates(TVEMVariationalStates):
         else:
             lpj_fn = model.log_joint
             sort_by_lpj = {}
-        K, lpj = self.K[idx], self.lpj[idx]
-        batch_size, S, H = K.shape
-        lpj[:] = lpj_fn(batch, K)
+
+        K, lpj = self.K, self.lpj
+        batch_size, H = batch.shape[0], K.shape[2]
+        lpj[idx] = lpj_fn(batch, K[idx])
 
         new_K_prior = (
             to.rand(batch_size, self.config["S_new_prior"], H, device=K.device)
@@ -59,7 +60,7 @@ class TVSVariationalStates(TVEMVariationalStates):
         ).byte()
 
         approximate_marginals = (
-            mean_posterior(K.type_as(lpj), lpj)
+            mean_posterior(K[idx].type_as(lpj), lpj[idx])
             .unsqueeze(1)
             .expand(batch_size, self.config["S_new_marg"], H)
         )  # approximates p(s_h=1|\yVecN, \Theta), shape is (batch_size, S_new_marg, H)
@@ -72,6 +73,6 @@ class TVSVariationalStates(TVEMVariationalStates):
 
         new_lpj = lpj_fn(batch, new_K)
 
-        return update_states_for_batch(
-            new_K, new_lpj, idx, self.K, self.lpj, sort_by_lpj=sort_by_lpj
-        )
+        set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
+
+        return update_states_for_batch(new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj)
