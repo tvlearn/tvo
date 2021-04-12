@@ -3,9 +3,11 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
+import torch.distributed as dist
 from torch.utils.data import TensorDataset, DataLoader, Dataset, Sampler
 import numpy as np
 import tvem
+from tvem.utils.parallel import broadcast
 
 
 class TVEMDataLoader(DataLoader):
@@ -41,7 +43,18 @@ class TVEMDataLoader(DataLoader):
             # NOTE: this means that the E-step will sometimes write over a certain K[idx] and
             # lpj[idx] twice over the course of an epoch, even in the same batch (although that
             # will happen rarely). This double writing is not a race condition: the last write wins.
-            kwargs["sampler"] = ShufflingSampler(dataset, N)
+            n_samples = to.tensor(N)
+            assert dist.is_initialized()
+            comm_size = dist.get_world_size()
+            # Ranks ..., (comm_size-2), (comm_size-1) are
+            # assigned one data point more than ranks
+            # 0, 1, ... if the dataset cannot be evenly
+            # distributed across MPI processes. The split
+            # point depends on the total number of data
+            # points and number of MPI processes (see
+            # scatter_to_processes, gather_from_processes)
+            broadcast(n_samples, src=comm_size - 1)
+            kwargs["sampler"] = ShufflingSampler(dataset, int(n_samples))
             kwargs["shuffle"] = None
 
         super().__init__(dataset, **kwargs)
