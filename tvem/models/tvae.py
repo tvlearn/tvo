@@ -359,7 +359,9 @@ class TVAE(Trainable, Sampler, Reconstructor):
                 all_reduce(p.grad)
                 p.grad /= n_procs
 
-    def data_estimator(self, idx: to.Tensor, states: TVEMVariationalStates):  # type: ignore
+    def data_estimator(
+        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
+    ) -> to.Tensor:  # type: ignore
         r"""
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
         """
