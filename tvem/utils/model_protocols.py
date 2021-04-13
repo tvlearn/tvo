@@ -249,7 +249,9 @@ class Reconstructor(Protocol):
     """Implements data_estimator."""
 
     @abstractmethod
-    def data_estimator(self, idx: to.Tensor, states: "TVEMVariationalStates") -> to.Tensor:
+    def data_estimator(
+        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
+    ) -> to.Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
         as follows:""" r"""
