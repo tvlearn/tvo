@@ -110,7 +110,7 @@ class Trainer:
             F += model.free_energy(idx, batch, states)
             if reconstruction is not None:
                 # full data estimation
-                reconstruction[idx] = model.data_estimator(idx, states)  # type: ignore
+                reconstruction[idx] = model.data_estimator(idx, batch, states)  # type: ignore
         all_reduce(F)
         all_reduce(subs)
         return F.item() / N, subs.item() / N, reconstruction
@@ -240,7 +240,7 @@ class Trainer:
                 if train_reconstruction is not None:
                     assert isinstance(model, Reconstructor)
                     train_reconstruction[idx] = model.data_estimator(
-                        idx, train_states
+                        idx, batch, train_states
                     )  # full data estimation
             if to.isnan(batch).any():
                 missing_data_mask = to.isnan(batch)
