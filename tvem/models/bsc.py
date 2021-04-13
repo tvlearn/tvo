@@ -104,26 +104,20 @@ class BSC(Optimized, Sampler, Reconstructor):
         Wbar = to.matmul(
             Kfloat, self.theta["W"].t()
         )  # TODO Pre-allocate tensor and use `out` argument of to.matmul
-        Kpriorterm = (
-            to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
-            if self.config["individual_priors"]
-            else to.log(self.theta["pies"] / (1 - self.theta["pies"])) * Kfloat.sum(dim=2)
-        )
-        lpj = (
-            to.mul(to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"])
-            + Kpriorterm
-        )
+        lpj = to.mul(
+            to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
+        ) + to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
         return lpj.to(device=states.device)
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
         """Evaluate log-joints for BSC."""
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
-        D, H = self.shape
-        priorterm = (
-            to.log(1 - self.theta["pies"]).sum()
-            if self.config["individual_priors"]
-            else H * to.log(1 - self.theta["pies"])
+        D = to.sum(to.logical_not(to.isnan(data)), dim=1)  # (N,)
+        return (
+            lpj
+            + to.log(1 - self.theta["pies"]).sum()
+            - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
         )
         return lpj + priorterm - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
@@ -234,7 +228,7 @@ class BSC(Optimized, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, states: TVEMVariationalStates) -> Tensor:
+    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
         as follows:""" r"""
