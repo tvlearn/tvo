@@ -1,0 +1,21 @@
+name: tvem
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3
+  - numpy
+  - pytorch=1.8=cpu*
+  - matplotlib
+  - h5py
+  - pylama
+  - pytest
+  - mypy
+  - pytest-cov
+  - black
+  - munch
+  - cython
+  - sphinx
+  - sphinx-autodoc-typehints
+  - sphinx_rtd_theme
+  - gcc_linux-64
