@@ -7,7 +7,6 @@ from .tvs import TVSVariationalStates
 __all__ = [
     "TVEMVariationalStates",
     "FullEM",
-    "FullEMSingleCauseModels",
     "RandomSampledVarStates",
     "EEMVariationalStates",
     "TVSVariationalStates",

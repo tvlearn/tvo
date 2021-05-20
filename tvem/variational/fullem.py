@@ -29,7 +29,7 @@ def state_matrix(H: int, device: to.device = None):
 
 
 class FullEM(TVEMVariationalStates):
-    def __init__(self, N: int, H: int, precision: to.dtype, K_init=None):
+    def __init__(self, N: int, H: int, precision: to.dtype):
         """Full EM class.
 
         :param N: Number of datapoints
