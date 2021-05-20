@@ -117,12 +117,3 @@ class FullEMConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
-
-
-class FullEMSingleCauseConfig(EStepConfig):
-    def __init__(self, n_latents: int):
-        """Full EM configuration."""
-        super().__init__(n_latents)
-
-    def as_dict(self) -> Dict[str, Any]:
-        return vars(self)
