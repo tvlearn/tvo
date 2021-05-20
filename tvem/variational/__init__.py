@@ -1,5 +1,5 @@
 from .TVEMVariationalStates import TVEMVariationalStates
-from .fullem import FullEM
+from .fullem import FullEM, FullEMSingleCauseModels
 from .RandomSampledVarStates import RandomSampledVarStates
 from .eem import EEMVariationalStates
 from .tvs import TVSVariationalStates

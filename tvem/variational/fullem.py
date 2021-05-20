@@ -79,4 +79,3 @@ class FullEMSingleCauseModels(FullEM):
         lpj[idx] = lpj_fn(batch, K[idx])
 
         return 0
-
