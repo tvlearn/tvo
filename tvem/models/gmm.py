@@ -12,7 +12,6 @@ from typing import Union, Tuple
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
-from tvem.variational.fullem import FullEMSingleCauseModels
 from tvem.variational._utils import mean_posterior
 from tvem.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvem.utils.sanity import fix_theta
@@ -109,9 +108,7 @@ class GMM(Optimized, Sampler, Reconstructor):
         D = self.shape[0]
         return lpj - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
-    def update_param_batch(
-        self, idx: Tensor, batch: Tensor, states: FullEMSingleCauseModels
-    ) -> None:
+    def update_param_batch(self, idx: Tensor, batch: Tensor, states: Tensor) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
         batch_size, S, _ = K.shape
@@ -209,7 +206,7 @@ class GMM(Optimized, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, states: FullEMSingleCauseModels) -> Tensor:
+    def data_estimator(self, idx: Tensor, states: Tensor) -> Tensor:
 
         # Not yet implemented
 
