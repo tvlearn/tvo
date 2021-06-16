@@ -37,7 +37,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         :param W_init: Tensor with shape (D,H), initializes BSC weights.
         :param pies_init: Tensor with shape (H,), initializes BSC priors.
         :param individual_priors: Whether to use a Bernoulli prior with H individual prior
-         probabilities. If False, the same prior robability will be used for all latents.
+         probabilities. If False, the same prior probability will be used for all latents.
         :param precision: Floating point precision required. Must be one of torch.float32 or
                           torch.float64.
 
