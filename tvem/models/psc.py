@@ -119,7 +119,7 @@ class PSC(Sampler, Optimized, Reconstructor):
         priorterm = Kfloat @ to.log(pies_ / (1 - pies_))
 
         Wbar = (Kfloat @ W).clamp(min=self._tiny)
-        lpj = (data.unsqueeze(1).type_as(pies) * Wbar.log() - Wbar).sum(dim=2) + priorterm
+        lpj = (data.unsqueeze(1).type_as(pies) * Wbar.log() - Wbar).nansum(dim=2) + priorterm
         assert lpj.shape == (N, S)
         assert not to.isnan(lpj).any() and not to.isinf(lpj).any()
         return lpj
@@ -136,7 +136,7 @@ class PSC(Sampler, Optimized, Reconstructor):
             + to.sum(to.log(1 - pies_))
             - to.lgamma(data.type_as(pies) + 1.0 + self._tiny)
             .to(data.device)
-            .sum(dim=1)
+            .nansum(dim=1)
             .unsqueeze(1)
         )  # TODO: Evaluate prior term only once per epoch and factorial term only once per run
         assert logjoints.shape == lpj.shape
