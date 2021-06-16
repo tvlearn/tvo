@@ -27,6 +27,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         W_init: Tensor = None,
         sigma2_init: Tensor = None,
         pies_init: Tensor = None,
+        individual_priors: bool = True,
         precision: to.dtype = to.float64,
     ):
         """Shallow Binary Sparse Coding (BSC) model.
@@ -35,6 +36,8 @@ class BSC(Optimized, Sampler, Reconstructor):
         :param D: Number of observables.
         :param W_init: Tensor with shape (D,H), initializes BSC weights.
         :param pies_init: Tensor with shape (H,), initializes BSC priors.
+        :param individual_priors: Whether to use a Bernoulli prior with H individual prior
+         probabilities. If False, the same prior robability will be used for all latents.
         :param precision: Floating point precision required. Must be one of torch.float32 or
                           torch.float64.
 
@@ -52,10 +55,14 @@ class BSC(Optimized, Sampler, Reconstructor):
             broadcast(W_init)
 
         if pies_init is not None:
-            assert pies_init.shape == (H,)
+            assert pies_init.shape == (H,) if individual_priors else pies_init.shape == (1,)
             pies_init = pies_init.to(dtype=precision, device=device)
         else:
-            pies_init = to.full((H,), 1.0 / H, dtype=precision, device=device)
+            pies_init = (
+                to.full((H,), 1.0 / H, dtype=precision, device=device)
+                if individual_priors
+                else to.tensor([1.0 / H], dtype=precision, device=device)
+            )
 
         if sigma2_init is not None:
             assert sigma2_init.shape == (1,)
@@ -84,32 +91,41 @@ class BSC(Optimized, Sampler, Reconstructor):
         self.my_pies = to.zeros(H, dtype=precision, device=device)
         self.my_sigma2 = to.zeros(1, dtype=precision, device=device)
         self.my_N = to.tensor([0], dtype=to.int, device=device)
-        self._config = dict(H=H, D=D, precision=precision, device=device)
+        self._config = dict(
+            H=H, D=D, individual_priors=individual_priors, precision=precision, device=device
+        )
         self._shape = self.theta["W"].shape
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
-        """Evaluate log-pseudo-joints for BSC."""
+        """Evaluate log-pseudo-joints for BSC"""
         Kfloat = states.to(
             dtype=self.theta["W"].dtype
         )  # TODO Find solution to avoid byte->float casting
         Wbar = to.matmul(
             Kfloat, self.theta["W"].t()
         )  # TODO Pre-allocate tensor and use `out` argument of to.matmul
-        lpj = to.mul(
-            to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
-        ) + to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
+        Kpriorterm = (
+            to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
+            if self.config["individual_priors"]
+            else to.log(self.theta["pies"] / (1 - self.theta["pies"])) * Kfloat.sum(dim=2)
+        )
+        lpj = (
+            to.mul(to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"])
+            + Kpriorterm
+        )
         return lpj.to(device=states.device)
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
         """Evaluate log-joints for BSC."""
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
-        D = self.shape[0]
-        return (
-            lpj
-            + to.log(1 - self.theta["pies"]).sum()
-            - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
+        D, H = self.shape
+        priorterm = (
+            to.log(1 - self.theta["pies"]).sum()
+            if self.config["individual_priors"]
+            else H * to.log(1 - self.theta["pies"])
         )
+        return lpj + priorterm - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
         lpj = states.lpj[idx]
@@ -148,7 +164,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         all_reduce(self.my_N)
 
         N = self.my_N.item()
-        D = self.shape[0]
+        D, H = self.shape
 
         # Calculate updated W
         Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
@@ -161,7 +177,11 @@ class BSC(Optimized, Sampler, Reconstructor):
             theta_new["W"] = Wold_noisy
 
         # Calculate updated pi
-        theta_new["pies"] = self.my_pies / N
+        theta_new["pies"] = (
+            self.my_pies / N
+            if self.config["individual_priors"]
+            else self.my_pies.sum(dim=0, keepdim=True) / N / H
+        )
 
         # Calculate updated sigma^2
         theta_new["sigma2"] = self.my_sigma2 / N / D
