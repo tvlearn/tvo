@@ -221,10 +221,10 @@ class _TrainingAndOrValidation(Experiment):
             reco_dict = {}
             if (
                 f"{log_kind}_reconstruction" not in self._conf.log_blacklist
-                and f"{log_kind}_rec" in epoch_results
+                and f"{data_kind}_rec" in epoch_results
             ):
                 reco_dict[f"{log_kind}_reconstruction"] = gather_from_processes(
-                    epoch_results[f"{log_kind}_rec"]
+                    epoch_results[f"{data_kind}_rec"]
                 )
                 logger.set(**reco_dict)
 
