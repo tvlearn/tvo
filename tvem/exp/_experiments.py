@@ -228,7 +228,8 @@ class _TrainingAndOrValidation(Experiment):
                 )
                 logger.set(**reco_dict)
 
-        logger.append(theta=self.model.theta)
+        log_theta_fn = logger.set if self._conf.log_only_latest_theta else logger.append
+        log_theta_fn(theta=self.model.theta)
         logger.write()
 
 

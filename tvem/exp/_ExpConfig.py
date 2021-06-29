@@ -17,6 +17,7 @@ class ExpConfig:
         warmup_Esteps: int = 0,
         output: str = None,
         log_blacklist: Iterable[str] = [],
+        log_only_latest_theta: bool = False,
         rollback_if_F_decreases: Sequence[str] = [],
         warmup_reco_epochs: Iterable[int] = None,
         reco_epochs: Iterable[int] = None,
@@ -47,6 +48,8 @@ class ExpConfig:
                               - "theta": a group containing logs of whatever model.theta contains
                                 If one of these names appears in `log_blacklist`, the corresponing
                                 quantity will not be logged.
+        :param log_only_latest_theta: Log only the most recent snapshot of the model parameters
+                                      (use H5Logger.set instead of H5Logger.append)
         :param rollback_if_F_decreases: names of model parameters (corresponding to those in
                                         model.theta) that should be rolled back (i.e. not
                                         updated) if the free energy value before and after
@@ -77,6 +80,7 @@ class ExpConfig:
         self.warmup_Esteps = warmup_Esteps
         self.output = output if output is not None else f"tvem_exp_{os.getpid()}.h5"
         self.log_blacklist = log_blacklist
+        self.log_only_latest_theta = log_only_latest_theta
         self.rollback_if_F_decreases = rollback_if_F_decreases
         self.warmup_reco_epochs = warmup_reco_epochs
         self.reco_epochs = reco_epochs
