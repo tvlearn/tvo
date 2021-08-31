@@ -119,7 +119,6 @@ class BSC(Optimized, Sampler, Reconstructor):
             + to.log(1 - self.theta["pies"]).sum()
             - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
         )
-        return lpj + priorterm - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
         lpj = states.lpj[idx]
