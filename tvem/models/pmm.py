@@ -12,6 +12,7 @@ from typing import Union, Tuple
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
+from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvem.utils.sanity import fix_theta
@@ -184,7 +185,7 @@ class PMM(Optimized, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, states: Tensor) -> Tensor:
+    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> Tensor:
 
         # Not yet implemented
 
