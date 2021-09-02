@@ -4,7 +4,7 @@
 
 # otherwise Testing is picked up as a test class
 from tvem.exp import ExpConfig, EEMConfig, FullEMConfig, Training, Testing as _Testing
-from tvem.models import NoisyOR, BSC, TVAE
+from tvem.models import NoisyOR, BSC, GaussianTVAE
 from tvem.utils.model_protocols import Trainable, Reconstructor
 from tvem.utils.parallel import init_processes, broadcast
 from tvem.utils import get
@@ -132,7 +132,8 @@ def batch_size(request):
 
 
 @pytest.fixture(
-    scope="function", params=("NoisyOR", "BSC", "BSC_incmpl", "TVAE", "TVAE_incmpl", "LogJointOnly")
+    scope="function",
+    params=("NoisyOR", "BSC", "BSC_incmpl", "GaussianTVAE", "GaussianTVAE_incmpl", "LogJointOnly"),
 )
 def model_and_data(request, hyperparams, input_files, precision):
     """Return a tuple of a model and a filename (dataset for the model).
@@ -146,11 +147,11 @@ def model_and_data(request, hyperparams, input_files, precision):
         return BSC(H=H, D=D, precision=precision), input_files.continuous_data
     elif request.param == "BSC_incmpl":
         return BSC(H=H, D=D, precision=precision), input_files.continuous_data_incmpl
-    elif request.param == "TVAE":
-        return TVAE(shape=(D, H * 2, H), precision=precision), input_files.continuous_data
-    elif request.param == "TVAE_incmpl":
+    elif request.param == "GaussianTVAE":
+        return GaussianTVAE(shape=(D, H * 2, H), precision=precision), input_files.continuous_data
+    elif request.param == "GaussianTVAE_incmpl":
         return (
-            TVAE(shape=(D, H * 2, H), precision=precision),
+            GaussianTVAE(shape=(D, H * 2, H), precision=precision),
             input_files.continuous_data_incmpl,
         )
     elif request.param == "LogJointOnly":

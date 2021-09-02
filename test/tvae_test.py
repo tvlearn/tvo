@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from tvem.models import TVAE, BSC
+from tvem.models import GaussianTVAE, BSC
 from tvem.variational import FullEM
 from tvem.utils import get
 from tvem.utils.parallel import init_processes
@@ -34,7 +34,7 @@ def simple_tvae(add_gpu_mark):
     b = [to.zeros((H1)), to.zeros((D))]
     pi = to.full((H0,), 0.2)
     sigma2 = 0.01
-    return TVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
+    return GaussianTVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
 
 
 def test_forward(simple_tvae):
@@ -130,7 +130,7 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
     b = [to.zeros((H1), dtype=precision, device=d), to.zeros((D), dtype=precision, device=d)]
     pi = to.full((H0,), 0.2, dtype=precision, device=d)
     sigma2 = 0.01
-    tvae = TVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2, precision=precision)
+    tvae = GaussianTVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2, precision=precision)
 
     bsc_W = W[1].t()
     bsc_sigma2 = to.tensor([0.01], dtype=precision, device=d)
@@ -172,7 +172,7 @@ def tvae(request, train_setup, add_gpu_mark):
         analytical_sigma_updates = False
         analytical_pi_updates = False
 
-    return TVAE(
+    return GaussianTVAE(
         train_setup.shape,
         precision=train_setup.data.dtype,
         analytical_pi_updates=analytical_pi_updates,
@@ -201,7 +201,7 @@ def test_train(train_setup, tvae):
 
 
 def copy_tvae(tvae):
-    tvae_copy = TVAE(
+    tvae_copy = GaussianTVAE(
         shape=tvae.net_shape,
         precision=tvae.precision,
         W_init=[w.detach().clone() for w in tvae.W],

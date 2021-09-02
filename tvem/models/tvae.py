@@ -12,9 +12,180 @@ import tvem
 import torch as to
 from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union
 from math import pi as MATH_PI
+from abc import abstractmethod
 
 
-class TVAE(Trainable, Sampler, Reconstructor):
+def _get_net_shape(net_shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
+    if net_shape is not None:
+        return tuple(reversed(net_shape))
+    else:
+        assert (
+            W_init is not None
+        ), "Must pass one of `net_shape` and `W_init` to __init__ of the\
+        TVAE model"
+        return tuple(w.shape[0] for w in W_init) + (W_init[-1].shape[1],)
+
+
+def _init_W(
+    net_shape: Sequence[int], precision: to.dtype, init: Optional[Sequence[to.Tensor]]
+) -> List[to.Tensor]:
+    """Return weights initialized with Xavier or to specified init values.
+
+    This method also makes sure that device and precision are the ones required by
+    the model.
+    """
+    if init is None:
+        n_layers = len(net_shape) - 1
+        W_shapes = ((net_shape[ln], net_shape[ln + 1]) for ln in range(n_layers))
+        W = list(map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes)))
+    else:
+        assert (
+            len(init) == len(net_shape) - 1
+        ), f"Shape is {net_shape} but {len(init)} weights passed"
+        Wshapes = [w.shape for w in init]
+        expected_Wshapes = [(net_shape[ln], net_shape[ln + 1]) for ln in range(len(init))]
+        err_msg = f"Input W shapes: {Wshapes}\nExpected W shapes {expected_Wshapes}"
+        assert all(ws == exp_s for ws, exp_s in zip(Wshapes, expected_Wshapes)), err_msg
+        W = list(w.clone() for w in init)
+    for w in W:
+        broadcast(w)
+    return [w.to(device=tvem.get_device(), dtype=precision).requires_grad_(True) for w in W]
+
+
+def _init_b(
+    net_shape: Sequence[int], precision: to.dtype, init: Optional[Iterable[to.Tensor]]
+) -> List[to.Tensor]:
+    """Return biases initialized to zeros or to specified init values.
+
+    This method also makes sure that device and precision are the ones required by the model.
+    """
+    if init is None:
+        B = [to.zeros(s) for s in net_shape[1:]]
+    else:
+        assert all(b.shape == (net_shape[ln + 1],) for ln, b in enumerate(init))
+        B = [b.clone() for b in init]
+    return [b.to(device=tvem.get_device(), dtype=precision).requires_grad_(True) for b in B]
+
+
+def _init_pi(
+    precision: to.dtype, init: Optional[to.Tensor], H0: int, requires_grad: bool
+) -> to.Tensor:
+    if init is None:
+        pi = to.full((H0,), 1 / H0)
+    else:
+        assert init.shape == (H0,)
+        pi = init.clone()
+    return pi.to(device=tvem.get_device(), dtype=precision).requires_grad_(requires_grad)
+
+
+def _init_sigma2(precision: to.dtype, init: Optional[float], requires_grad: bool) -> to.Tensor:
+    sigma2 = to.tensor([0.01] if init is None else [init])
+    return sigma2.to(device=tvem.get_device(), dtype=precision).requires_grad_(requires_grad)
+
+
+class _TVAE(Trainable, Sampler, Reconstructor):
+    _theta: Dict[str, to.Tensor]
+    _precision: to.dtype
+    _net_shape: Sequence[int]
+    _optimizer: to.optim.Optimizer
+    _scheduler: to.optim.lr_scheduler._LRScheduler
+
+    @abstractmethod
+    def log_joint(self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None) -> to.Tensor:
+        ...
+
+    def _log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
+        with to.no_grad():
+            lpj, _ = self._lpj_and_mlpout(data, states)
+        return lpj
+
+    @abstractmethod
+    def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
+        ...
+
+    def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
+        with to.no_grad():
+            return super().free_energy(idx, batch, states)
+
+    def _free_energy_from_logjoints(self, logjoints: to.Tensor) -> to.Tensor:
+        Fn = to.logsumexp(logjoints, dim=1)
+        assert Fn.shape == (logjoints.shape[0],)
+        assert not to.isnan(Fn).any() and not to.isinf(Fn).any()
+        return Fn.sum()
+
+    def update_param_batch(
+        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
+    ) -> float:
+        if to.isnan(batch).any():
+            raise RuntimeError("There are NaNs in this batch")
+        F, mlp_out = self._optimize_nn_params(idx, batch, states)
+        with to.no_grad():
+            self._accumulate_param_updates(idx, batch, states, mlp_out)
+        return F
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        """Shape of TVAE model as a bayes net: (D, H0)
+
+        Neural network shape is ignored.
+        """
+        return tuple((self._net_shape[-1], self._net_shape[0]))
+
+    @property
+    def net_shape(self) -> Tuple[int, ...]:
+        """Full TVAE network shape (D, Hn, Hn-1, ..., H0)."""
+        return tuple(reversed(self._net_shape))
+
+    def _optimize_nn_params(
+        self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates
+    ) -> Tuple[float, to.Tensor]:
+        """
+        Gradient-based optimized parameters are changed in-place. All other arguments are left
+        untouched.
+
+        :returns: F and mlp_output _before_ the weight update
+        """
+        assert self._optimizer is not None  # to make mypy happy
+
+        lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
+        F = self._free_energy_from_logjoints(self.log_joint(data, states.K[idx], lpj))
+        loss = -F / data.shape[0]
+        loss.backward()
+
+        mpi_average_grads(self.theta)
+        self._optimizer.step()
+        self._scheduler.step()
+        self._optimizer.zero_grad()
+
+        return F.item(), mlp_out
+
+    def _accumulate_param_updates(
+        self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates, mlp_out: to.Tensor
+    ) -> None:
+        pass
+
+    def data_estimator(
+        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
+    ) -> to.Tensor:  # type: ignore
+        r"""
+        :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
+        """
+
+        lpj = states.lpj[idx]
+        K = states.K[idx]
+
+        with to.no_grad():
+            means = self.forward(K)  # N,S,D
+
+        return mean_posterior(means, lpj)  # N, D
+
+    @abstractmethod
+    def forward(self, x: to.Tensor) -> to.Tensor:
+        """Forward application of TVAE's MLP to the specified input."""
+        ...
+
+
+class GaussianTVAE(_TVAE):
     def __init__(
         self,
         shape: Sequence[int] = None,
@@ -30,7 +201,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
         analytical_pi_updates: bool = True,
         clamp_sigma_updates: bool = False,
     ):
-        """Create a TVAE model.
+        """Create a TVAE model with Gaussian observables.
 
         :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
                       Can be None if W_init is not None.
@@ -51,13 +222,15 @@ class TVAE(Trainable, Sampler, Reconstructor):
         self._theta: Dict[str, to.Tensor] = {}
         self._clamp_sigma = clamp_sigma_updates
         self._precision = precision
-        self._net_shape = self._get_net_shape(shape, W_init)
-        self.W = self._init_W(W_init)
-        self.b = self._init_b(b_init)
+        self._net_shape = _get_net_shape(shape, W_init)
+        self.W = _init_W(self._net_shape, precision, W_init)
+        self.b = _init_b(self._net_shape, precision, b_init)
         H0 = self._net_shape[0]
-        self._theta["pies"] = self._init_pi(pi_init, H0, requires_grad=not analytical_pi_updates)
-        self._theta["sigma2"] = self._init_sigma2(
-            sigma2_init, requires_grad=not analytical_sigma_updates
+        self._theta["pies"] = _init_pi(
+            precision, pi_init, H0, requires_grad=not analytical_pi_updates
+        )
+        self._theta["sigma2"] = _init_sigma2(
+            precision, sigma2_init, requires_grad=not analytical_sigma_updates
         )
         self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
         self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
@@ -101,70 +274,6 @@ class TVAE(Trainable, Sampler, Reconstructor):
             device=tvem.get_device(),
         )
 
-    def _get_net_shape(self, shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
-        if shape is not None:
-            return tuple(reversed(shape))
-        else:
-            assert W_init is not None, "Must pass one of `shape` and `W_init` to TVAE.__init__"
-            return tuple(w.shape[0] for w in W_init) + (W_init[-1].shape[1],)
-
-    def _init_W(self, init: Optional[Sequence[to.Tensor]]) -> List[to.Tensor]:
-        """Return weights initialized with Xavier or to specified init values.
-
-        This method also makes sure that device and precision are the ones required by
-        the model.
-        """
-        shape = self._net_shape
-        if init is None:
-            n_layers = len(shape) - 1
-            W_shapes = ((shape[ln], shape[ln + 1]) for ln in range(n_layers))
-            W = list(map(to.nn.init.xavier_normal_, (to.empty(s) for s in W_shapes)))
-        else:
-            assert len(init) == len(shape) - 1, f"Shape is {shape} but {len(init)} weights passed"
-            Wshapes = [w.shape for w in init]
-            expected_Wshapes = [(shape[ln], shape[ln + 1]) for ln in range(len(init))]
-            err_msg = f"Input W shapes: {Wshapes}\nExpected W shapes {expected_Wshapes}"
-            assert all(ws == exp_s for ws, exp_s in zip(Wshapes, expected_Wshapes)), err_msg
-            W = list(w.clone() for w in init)
-        for w in W:
-            broadcast(w)
-        return [
-            w.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for w in W
-        ]
-
-    def _init_b(self, init: Optional[Iterable[to.Tensor]]) -> List[to.Tensor]:
-        """Return biases initialized to zeros or to specified init values.
-
-        This method also makes sure that device and precision are the ones required by the model.
-        """
-        if init is None:
-            B = [to.zeros(s) for s in self._net_shape[1:]]
-        else:
-            assert all(b.shape == (self._net_shape[ln + 1],) for ln, b in enumerate(init))
-            B = [b.clone() for b in init]
-        return [
-            b.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(True) for b in B
-        ]
-
-    def _init_pi(self, init: Optional[to.Tensor], H0: int, requires_grad: bool) -> to.Tensor:
-        if init is None:
-            pi = to.full((H0,), 1 / H0)
-        else:
-            assert init.shape == (H0,)
-            pi = init.clone()
-        return pi.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(requires_grad)
-
-    def _init_sigma2(self, init: Optional[float], requires_grad: bool) -> to.Tensor:
-        sigma2 = to.tensor([0.01] if init is None else [init])
-        return sigma2.to(device=tvem.get_device(), dtype=self.precision).requires_grad_(
-            requires_grad
-        )
-
-    def _log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
-        with to.no_grad():
-            lpj, _ = self._lpj_and_mlpout(data, states)
-        return lpj
-
     def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
         N = data.shape[0]
         N_, S, H = states.shape
@@ -182,10 +291,6 @@ class TVAE(Trainable, Sampler, Reconstructor):
         assert not to.isnan(lpj).any() and not to.isinf(lpj).any()
         return lpj, mlp_out
 
-    def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
-        with to.no_grad():
-            return super().free_energy(idx, batch, states)
-
     def log_joint(self, data, states, lpj=None):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = data.shape[1] - to.isnan(data).sum(dim=1)  # (N,): ignores missing data
@@ -195,22 +300,6 @@ class TVAE(Trainable, Sampler, Reconstructor):
         # TODO: could pre-evaluate the constant factor once per epoch
         logjoints = lpj - D / 2 * to.log(2 * MATH_PI * sigma2) + to.log(1 - pi).sum()
         return logjoints
-
-    def _free_energy_from_logjoints(self, logjoints: to.Tensor) -> to.Tensor:
-        Fn = to.logsumexp(logjoints, dim=1)
-        assert Fn.shape == (logjoints.shape[0],)
-        assert not to.isnan(Fn).any() and not to.isinf(Fn).any()
-        return Fn.sum()
-
-    def update_param_batch(
-        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
-    ) -> float:
-        if to.isnan(batch).any():
-            raise RuntimeError("There are NaNs in this batch")
-        F, mlp_out = self._optimize_nn_params(idx, batch, states)
-        with to.no_grad():
-            self._accumulate_param_updates(idx, batch, states, mlp_out)
-        return F
 
     def update_param_epoch(self) -> None:
         pi = self.theta["pies"]
@@ -269,38 +358,10 @@ class TVAE(Trainable, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """Shape of TVAE model as a bayes net: (D, H0)
-
-        Neural network shape is ignored.
-        """
-        return tuple((self._net_shape[-1], self._net_shape[0]))
-
-    @property
-    def net_shape(self) -> Tuple[int, ...]:
-        """Full TVAE network shape (D, Hn, Hn-1, ..., H0)."""
-        return tuple(reversed(self._net_shape))
-
     def _optimize_nn_params(
         self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates
     ) -> Tuple[float, to.Tensor]:
-        """
-        W, b are changed in-place. All other arguments are left untouched.
-
-        :returns: F and mlp_output _before_ the weight update
-        """
-        assert self._optimizer is not None  # to make mypy happy
-
-        lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
-        F = self._free_energy_from_logjoints(self.log_joint(data, states.K[idx], lpj))
-        loss = -F / data.shape[0]
-        loss.backward()
-
-        mpi_average_grads(self.theta)
-        self._optimizer.step()
-        self._scheduler.step()
-        self._optimizer.zero_grad()
+        F, mlp_out = super()._optimize_nn_params(idx, data, states)
 
         with to.no_grad():
             sigma2 = self.theta["sigma2"]
@@ -310,7 +371,7 @@ class TVAE(Trainable, Sampler, Reconstructor):
             if pi.requires_grad:
                 to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
 
-        return F.item(), mlp_out
+        return F, mlp_out
 
     def _accumulate_param_updates(
         self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates, mlp_out: to.Tensor
@@ -345,18 +406,3 @@ class TVAE(Trainable, Sampler, Reconstructor):
         output = output @ self.W[-1] + self.b[-1]
 
         return output
-
-    def data_estimator(
-        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
-    ) -> to.Tensor:  # type: ignore
-        r"""
-        :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
-        """
-
-        lpj = states.lpj[idx]
-        K = states.K[idx]
-
-        with to.no_grad():
-            means = self.forward(K)  # N,S,D
-
-        return mean_posterior(means, lpj)  # N, D
