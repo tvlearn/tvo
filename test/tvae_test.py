@@ -3,9 +3,8 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from tvem.models import GaussianTVAE, BSC
+from tvem.models import GaussianTVAE, BernoulliTVAE, BSC
 from tvem.variational import FullEM
-from tvem.utils import get
 from tvem.utils.parallel import init_processes
 import tvem
 from math import pi as MATH_PI
@@ -27,14 +26,17 @@ def fullem_for(tvae, N):
     return FullEM(N, H0, tvae.precision)
 
 
-@pytest.fixture(scope="function")
-def simple_tvae(add_gpu_mark):
+@pytest.fixture(scope="function", params=("Gaussian", "Bernoulli"))
+def simple_tvae(request, add_gpu_mark):
     H0, H1, D = 2, 3, 1
     W = [to.ones((H0, H1)), to.ones((H1, D))]
     b = [to.zeros((H1)), to.zeros((D))]
     pi = to.full((H0,), 0.2)
-    sigma2 = 0.01
-    return GaussianTVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
+    if request.param == "Gaussian":
+        sigma2 = 0.01
+        return GaussianTVAE(pi_init=pi, W_init=W, b_init=b, sigma2_init=sigma2)
+    elif request.param == "Bernoulli":
+        return BernoulliTVAE(pi_init=pi, W_init=W, b_init=b)
 
 
 def test_forward(simple_tvae):
@@ -42,14 +44,17 @@ def test_forward(simple_tvae):
 
     mlp_in = to.zeros((2, H0), device=tvem.get_device(), dtype=simple_tvae.precision)
     mlp_in[1, -1] = 1.0
+
     # assuming all W==1, all b==0 and ReLU activation
-    expected_output = H1 * to.relu(mlp_in.sum(dim=1, keepdim=True))
+    e = H1 * to.relu(mlp_in.sum(dim=1, keepdim=True))
+    expected_output = to.sigmoid(e) if isinstance(simple_tvae, BernoulliTVAE) else e
 
     out = simple_tvae.forward(mlp_in)
     assert to.allclose(out, expected_output)
 
     mlp_in = to.rand(100, H0, device=tvem.get_device(), dtype=simple_tvae.precision)
-    expected_output = H1 * mlp_in.sum(dim=1, keepdim=True)
+    e = H1 * mlp_in.sum(dim=1, keepdim=True)
+    expected_output = to.sigmoid(e) if isinstance(simple_tvae, BernoulliTVAE) else e
     out = simple_tvae.forward(mlp_in)
     assert to.allclose(out, expected_output)
 
@@ -58,17 +63,27 @@ def true_lpj(tvae_model, data, states):
     # true lpj calculations make certain simplifying assumptions on tvae
     # parameters. check they are satisfied.
     d = tvem.get_device()
-    pi, sigma2 = get(tvae_model.theta, "pies", "sigma2")
+    pi = tvae_model.theta["pies"]
     assert all(math.isclose(pi[0], p) for p in pi)
     assert all(w.allclose(to.ones(1, device=d, dtype=tvae_model.precision)) for w in tvae_model.W)
     assert all(b.allclose(to.zeros(1, device=d, dtype=tvae_model.precision)) for b in tvae_model.b)
 
     D, H1, H0 = tvae_model.net_shape
     mlp_out = states.K.sum(dim=2, dtype=tvae_model.precision, keepdim=True).mul_(H1)
+    mlp_out = to.sigmoid(mlp_out) if isinstance(tvae_model, BernoulliTVAE) else mlp_out
     assert mlp_out.allclose(tvae_model.forward(states.K))
+    N, S = data.shape[0], states.K.shape[1]
 
-    s1 = (data.unsqueeze(1) - mlp_out).pow_(2).sum(dim=2).div_(2 * sigma2)
-    s2 = states.K.to(dtype=tvae_model.precision).matmul(to.log(pi / (1 - pi)))
+    if isinstance(tvae_model, GaussianTVAE):
+        s1 = (data.unsqueeze(1) - mlp_out).pow_(2).sum(dim=2).div_(2 * tvae_model.theta["sigma2"])
+    elif isinstance(tvae_model, BernoulliTVAE):
+        s1 = to.sum(
+            to.nn.functional.binary_cross_entropy(
+                mlp_out, data.unsqueeze(1).expand(N, S, D), reduction="none"
+            ),
+            dim=2,
+        )
+    s2 = states.K.to(dtype=tvae_model.precision) @ to.log(pi / (1 - pi))
     true_lpj = s2.sub_(s1)
 
     return true_lpj
@@ -79,12 +94,17 @@ def true_free_energy(tvae_model, data, states):
     assert D == tvae_model.theta["b_1"].numel()
     assert D == tvae_model.theta["W_1"].shape[1]
     assert H0 == tvae_model.theta["pies"].numel()
+    pi = tvae_model.theta["pies"]
 
-    logjoints = (
-        true_lpj(tvae_model, data, states)
-        - D / 2 * to.log(2 * to.tensor(MATH_PI) * tvae_model.theta["sigma2"])
-        + to.log(1 - tvae_model.theta["pies"][0]) * H0
-    )
+    if isinstance(tvae_model, GaussianTVAE):
+        logjoints = (
+            true_lpj(tvae_model, data, states)
+            - D / 2 * to.log(2 * to.tensor(MATH_PI) * tvae_model.theta["sigma2"])
+            + to.log(1 - pi[0]) * H0
+        )
+    elif isinstance(tvae_model, BernoulliTVAE):
+        logjoints = true_lpj(tvae_model, data, states) + to.log(1 - pi[0]) * H0
+
     return to.logsumexp(logjoints, dim=1).sum().item()
 
 
@@ -162,22 +182,33 @@ def train_setup():
     return Munch(N=N, D=D, shape=(D, 10, 10), data=to.rand(N, D, device=tvem.get_device()))
 
 
-@pytest.fixture(scope="function", params=["analytical_pisigma", "gd_sigma", "gd_pisigma"])
+@pytest.fixture(
+    scope="function",
+    params=[
+        "gaussian-analytical_pisigma",
+        "gaussian-gd_sigma",
+        "gaussian-gd_pisigma",
+        "bernoulli-analytical_pi",
+        "bernoulli-gd_pi",
+    ],
+)
 def tvae(request, train_setup, add_gpu_mark):
-    analytical_pi_updates = True
-    analytical_sigma_updates = True
-    if request.param == "gd_sigma":
-        analytical_sigma_updates = False
-    if request.param == "gd_pisigma":
-        analytical_sigma_updates = False
-        analytical_pi_updates = False
-
-    return GaussianTVAE(
-        train_setup.shape,
-        precision=train_setup.data.dtype,
-        analytical_pi_updates=analytical_pi_updates,
-        analytical_sigma_updates=analytical_sigma_updates,
-    )
+    if request.param == "gaussian-analytical_pisigma":
+        model = GaussianTVAE
+        kwargs = {"analytical_pi_updates": True, "analytical_sigma_updates": True}
+    elif request.param == "gaussian-gd_sigma":
+        model = GaussianTVAE
+        kwargs = {"analytical_pi_updates": True, "analytical_sigma_updates": False}
+    elif request.param == "gaussian-gd_pisigma":
+        model = GaussianTVAE
+        kwargs = {"analytical_pi_updates": False, "analytical_sigma_updates": False}
+    elif request.param == "bernoulli-analytical_pi":
+        model = BernoulliTVAE
+        kwargs = {"analytical_pi_updates": True}
+    elif request.param == "bernoulli-gd_pi":
+        model = BernoulliTVAE
+        kwargs = {"analytical_pi_updates": False}
+    return model(train_setup.shape, precision=train_setup.data.dtype, **kwargs)
 
 
 @pytest.mark.gpu
@@ -201,16 +232,26 @@ def test_train(train_setup, tvae):
 
 
 def copy_tvae(tvae):
-    tvae_copy = GaussianTVAE(
-        shape=tvae.net_shape,
-        precision=tvae.precision,
-        W_init=[w.detach().clone() for w in tvae.W],
-        b_init=[b.detach().clone() for b in tvae.b],
-        sigma2_init=float(tvae.theta["sigma2"].detach().clone().item()),
-        pi_init=tvae.theta["pies"].detach().clone(),
-        analytical_pi_updates=not tvae.theta["pies"].requires_grad,
-        analytical_sigma_updates=not tvae.theta["sigma2"].requires_grad,
-    )
+    if isinstance(tvae, GaussianTVAE):
+        tvae_copy = GaussianTVAE(
+            shape=tvae.net_shape,
+            precision=tvae.precision,
+            W_init=[w.detach().clone() for w in tvae.W],
+            b_init=[b.detach().clone() for b in tvae.b],
+            sigma2_init=float(tvae.theta["sigma2"].detach().clone().item()),
+            pi_init=tvae.theta["pies"].detach().clone(),
+            analytical_pi_updates=not tvae.theta["pies"].requires_grad,
+            analytical_sigma_updates=not tvae.theta["sigma2"].requires_grad,
+        )
+    elif isinstance(tvae, BernoulliTVAE):
+        tvae_copy = BernoulliTVAE(
+            shape=tvae.net_shape,
+            precision=tvae.precision,
+            W_init=[w.detach().clone() for w in tvae.W],
+            b_init=[b.detach().clone() for b in tvae.b],
+            pi_init=tvae.theta["pies"].detach().clone(),
+            analytical_pi_updates=not tvae.theta["pies"].requires_grad,
+        )
     return tvae_copy
 
 
