@@ -207,6 +207,9 @@ class GaussianTVAE(_TVAE):
                       Can be None if W_init is not None.
         :param precision: One of to.float32 or to.float64, indicates the floating point precision
                           of model parameters.
+        :param min_lr: See docs of tvem.utils.CyclicLR
+        :param max_lr: See docs of tvem.utils.CyclicLR
+        :param cycliclr_step_size_up: See docs of tvem.utils.CyclicLR
         :param pi_init: Optional tensor with initial prior values
         :param W_init: Optional list of tensors with initial weight values. Weight matrices
                        must be ordered from most hidden to observable layer. If this parameter
@@ -404,5 +407,189 @@ class GaussianTVAE(_TVAE):
 
         # output layer (linear)
         output = output @ self.W[-1] + self.b[-1]
+
+        return output
+
+
+class BernoulliTVAE(_TVAE):
+    def __init__(
+        self,
+        shape: Sequence[int] = None,
+        precision: to.dtype = to.float64,
+        min_lr: float = 0.001,
+        max_lr: float = 0.01,
+        cycliclr_step_size_up=400,
+        pi_init: to.Tensor = None,
+        W_init: Sequence[to.Tensor] = None,
+        b_init: Sequence[to.Tensor] = None,
+        analytical_pi_updates: bool = True,
+    ):
+        """Create a TVAE model with Bernoulli observables.
+
+        :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
+                      Can be None if W_init is not None.
+        :param precision: One of to.float32 or to.float64, indicates the floating point precision
+                          of model parameters.
+        :param min_lr: See docs of tvem.utils.CyclicLR
+        :param max_lr: See docs of tvem.utils.CyclicLR
+        :param cycliclr_step_size_up: See docs of tvem.utils.CyclicLR
+        :param pi_init: Optional tensor with initial prior values
+        :param W_init: Optional list of tensors with initial weight values. Weight matrices
+                       must be ordered from most hidden to observable layer. If this parameter
+                       is not None, the shape parameter can be omitted.
+        :param b_init: Optional list of tensors with initial.
+        :param analytical_pi_updates: Whether priors should be updated via the analytical
+                                      max-likelihood solution rather than gradient descent.
+        """
+        self._theta: Dict[str, to.Tensor] = {}
+        self._precision = precision
+        self._net_shape = _get_net_shape(shape, W_init)
+        self.W = _init_W(self._net_shape, precision, W_init)
+        self.b = _init_b(self._net_shape, precision, b_init)
+        H0 = self._net_shape[0]
+        self._theta["pies"] = _init_pi(
+            precision, pi_init, H0, requires_grad=not analytical_pi_updates
+        )
+        self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
+        self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
+        self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
+
+        gd_parameters = self.W + self.b
+
+        if analytical_pi_updates:
+            self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
+            self._analytical_pi_updates = True
+        else:
+            gd_parameters.append(self._theta["pies"])
+            self._analytical_pi_updates = False
+
+        self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
+        self._scheduler = CyclicLR(
+            self._optimizer,
+            base_lr=min_lr,
+            max_lr=max_lr,
+            step_size_up=cycliclr_step_size_up,
+            cycle_momentum=False,
+        )
+        # number of datapoints processed in a training epoch
+        self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
+        self._config = dict(
+            net_shape=self._net_shape,
+            precision=self.precision,
+            min_lr=self._min_lr,
+            max_lr=self._max_lr,
+            step_size_up=self._step_size_up,
+            analytical_pi_updates=self._analytical_pi_updates,
+            device=tvem.get_device(),
+        )
+
+    def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
+        N, D = data.shape
+        N_, S, H = states.shape
+        assert N == N_, "Shape mismatch between data and states"
+        pi = self.theta["pies"]
+        states = states.to(dtype=self.precision)
+
+        mlp_out = self.forward(states)  # (N, S, D)
+
+        # nansum used to automatically ignore missing data
+        s1 = to.nansum(
+            to.nn.functional.binary_cross_entropy(
+                mlp_out, data.unsqueeze(1).expand(N, S, D), reduction="none"
+            ),
+            dim=2,
+        )  # (N, S)
+        s2 = states @ to.log(pi / (1.0 - pi))  # (N, S)
+        lpj = s2 - s1
+        assert lpj.shape == (N, S)
+        assert not to.isnan(lpj).any() and not to.isinf(lpj).any()
+        return lpj, mlp_out
+
+    def log_joint(self, data, states, lpj=None):
+        D = data.shape[1] - to.isnan(data).sum(dim=1)  # (N,): ignores missing data
+        D = D.unsqueeze(1)  # (N, 1)
+        if lpj is None:
+            lpj = self._log_pseudo_joint(data, states)
+        # TODO: could pre-evaluate the constant factor once per epoch
+        logjoints = lpj + to.log(1 - self.theta["pies"]).sum()
+        return logjoints
+
+    def update_param_epoch(self) -> None:
+        pi = self.theta["pies"]
+
+        if tvem.get_run_policy() == "mpi":
+            with to.no_grad():
+                for p in self.theta.values():
+                    if p.requires_grad:
+                        broadcast(p)
+
+        if pi.requires_grad:
+            return  # nothing to do
+        else:
+            all_reduce(self._train_datapoints)
+            N = self._train_datapoints.item()
+            all_reduce(self._new_pi)
+            pi[:] = self._new_pi / N
+            # avoids infinites in lpj evaluation
+            to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
+            self._new_pi.zero_()
+
+        self._train_datapoints[:] = 0
+
+    def generate_data(
+        self, N: int = None, hidden_state: to.Tensor = None
+    ) -> Union[to.Tensor, Tuple[to.Tensor, to.Tensor]]:
+        H = self.shape[-1]
+        if hidden_state is None:
+            pies = self.theta["pies"]
+            hidden_state = to.rand((N, H), dtype=pies.dtype, device=pies.device) < pies
+            must_return_hidden_state = True
+        else:
+            if N is not None:
+                shape = hidden_state.shape
+                assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            must_return_hidden_state = False
+
+        with to.no_grad():
+            mlp_out = self.forward(hidden_state)
+        Y = to.distributions.Bernoulli(mlp_out).sample()
+
+        return (Y, hidden_state) if must_return_hidden_state else Y
+
+    def _optimize_nn_params(
+        self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates
+    ) -> Tuple[float, to.Tensor]:
+        F, mlp_out = super()._optimize_nn_params(idx, data, states)
+
+        with to.no_grad():
+            pi = self.theta["pies"]
+            if pi.requires_grad:
+                to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
+
+        return F, mlp_out
+
+    def _accumulate_param_updates(
+        self, idx: to.Tensor, data: to.Tensor, states: TVEMVariationalStates, mlp_out: to.Tensor
+    ) -> None:
+        """Evaluate partial updates to pi."""
+        K_batch = states.K[idx].type_as(states.lpj)
+
+        if not self.theta["pies"].requires_grad:
+            # \pi_h = \frac{1}{N} \sum_n < K_nsh >_{q^n}
+            self._new_pi.add_(mean_posterior(K_batch, states.lpj[idx]).sum(dim=0))
+
+        self._train_datapoints.add_(data.shape[0])
+
+    def forward(self, x: to.Tensor) -> to.Tensor:
+        """Forward application of TVAE's MLP to the specified input."""
+        assert x.shape[-1] == self._net_shape[0], "Incompatible shape in forward input"
+
+        # middle layers (relu)
+        output = x.to(dtype=self.precision)
+        for W, b in zip(self.W[:-1], self.b[:-1]):
+            output = to.relu(output @ W + b)
+
+        # output layer (sigmoid)
+        output = to.sigmoid(output @ self.W[-1] + self.b[-1])
 
         return output
