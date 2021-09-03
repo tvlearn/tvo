@@ -290,7 +290,7 @@ class GaussianTVAE(_TVAE):
         if optimizer is None:
             self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
         else:
-            self._optimizer = optimizer(gd_parameters)
+            self._optimizer = optimizer
 
         self._scheduler = CyclicLR(
             self._optimizer,
@@ -536,7 +536,7 @@ class BernoulliTVAE(_TVAE):
         if optimizer is None:
             self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
         else:
-            self._optimizer = optimizer(gd_parameters)
+            self._optimizer = optimizer
 
         self._scheduler = CyclicLR(
             self._optimizer,
