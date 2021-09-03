@@ -438,7 +438,7 @@ class GaussianTVAE(_TVAE):
 
         output = x.to(dtype=self.precision)
         if self._external_model is not None:
-            output = self._external_model.forward(output)
+            output = self._external_model.forward(output).to(dtype=self.precision)
         else:
             assert isinstance(self.W, Sequence) and isinstance(
                 self.b, Sequence
@@ -660,7 +660,7 @@ class BernoulliTVAE(_TVAE):
 
         output = x.to(dtype=self.precision)
         if self._external_model is not None:
-            output = self._external_model.forward(output)
+            output = self._external_model.forward(output).to(dtype=self.precision)
         else:
             assert isinstance(self.W, Sequence) and isinstance(
                 self.b, Sequence
