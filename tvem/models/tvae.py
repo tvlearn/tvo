@@ -667,7 +667,6 @@ class BernoulliTVAE(_TVAE):
             )  # to make mypy happy
 
             # middle layers (relu)
-            output = x.to(dtype=self.precision)
             for W, b in zip(self.W[:-1], self.b[:-1]):
                 output = to.relu(output @ W + b)
 
