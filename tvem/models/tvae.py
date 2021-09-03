@@ -87,8 +87,9 @@ class _TVAE(Trainable, Sampler, Reconstructor):
     _theta: Dict[str, to.Tensor]
     _precision: to.dtype
     _net_shape: Sequence[int]
-    _optimizer: to.optim.Optimizer
-    _scheduler: to.optim.lr_scheduler._LRScheduler
+    _scheduler: opt.lr_scheduler._LRScheduler
+    _optimizer: opt.Optimizer
+    _external_model: Optional[to.nn.Module] = None
 
     @abstractmethod
     def log_joint(self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None) -> to.Tensor:
@@ -200,11 +201,13 @@ class GaussianTVAE(_TVAE):
         analytical_sigma_updates: bool = True,
         analytical_pi_updates: bool = True,
         clamp_sigma_updates: bool = False,
+        external_model: Optional[to.nn.Module] = None,
+        optimizer: Optional[opt.Optimizer] = None,
     ):
         """Create a TVAE model with Gaussian observables.
 
-        :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).
-                      Can be None if W_init is not None.
+        :param shape: Network shape, from observable to most hidden: (D,...,H1,H0). One of shape,
+                      (W_init, b_init), external_model must be specified exclusively.
         :param precision: One of to.float32 or to.float64, indicates the floating point precision
                           of model parameters.
         :param min_lr: See docs of tvem.utils.CyclicLR
@@ -212,34 +215,63 @@ class GaussianTVAE(_TVAE):
         :param cycliclr_step_size_up: See docs of tvem.utils.CyclicLR
         :param pi_init: Optional tensor with initial prior values
         :param W_init: Optional list of tensors with initial weight values. Weight matrices
-                       must be ordered from most hidden to observable layer. If this parameter
-                       is not None, the shape parameter can be omitted.
-        :param b_init: Optional list of tensors with initial.
+                       must be ordered from most hidden to observable layer. One of shape,
+                       (W_init, b_init), external_model must be specified exclusively.
+        :param b_init: Optional list of tensors with initial bias. One of shape,
+                       (W_init, b_init), external_model must be specified exclusively.
         :param sigma2_init: Optional initial value for model variance.
         :param analytical_sigma_updates: Whether sigmas should be updated via the analytical
                                          max-likelihood solution rather than gradient descent.
         :param analytical_pi_updates: Whether priors should be updated via the analytical
                                       max-likelihood solution rather than gradient descent.
         :param clamp_sigma_updates: Whether to limit the rate at which sigma can be updated.
+        :param external_model: Optional decoder neural network. One of shape, (W_init, b_init),
+                               external_model must be specified exclusively.
+        :param optimizer: Gradient optimizer (defaults to Adam if not specified)
         """
         self._theta: Dict[str, to.Tensor] = {}
         self._clamp_sigma = clamp_sigma_updates
         self._precision = precision
-        self._net_shape = _get_net_shape(shape, W_init)
-        self.W = _init_W(self._net_shape, precision, W_init)
-        self.b = _init_b(self._net_shape, precision, b_init)
-        H0 = self._net_shape[0]
+        self._external_model = external_model
+        assert (
+            (shape is not None and W_init is None and b_init is None and external_model is None)
+            or (
+                shape is None
+                and W_init is not None
+                and b_init is not None
+                and external_model is None
+            )
+            or (shape is None and W_init is None and b_init is None and external_model is not None)
+        ), "Must exclusively specify one one `shape`, (`W_init`, `b_init`), `external_model`"
+
+        if external_model is not None:
+            assert hasattr(
+                external_model, "H0"
+            ), "for externally defined models, H0 has to be provided manually"
+            assert hasattr(
+                external_model, "shape"
+            ), "for externally defined models, shape has to be provided manually"
+            H0 = external_model.H0
+            self._net_shape = external_model.shape
+            self.W = self.b = None
+            gd_parameters = list(external_model.parameters())
+        else:
+            self._net_shape = _get_net_shape(shape, W_init)
+            H0 = self._net_shape[0]
+            self.W = _init_W(self._net_shape, precision, W_init)
+            self.b = _init_b(self._net_shape, precision, b_init)
+            self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
+            self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
+            gd_parameters = self.W + self.b
+
         self._theta["pies"] = _init_pi(
             precision, pi_init, H0, requires_grad=not analytical_pi_updates
         )
         self._theta["sigma2"] = _init_sigma2(
             precision, sigma2_init, requires_grad=not analytical_sigma_updates
         )
-        self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
-        self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
-        self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
 
-        gd_parameters = self.W + self.b
+        self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
 
         if analytical_sigma_updates:
             self._new_sigma2 = to.zeros(1, dtype=precision, device=tvem.get_device())
@@ -255,7 +287,11 @@ class GaussianTVAE(_TVAE):
             gd_parameters.append(self._theta["pies"])
             self._analytical_pi_updates = False
 
-        self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
+        if optimizer is None:
+            self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
+        else:
+            self._optimizer = optimizer(gd_parameters)
+
         self._scheduler = CyclicLR(
             self._optimizer,
             base_lr=min_lr,
@@ -400,13 +436,20 @@ class GaussianTVAE(_TVAE):
         """Forward application of TVAE's MLP to the specified input."""
         assert x.shape[-1] == self._net_shape[0], "Incompatible shape in forward input"
 
-        # middle layers (relu)
         output = x.to(dtype=self.precision)
-        for W, b in zip(self.W[:-1], self.b[:-1]):
-            output = to.relu(output @ W + b)
+        if self._external_model is not None:
+            output = self._external_model.forward(output)
+        else:
+            assert isinstance(self.W, Sequence) and isinstance(
+                self.b, Sequence
+            )  # to make mypy happy
 
-        # output layer (linear)
-        output = output @ self.W[-1] + self.b[-1]
+            # middle layers (relu)
+            for W, b in zip(self.W[:-1], self.b[:-1]):
+                output = to.relu(output @ W + b)
+
+            # output layer (linear)
+            output = output @ self.W[-1] + self.b[-1]
 
         return output
 
@@ -423,6 +466,8 @@ class BernoulliTVAE(_TVAE):
         W_init: Sequence[to.Tensor] = None,
         b_init: Sequence[to.Tensor] = None,
         analytical_pi_updates: bool = True,
+        external_model: Optional[to.nn.Module] = None,
+        optimizer: Optional[opt.Optimizer] = None,
     ):
         """Create a TVAE model with Bernoulli observables.
 
@@ -443,18 +488,43 @@ class BernoulliTVAE(_TVAE):
         """
         self._theta: Dict[str, to.Tensor] = {}
         self._precision = precision
-        self._net_shape = _get_net_shape(shape, W_init)
-        self.W = _init_W(self._net_shape, precision, W_init)
-        self.b = _init_b(self._net_shape, precision, b_init)
-        H0 = self._net_shape[0]
+        self._external_model = external_model
+        assert (
+            (shape is not None and W_init is None and b_init is None and external_model is None)
+            or (
+                shape is None
+                and W_init is not None
+                and b_init is not None
+                and external_model is None
+            )
+            or (shape is None and W_init is None and b_init is None and external_model is not None)
+        ), "Must exclusively specify one one `shape`, (`W_init`, `b_init`), `external_model`"
+
+        if external_model is not None:
+            assert hasattr(
+                external_model, "H0"
+            ), "for externally defined models, H0 has to be provided manually"
+            assert hasattr(
+                external_model, "shape"
+            ), "for externally defined models, shape has to be provided manually"
+            H0 = external_model.H0
+            self._net_shape = external_model.shape
+            self.W = self.b = None
+            gd_parameters = list(external_model.parameters())
+        else:
+            self._net_shape = _get_net_shape(shape, W_init)
+            H0 = self._net_shape[0]
+            self.W = _init_W(self._net_shape, precision, W_init)
+            self.b = _init_b(self._net_shape, precision, b_init)
+            self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
+            self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
+            gd_parameters = self.W + self.b
+
         self._theta["pies"] = _init_pi(
             precision, pi_init, H0, requires_grad=not analytical_pi_updates
         )
-        self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
-        self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
-        self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
 
-        gd_parameters = self.W + self.b
+        self._min_lr, self._max_lr, self._step_size_up = min_lr, max_lr, cycliclr_step_size_up
 
         if analytical_pi_updates:
             self._new_pi = to.zeros(H0, dtype=precision, device=tvem.get_device())
@@ -463,7 +533,11 @@ class BernoulliTVAE(_TVAE):
             gd_parameters.append(self._theta["pies"])
             self._analytical_pi_updates = False
 
-        self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
+        if optimizer is None:
+            self._optimizer = opt.Adam(gd_parameters, lr=min_lr)
+        else:
+            self._optimizer = optimizer(gd_parameters)
+
         self._scheduler = CyclicLR(
             self._optimizer,
             base_lr=min_lr,
@@ -584,12 +658,20 @@ class BernoulliTVAE(_TVAE):
         """Forward application of TVAE's MLP to the specified input."""
         assert x.shape[-1] == self._net_shape[0], "Incompatible shape in forward input"
 
-        # middle layers (relu)
         output = x.to(dtype=self.precision)
-        for W, b in zip(self.W[:-1], self.b[:-1]):
-            output = to.relu(output @ W + b)
+        if self._external_model is not None:
+            output = self._external_model.forward(output)
+        else:
+            assert isinstance(self.W, Sequence) and isinstance(
+                self.b, Sequence
+            )  # to make mypy happy
 
-        # output layer (sigmoid)
-        output = to.sigmoid(output @ self.W[-1] + self.b[-1])
+            # middle layers (relu)
+            output = x.to(dtype=self.precision)
+            for W, b in zip(self.W[:-1], self.b[:-1]):
+                output = to.relu(output @ W + b)
+
+            # output layer (sigmoid)
+            output = to.sigmoid(output @ self.W[-1] + self.b[-1])
 
         return output

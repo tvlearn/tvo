@@ -11,6 +11,7 @@ from math import pi as MATH_PI
 import math
 import pytest
 from munch import Munch
+import copy
 
 
 @pytest.fixture(
@@ -182,6 +183,47 @@ def train_setup():
     return Munch(N=N, D=D, shape=(D, 10, 10), data=to.rand(N, D, device=tvem.get_device()))
 
 
+@pytest.fixture(scope="function", params=["with_external", "without_external"])
+def external_model(request):
+    if request.param == "with_external":
+
+        class ExternalModule(to.nn.Module):
+            def __init__(self, request=None):
+                super(ExternalModule, self).__init__()
+                self.shape = (10, 10, 25)
+                self.flatten = to.nn.Flatten()
+                self.H0 = self.shape[0]
+                self.conv1 = to.nn.ConvTranspose2d(
+                    in_channels=1, out_channels=1, kernel_size=3, padding=1
+                )  # pseudo-invert convolution
+                self.linear_relu_stack = to.nn.Sequential(
+                    to.nn.Linear(self.shape[0], self.shape[1]),
+                    to.nn.ReLU(),
+                    to.nn.Linear(self.shape[1], self.shape[2]),
+                    to.nn.ReLU(),
+                )
+
+            def forward(self, x):
+                h = self.linear_relu_stack(x)
+                # dimentionalize for conv
+                if len(h.shape) == 3:
+                    h = h.unsqueeze(dim=1)  # add channel depth
+                elif len(h.shape) == 2:
+                    h = h.unsqueeze(dim=0).unsqueeze(dim=0)  # add channel and batch dims
+                h = self.conv1(h)
+
+                # de-dimentionalize
+                h = h.squeeze()
+                if len(h.shape) == 1:
+                    h = h.unsqueeze(dim=0)  # add s dim
+
+                return h
+
+        return ExternalModule
+    elif request.param == "without_external":
+        return None
+
+
 @pytest.fixture(
     scope="function",
     params=[
@@ -192,7 +234,7 @@ def train_setup():
         "bernoulli-gd_pi",
     ],
 )
-def tvae(request, train_setup, add_gpu_mark):
+def tvae(request, train_setup, external_model, add_gpu_mark):
     if request.param == "gaussian-analytical_pisigma":
         model = GaussianTVAE
         kwargs = {"analytical_pi_updates": True, "analytical_sigma_updates": True}
@@ -208,7 +250,23 @@ def tvae(request, train_setup, add_gpu_mark):
     elif request.param == "bernoulli-gd_pi":
         model = BernoulliTVAE
         kwargs = {"analytical_pi_updates": False}
-    return model(train_setup.shape, precision=train_setup.data.dtype, **kwargs)
+
+    if external_model is not None:
+        if model == BernoulliTVAE:
+
+            class external_bernoulli_model(external_model):
+                def forward(self, x):
+                    return to.sigmoid(super(external_bernoulli_model, self).forward(x))
+
+            ext = external_bernoulli_model()
+        elif model == GaussianTVAE:
+            ext = external_model()
+        kwargs["shape"] = None
+    else:
+        ext = None
+        kwargs["shape"] = train_setup.shape
+
+    return model(**kwargs, precision=train_setup.data.dtype, external_model=ext)
 
 
 @pytest.mark.gpu
@@ -232,25 +290,35 @@ def test_train(train_setup, tvae):
 
 
 def copy_tvae(tvae):
+    if tvae._external_model is not None:
+        kwargs = {
+            "shape": None,
+            "W_init": None,
+            "b_init": None,
+            "external_model": copy.deepcopy(tvae._external_model),
+        }
+    else:
+        kwargs = {
+            "shape": None,
+            "W_init": [w.detach().clone() for w in tvae.W],
+            "b_init": [b.detach().clone() for b in tvae.b],
+            "external_model": None,
+        }
     if isinstance(tvae, GaussianTVAE):
         tvae_copy = GaussianTVAE(
-            shape=tvae.net_shape,
             precision=tvae.precision,
-            W_init=[w.detach().clone() for w in tvae.W],
-            b_init=[b.detach().clone() for b in tvae.b],
             sigma2_init=float(tvae.theta["sigma2"].detach().clone().item()),
             pi_init=tvae.theta["pies"].detach().clone(),
             analytical_pi_updates=not tvae.theta["pies"].requires_grad,
             analytical_sigma_updates=not tvae.theta["sigma2"].requires_grad,
+            **kwargs,
         )
     elif isinstance(tvae, BernoulliTVAE):
         tvae_copy = BernoulliTVAE(
-            shape=tvae.net_shape,
             precision=tvae.precision,
-            W_init=[w.detach().clone() for w in tvae.W],
-            b_init=[b.detach().clone() for b in tvae.b],
             pi_init=tvae.theta["pies"].detach().clone(),
             analytical_pi_updates=not tvae.theta["pies"].requires_grad,
+            **kwargs,
         )
     return tvae_copy
 
