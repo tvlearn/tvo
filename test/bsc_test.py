@@ -13,14 +13,25 @@ from tvem.variational import FullEM
 
 
 @pytest.fixture(
-    scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+    scope="module", params=[pytest.param(tvem.get_device().type, marks=[pytest.mark.gpu])]
 )
-def setup(request):
+def add_gpu_mark():
+    """No-op fixture, use it to add the 'gpu' mark to a test or fixture."""
+    pass
+
+
+@pytest.fixture(scope="function", params=["single-prior", "individual-priors"])
+def setup(request, add_gpu_mark):
     class Setup:
         _device = tvem.get_device()
+        individual = request.param == "individual-priors"
         N, D, H = 2, 1, 2
         precision = to.float32
-        pies_init = to.full((H,), 0.5, dtype=precision, device=_device)
+        pies_init = (
+            to.full((H,), 0.5, dtype=precision, device=_device)
+            if individual
+            else to.tensor([0.5], dtype=precision, device=_device)
+        )
         W_init = to.full((D, H), 1.0, dtype=precision, device=_device)
         sigma2_init = to.tensor([1.0], dtype=precision, device=_device)
 
@@ -31,6 +42,7 @@ def setup(request):
             sigma2_init=sigma2_init,
             pies_init=pies_init,
             precision=precision,
+            individual_priors=individual,
         )
         all_s = FullEM(N, H, precision)
         all_s.lpj = to.zeros_like(all_s.lpj)
