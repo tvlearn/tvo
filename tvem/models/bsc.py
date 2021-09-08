@@ -104,9 +104,17 @@ class BSC(Optimized, Sampler, Reconstructor):
         Wbar = to.matmul(
             Kfloat, self.theta["W"].t()
         )  # TODO Pre-allocate tensor and use `out` argument of to.matmul
-        lpj = to.mul(
-            to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
-        ) + to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
+        Kpriorterm = (
+            to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
+            if self.config["individual_priors"]
+            else to.log(self.theta["pies"] / (1 - self.theta["pies"])) * Kfloat.sum(dim=2)
+        )
+        lpj = (
+            to.mul(
+                to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
+            )
+            + Kpriorterm
+        )
         return lpj.to(device=states.device)
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
@@ -114,11 +122,13 @@ class BSC(Optimized, Sampler, Reconstructor):
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
         D = to.sum(to.logical_not(to.isnan(data)), dim=1)  # (N,)
-        return (
-            lpj
-            + to.log(1 - self.theta["pies"]).sum()
-            - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
+        H = self.shape[1]
+        priorterm = (
+            to.log(1 - self.theta["pies"]).sum()
+            if self.config["individual_priors"]
+            else H * to.log(1 - self.theta["pies"])
         )
+        return lpj + priorterm - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> None:
         lpj = states.lpj[idx]
