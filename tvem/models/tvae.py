@@ -303,6 +303,7 @@ class GaussianTVAE(_TVAE):
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
         self._config = dict(
             net_shape=self._net_shape,
+            external_model=self._external_model,
             precision=self.precision,
             min_lr=self._min_lr,
             max_lr=self._max_lr,
@@ -549,6 +550,7 @@ class BernoulliTVAE(_TVAE):
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
         self._config = dict(
             net_shape=self._net_shape,
+            external_model=self._external_model,
             precision=self.precision,
             min_lr=self._min_lr,
             max_lr=self._max_lr,
