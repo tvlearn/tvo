@@ -121,3 +121,13 @@ class H5Logger:
                 f.create_dataset(key, data=value)
             except TypeError:
                 f.create_dataset(key, data=str(value))
+
+    def append_and_write(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
+        """Jointly append and write arguments. See docs of `append` and `write`."""
+        self.append(**kwargs)
+        self.write()
+
+    def set_and_write(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
+        """Jointly set and write arguments. See docs of `set` and `write`."""
+        self.set(**kwargs)
+        self.write()
