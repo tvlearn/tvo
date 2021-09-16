@@ -10,11 +10,12 @@ from os import path, rename
 
 
 class H5Logger:
-    def __init__(self, output: str, blacklist: Iterable[str] = []):
+    def __init__(self, output: str, blacklist: Iterable[str] = [], verbose: bool = False):
         """Utility class to iteratively write to HD5 files.
 
         :param output: Output filename or file path. Overwritten if it already exists.
         :param blacklist: Variables in `blacklist` are ignored and never get logged.
+        :param verbose: Whether to print variable names after appending/setting
 
         If tvem.get_run_policy() is 'mpi', operations on H5Logger are no-op for all processes
         except for the process with rank 0.
@@ -23,6 +24,7 @@ class H5Logger:
         self._fname = output
         self._data: Dict[str, to.Tensor] = {}
         self._blacklist = blacklist
+        self._verbose = verbose
 
     def append(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
         """Append arguments to log. Arguments can be torch.Tensors or dictionaries thereof.
@@ -59,6 +61,8 @@ class H5Logger:
                     f"but '{k}' is {type(v)}."
                 )
                 raise TypeError(msg)
+            if self._verbose:
+                print(f"Appended {k} to {self._fname}")
 
     def set(self, **kwargs: Union[to.Tensor, Dict[str, to.Tensor]]):
         """Set or reset arguments to desired value in log.
@@ -82,6 +86,9 @@ class H5Logger:
                 raise TypeError(msg)
 
             self._data[k] = v
+
+            if self._verbose:
+                print(f"Set {k} to {self._fname}")
 
     def write(self) -> None:
         """Write logged data to output file.
