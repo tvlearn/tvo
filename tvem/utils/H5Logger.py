@@ -9,6 +9,15 @@ from typing import Union, Iterable, Dict, Any
 from os import path, rename
 
 
+def _append_to_dict(d: Dict[str, to.Tensor], k: str, t: to.Tensor):
+    """Append tensor t to dict d at key k."""
+    if k not in d:
+        # the extra 0-sized dimension will be used for concatenation
+        d[k] = to.empty((0, *t.shape))
+    assert d[k].shape[1:] == t.shape, f"variable {k} changed shape between appends"
+    d[k] = to.cat((d[k].to(t), t.unsqueeze(0)))
+
+
 class H5Logger:
     def __init__(self, output: str, blacklist: Iterable[str] = [], verbose: bool = False):
         """Utility class to iteratively write to HD5 files.
@@ -35,26 +44,18 @@ class H5Logger:
         if self._rank != 0:
             return
 
-        def append_to_dict(d: Dict[str, to.Tensor], k: str, t: to.Tensor):
-            """Append tensor t to dict d at key k."""
-            if k not in d:
-                # the extra 0-sized dimension will be used for concatenation
-                d[k] = to.empty((0, *t.shape))
-            assert d[k].shape[1:] == t.shape, f"variable {k} changed shape between appends"
-            d[k] = to.cat((d[k].to(t), t.unsqueeze(0)))
-
         data = self._data
         for k, v in kwargs.items():
             if k in self._blacklist:
                 continue
 
             if isinstance(v, to.Tensor):
-                append_to_dict(data, k, v)
+                _append_to_dict(data, k, v)
             elif isinstance(v, dict):
                 if k not in data:
                     data[k] = {}
                 for name, tensor in v.items():
-                    append_to_dict(data[k], name, tensor)
+                    _append_to_dict(data[k], name, tensor)
             else:  # pragma: no cover
                 msg = (
                     "Arguments must be torch.Tensors or dictionaries thereof "
