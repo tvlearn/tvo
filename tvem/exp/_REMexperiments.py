@@ -1,0 +1,153 @@
+# -*- coding: utf-8 -*-
+# Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
+# Licensed under the Academic Free License version 3.0
+
+from tvem.exp import Training 
+from abc import ABC, abstractmethod
+from tvem.utils.data import TVEMDataLoader
+from tvem.utils.model_protocols import Trainable
+from tvem.utils.parallel import pprint, init_processes, gather_from_processes
+from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
+from tvem.utils import get, H5Logger
+from tvem.trainer import Trainer, REM1_Trainer
+from tvem.exp._EStepConfig import EStepConfig
+from tvem.exp._ExpConfig import ExpConfig
+from tvem.exp._REMExpConfig import REMExpConfig
+from tvem.exp._EpochLog import EpochLog
+from tvem.variational import TVEMVariationalStates
+import tvem
+
+import math
+from typing import Dict, Any, Generator
+import torch as to
+import torch.distributed as dist
+import time
+from pathlib import Path
+import os
+from munch import Munch
+
+class REMTraining(Training):
+    def __init__(
+        self,
+        conf: REMExpConfig,
+        estep_conf: EStepConfig,
+        model: Trainable,
+        train_data_file: str,
+        val_data_file: str = None,
+    ):
+        """Train model on given dataset for the given number of epochs.
+
+        :param conf: Experiment configuration.
+        :param estep_conf: Instance of a class inheriting from EStepConfig.
+        :param model: model to train
+        :param train_data_file: Path to an HDF5 file containing the training dataset.
+                                Datasets with name "train_data" and "data" will be
+                                searched in the file, in this order.
+        :param val_data_file: Path to an HDF5 file containing the training dataset.
+                              Datasets with name "val_data" and "data" will be searched in the file,
+                              in this order.
+
+        On the validation dataset, Training only performs E-steps without updating
+        the model parameters.
+
+        .. _DataLoader docs: https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader
+        """
+        if tvem.get_run_policy() == "mpi":
+            init_processes()
+        train_dataset = get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
+        val_dataset = None
+        if val_data_file is not None:
+            val_dataset = get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
+
+        setattr(conf, "train_dataset", train_data_file)
+        setattr(conf, "val_dataset", val_data_file)
+        
+        
+        H = sum(model.shape[1:])
+        self.model = model
+        assert isinstance(model, Trainable)
+        self._conf = Munch(conf.as_dict())
+        self._conf.model = type(model).__name__
+        self._conf.device = tvem.get_device().type
+        self._estep_conf = Munch(estep_conf.as_dict())
+        self.train_data = None
+        self.train_states = None
+        self._precision = model.precision
+        if train_dataset is not None:
+            self.train_data = self._make_dataloader(train_dataset, conf)
+            # might differ between processes: last process might have smaller N and less states
+            # (but TVEMDataLoader+ShufflingSampler make sure the number of batches is the same)
+            N = train_dataset.shape[0]
+            self.train_states = self._make_states(N, H, self._precision, estep_conf)
+
+        self.test_data = None
+        self.test_states = None
+        test_dataset = None
+        if test_dataset is not None:
+            self.test_data = self._make_dataloader(test_dataset, conf)
+            N = test_dataset.shape[0]
+            self.test_states = self._make_states(N, H, self._precision, estep_conf)
+
+        will_reconstruct = (
+            self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
+        )
+        self.trainer = REM1_Trainer(
+            self.model,
+            self.train_data,
+            self.train_states,
+            self.test_data,
+            self.test_states,
+            rollback_if_F_decreases=self._conf.rollback_if_F_decreases,
+            will_reconstruct=will_reconstruct,
+            eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
+            data_transform=self._conf.data_transform,
+        )
+        self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
+
+    def run(self, epochs: int) -> Generator[EpochLog, None, None]:#modifizieren
+        """Run training and/o testing.
+
+        :param epochs: Number of epochs to train for
+        """
+        trainer = self.trainer
+        logger = self.logger
+
+        self._log_confs(logger)
+
+        # warm-up E-steps
+        if self._conf.warmup_Esteps > 0:
+            pprint("Warm-up E-steps")
+        for e in range(self._conf.warmup_Esteps):
+            compute_reconstruction = (
+                self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs
+            )
+            d = trainer.e_step(compute_reconstruction, self._conf.beta_warmup)
+            self._log_epoch(logger, d)
+
+        # log initial free energies (after warm-up E-steps if any)
+        if self._conf.warmup_Esteps == 0:
+            d = trainer.eval_free_energies()
+        self._log_epoch(logger, d)
+        yield EpochLog(epoch=0, results=d)
+
+        # EM steps
+        for (steps, beta) in zip(self._conf.beta_steps, self._conf.beta):
+            for e in range(steps):
+                start_t = time.time()
+                compute_reconstruction = (
+                    self._conf.reco_epochs is not None and e in self._conf.reco_epochs
+                )
+                d = trainer.em_step(compute_reconstruction, beta)
+                epoch_runtime = time.time() - start_t
+                self._log_epoch(logger, d)
+                yield EpochLog(e + 1, d, epoch_runtime)
+
+        # remove leftover ".old" logfiles produced by the logger
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        leftover_logfile = self._conf.output + ".old"
+        if rank == 0 and Path(leftover_logfile).is_file():
+            os.remove(leftover_logfile)
+
+        # put trainer into undefined state after the experiment is finished
+        self.trainer = None  # type: ignore
+

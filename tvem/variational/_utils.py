@@ -194,3 +194,21 @@ def mean_posterior(g: to.Tensor, lpj: to.Tensor) -> to.Tensor:
     assert means.shape == (g.shape[0], *g.shape[2:])
     assert not to.isnan(means).any() and not to.isinf(means).any()
     return means
+def mean_tempered_posterior(g: to.Tensor, lpj: to.Tensor, beta: float = 1.0) -> to.Tensor:
+    """Compute expectation value of g(s) w.r.t truncated variational distribution q(s).
+
+    :param g: Values of g(s) with shape (N,S,...).
+    :param lpj: Log-pseudo-joint with shape (N,S).
+    :param beta: temperature parameter for REM1. Ranges between 0 and 1
+    :returns: tensor with shape (N,...).
+    """
+    cooled_lpj = to.mul(lpj, beta)
+    if tvem.get_device().type == "cpu":
+        means = _mean_post_einsum(g, cooled_lpj)
+    else:
+        means = _mean_post_mul(g, cooled_lpj)
+    #print(f"beta = {beta}")
+    assert means.shape == (g.shape[0], *g.shape[2:])
+    assert not to.isnan(means).any() and not to.isinf(means).any()
+    return means
+

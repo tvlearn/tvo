@@ -325,3 +325,4 @@ class Trainer:
             for p in self._to_rollback:
                 m.theta[p][:] = old_params[p]
             states.lpj[:] = old_lpj
+

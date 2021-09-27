@@ -8,9 +8,10 @@ from tvem.utils.model_protocols import Trainable
 from tvem.utils.parallel import pprint, init_processes, gather_from_processes
 from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
 from tvem.utils import get, H5Logger
-from tvem.trainer import Trainer
+from tvem.trainer import Trainer, REM1_Trainer
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
+from tvem.exp._REMExpConfig import REMExpConfig
 from tvem.exp._EpochLog import EpochLog
 from tvem.variational import TVEMVariationalStates
 import tvem
@@ -269,7 +270,6 @@ class Training(_TrainingAndOrValidation):
         setattr(conf, "train_dataset", train_data_file)
         setattr(conf, "val_dataset", val_data_file)
         super().__init__(conf, estep_conf, model, train_dataset, val_dataset)
-
 
 class Testing(_TrainingAndOrValidation):
     def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: Trainable, data_file: str):
