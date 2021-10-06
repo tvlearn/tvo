@@ -62,7 +62,7 @@ class REM1_GMM(GMM):
 
         return None
     def free_energy(
-        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
+            self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates", beta: float = 1
     ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
@@ -74,7 +74,6 @@ class REM1_GMM(GMM):
         This default implementation of free_energy is only appropriate for Optimized models.
         """
         #breakpoint()
-        beta = 1
         with to.no_grad():
             log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx])
             lpj = states.lpj[idx]
