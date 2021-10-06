@@ -13,7 +13,7 @@ from typing import Union, Tuple
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
-from tvem.variational._utils import mean_posterior, mean_tempered_posterior
+from tvem.variational._utils import mean_posterior, mean_tempered_posterior, lpj2pjc
 from tvem.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvem.utils.sanity import fix_theta
 from tvem.models import GMM
@@ -61,3 +61,27 @@ class REM1_GMM(GMM):
         self.my_N.add_(batch_size)
 
         return None
+    def free_energy(
+        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
+    ) -> float:
+        """Evaluate free energy for the given batch of datapoints.
+
+        :param idx: indexes of the datapoints in batch within the full dataset
+        :param batch: batch of datapoints, Tensor with shape (N,D)
+        :param states: all TVEMVariationalStates states for this dataset
+
+        .. note::
+        This default implementation of free_energy is only appropriate for Optimized models.
+        """
+        #breakpoint()
+        beta = 1
+        with to.no_grad():
+            log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx])
+            lpj = states.lpj[idx]
+            post = lpj2pjc(beta * lpj)
+            F = beta * mean_tempered_posterior(log_joints, lpj, beta) - mean_tempered_posterior(to.log(post), lpj, beta)
+            res = to.sum(F).item()
+            print(res)
+            sres = super(GMM, self).free_energy(idx, batch, states)
+            print(res / sres)
+        return res
