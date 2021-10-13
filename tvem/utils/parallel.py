@@ -68,25 +68,28 @@ def bcast_dtype(data: Tensor, src: int = 0) -> torch.dtype:
     :param src: Source rank
     :returns: dtype on each rank
     """
-    comm_rank = dist.get_rank()
+    if tvem.get_run_policy() == "seq":
+        return data.dtype
+    else:
+        comm_rank = dist.get_rank()
 
-    dtypes = [
-        torch.float32,
-        torch.float64,
-        torch.float16,
-        torch.uint8,
-        torch.int8,
-        torch.int16,
-        torch.int32,
-        torch.int64,
-    ]
+        dtypes = [
+            torch.float32,
+            torch.float64,
+            torch.float16,
+            torch.uint8,
+            torch.int8,
+            torch.int16,
+            torch.int32,
+            torch.int64,
+        ]
 
-    ind_dtype = torch.empty((1,), dtype=torch.uint8)
-    if comm_rank == src:
-        dtype = data.dtype
-        ind_dtype[:] = [*map(str, dtypes)].index(str(dtype))
-    dist.broadcast(ind_dtype, 0)
-    return dtypes[ind_dtype.item()]
+        ind_dtype = torch.empty((1,), dtype=torch.uint8)
+        if comm_rank == src:
+            dtype = data.dtype
+            ind_dtype[:] = [*map(str, dtypes)].index(str(dtype))
+        dist.broadcast(ind_dtype, 0)
+        return dtypes[ind_dtype.item()]
 
 
 def bcast_shape(data: Tensor, src: int) -> Tensor:
@@ -96,17 +99,20 @@ def bcast_shape(data: Tensor, src: int) -> Tensor:
     :param src: Source rank
     :returns: Tensor with shape on each rank
     """
-    comm_rank = dist.get_rank()
+    if tvem.get_run_policy() == "seq":
+        return torch.tensor(data.shape)
+    else:
+        comm_rank = dist.get_rank()
 
-    ndim = torch.empty((1,), dtype=torch.int64)
-    if comm_rank == src:
-        ndim[:] = data.dim()
-    dist.broadcast(ndim, src)
-    shape = torch.empty((ndim.item(),), dtype=torch.int64)
-    if comm_rank == src:
-        shape[:] = torch.tensor(data.shape)
-    dist.broadcast(shape, src)
-    return shape
+        ndim = torch.empty((1,), dtype=torch.int64)
+        if comm_rank == src:
+            ndim[:] = data.dim()
+        dist.broadcast(ndim, src)
+        shape = torch.empty((ndim.item(),), dtype=torch.int64)
+        if comm_rank == src:
+            shape[:] = torch.tensor(data.shape)
+        dist.broadcast(shape, src)
+        return shape
 
 
 def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
