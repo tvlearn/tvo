@@ -55,12 +55,12 @@ class REM1_Trainer(Trainer):
                   using the weights of epoch X-1.
         """
         ret_dict = {}
-
         # Training #
         if self.can_train:
-            F, subs, reco = self._train_epoch(compute_reconstruction, beta)
+            F_beta, F, subs, reco = self._train_epoch(compute_reconstruction, beta)
             all_reduce(F)
             ret_dict["train_F"] = F.item() / self.N_train
+            ret_dict["train_F_beta"] = F_beta.item() / self.N_train
             all_reduce(subs)
             ret_dict["train_subs"] = subs.item() / self.N_train
             if reco is not None:
@@ -98,6 +98,7 @@ class REM1_Trainer(Trainer):
         )
 
         assert train_data is not None and train_states is not None  # to make mypy happy
+        F_beta = to.tensor(0.0, device=tvem.get_device())
         F = to.tensor(0.0, device=tvem.get_device())
         subs = to.tensor(0)
         if isinstance(model, Optimized):
@@ -117,10 +118,64 @@ class REM1_Trainer(Trainer):
                 missing_data_mask = to.isnan(batch)
                 batch[missing_data_mask] = train_reconstruction[idx][missing_data_mask]
                 train_reconstruction[idx] = batch
-            batch_F = model.update_param_batch(idx, batch, train_states, beta)
+            batch_F_beta = model.update_param_batch(idx, batch, train_states, beta)
             if not self.eval_F_at_epoch_end:
-                if batch_F is None:
-                    batch_F = model.free_energy(idx, batch, train_states, beta)
+                if batch_F_beta is None:
+                    batch_F_beta = model.annealed_free_energy(idx, batch, train_states, beta)
+                    batch_F = model.free_energy(idx, batch, train_states)
+                F_beta += batch_F_beta
                 F += batch_F
         self._update_parameters_with_rollback()
-        return F, subs, train_reconstruction
+        return F_beta, F, subs, train_reconstruction
+
+    def eval_free_energies(self, beta) -> Dict[str, Any]:
+        """Return a dictionary with the same contents as e_step/em_step, without training the model.
+
+        :returns: a dictionary containing 'train_F_beta, train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        m = self.model
+        train_data, train_states = self.train_data, self.train_states
+        test_data, test_states = self.test_data, self.test_states
+        lpj_fn = m.log_pseudo_joint if isinstance(m, Optimized) else m.log_joint
+        ret = {}
+
+        if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
+            F = to.tensor(0.0)
+            F_beta = to.tensor(0.0)
+            if isinstance(m, Optimized):
+                m.init_epoch()
+            for idx, batch in train_data:
+                batch = self.data_transform(batch)
+                if isinstance(m, Optimized):
+                    m.init_batch()
+                train_states.lpj[idx] = lpj_fn(batch, train_states.K[idx])
+                F += m.free_energy(idx, batch, train_states)
+                F_beta += m.annealed_free_energy(idx, batch, train_states, beta)
+            all_reduce(F)
+            all_reduce(F_beta)
+            ret["train_F"] = F.item() / self.N_train
+            ret["train_F_beta"] = F_beta.item() / self.N_train
+            ret["train_subs"] = 0
+
+        if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
+            F = to.tensor(0.0)
+            F_beta = to.tensor(0.0)
+            if isinstance(m, Optimized):
+                m.init_epoch()
+            for idx, batch in test_data:
+                batch = self.data_transform(batch)
+                if isinstance(m, Optimized):
+                    m.init_batch()
+                test_states.lpj[idx] = lpj_fn(batch, test_states.K[idx])
+                F += m.free_energy(idx, batch, test_states)
+                F_beta += m.annealed_free_energy(idx, batch, train_states, beta)
+            all_reduce(F)
+            all_reduce(F_beta)
+            ret["test_F"] = F.item() / self.N_test
+            ret["test_F_beta"] = F_beta.item() / self.N_test
+            ret["test_subs"] = 0
+
+        return ret

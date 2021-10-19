@@ -126,7 +126,7 @@ class REMTraining(Training):
 
         # log initial free energies (after warm-up E-steps if any)
         if self._conf.warmup_Esteps == 0:
-            d = trainer.eval_free_energies()
+            d = trainer.eval_free_energies(self._conf.beta[0])
         self._log_epoch(logger, d)
         yield EpochLog(epoch=0, results=d)
 

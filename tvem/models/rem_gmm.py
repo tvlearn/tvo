@@ -61,7 +61,13 @@ class REM1_GMM(GMM):
         self.my_N.add_(batch_size)
 
         return None
+
     def free_energy(
+        self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates"
+    ) -> float:
+        return super(GMM, self).free_energy(idx, batch, states)
+
+    def annealed_free_energy(
             self, idx: to.Tensor, batch: to.Tensor, states: "TVEMVariationalStates", beta: float = 1
     ) -> float:
         """Evaluate free energy for the given batch of datapoints.
@@ -71,16 +77,12 @@ class REM1_GMM(GMM):
         :param states: all TVEMVariationalStates states for this dataset
 
         .. note::
-        This default implementation of free_energy is only appropriate for Optimized models.
+        This default implementation of free_energy is only appropriate for Optimized models
         """
-        #breakpoint()
         with to.no_grad():
             log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx])
             lpj = states.lpj[idx]
             post = lpj2pjc(beta * lpj)
             F = beta * mean_tempered_posterior(log_joints, lpj, beta) - mean_tempered_posterior(to.log(post), lpj, beta)
             res = to.sum(F).item()
-            print(res)
-            sres = super(GMM, self).free_energy(idx, batch, states)
-            print(res / sres)
         return res
