@@ -132,7 +132,7 @@ class REMTraining(Training):
 
         # EM steps
         for (steps, beta) in zip(self._conf.beta_steps, self._conf.beta):
-            for e in range(steps):
+            for e in range(int(steps)):
                 start_t = time.time()
                 compute_reconstruction = (
                     self._conf.reco_epochs is not None and e in self._conf.reco_epochs
