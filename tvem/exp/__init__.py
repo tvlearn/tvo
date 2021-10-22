@@ -14,6 +14,7 @@ __all__ = [
     "FullEMSingleCauseConfig",
     "ExpConfig",
     "EpochLog",
+    "REM_EpochLog",
     "REMTraining",
     "REMExpConfig",
 ]

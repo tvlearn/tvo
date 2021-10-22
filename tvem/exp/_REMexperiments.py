@@ -13,7 +13,7 @@ from tvem.trainer import Trainer, REM1_Trainer
 from tvem.exp._EStepConfig import EStepConfig
 from tvem.exp._ExpConfig import ExpConfig
 from tvem.exp._REMExpConfig import REMExpConfig
-from tvem.exp._EpochLog import EpochLog
+from tvem.exp._REM_EpochLog import REM_EpochLog
 from tvem.variational import TVEMVariationalStates
 import tvem
 
@@ -104,7 +104,73 @@ class REMTraining(Training):
         )
         self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 
-    def run(self, epochs: int) -> Generator[EpochLog, None, None]:#modifizieren
+    def _log_epoch(self, logger: H5Logger, epoch_results: Dict[str, float]):
+        """Log F, subs, model.theta, states.K and states.lpj to file, return printable log.
+
+        :param logger: the logger for this run
+        :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step
+        """
+        for data_kind in "train", "test":
+            if (data_kind + "_F" not in epoch_results) and (data_kind + "_F_beta" not in epoch_results):
+                print("no free energies provided")
+                continue
+
+            # log_kind is one of "train", "valid" or "test"
+            # (while data_kind is one of "train" or "test")
+            log_kind = "valid" if data_kind == "test" and self.train_data is not None else data_kind
+
+            # log F and subs to stdout and file
+            F_beta, F, subs = get(epoch_results, f"{data_kind}_F_beta", f"{data_kind}_F", f"{data_kind}_subs")
+            assert not (math.isnan(F) or math.isinf(F)), f"{log_kind} free energy is invalid!"
+            assert not (math.isnan(F_beta) or math.isinf(F_beta)), f"{log_kind} annealed free energy is invalid!"
+            F_and_subs_dict = {
+                    f"{log_kind}_F_beta": to.tensor(F_beta),
+                    f"{log_kind}_F": to.tensor(F),
+                    f"{log_kind}_subs": to.tensor(subs)
+                    }
+            logger.append(**F_and_subs_dict) # hier ansehen
+
+            # log latest states and lpj to file
+            states = getattr(self, f"{data_kind}_states")
+            if f"{log_kind}_states" not in self._conf.log_blacklist:
+                K = gather_from_processes(states.K)
+                logger.set(**{f"{log_kind}_states": K})
+            else:
+                K = None
+            if f"{log_kind}_lpj" not in self._conf.log_blacklist:
+                logger.set(**{f"{log_kind}_lpj": gather_from_processes(states.lpj)})
+
+            if self._conf.keep_best_states:
+                best_F_name = f"best_{log_kind}_F"
+                best_F = getattr(self, f"_{best_F_name}", None)
+                if best_F is None or F > best_F:
+                    rank = dist.get_rank() if dist.is_initialized() else 0
+                    if K is None:
+                        K = gather_from_processes(states.K)
+                    if rank == 0:
+                        assert isinstance(K, to.Tensor)  # to make mypy happy
+                        best_states_dict = {
+                            best_F_name: to.tensor(F),
+                            f"best_{log_kind}_states": K.cpu().clone(),
+                        }
+                        logger.set(**best_states_dict)
+                    setattr(self, f"_{best_F_name}", F)
+
+            # log data reconstructions
+            reco_dict = {}
+            if (
+                f"{log_kind}_reconstruction" not in self._conf.log_blacklist
+                and f"{data_kind}_rec" in epoch_results
+            ):
+                reco_dict[f"{log_kind}_reconstruction"] = gather_from_processes(
+                    epoch_results[f"{data_kind}_rec"]
+                )
+                logger.set(**reco_dict)
+
+        log_theta_fn = logger.set if self._conf.log_only_latest_theta else logger.append
+        log_theta_fn(theta=self.model.theta)
+        logger.write()
+    def run(self, epochs: int) -> Generator[REM_EpochLog, None, None]:#modifizieren
         """Run training and/o testing.
 
         :param epochs: Number of epochs to train for
@@ -128,7 +194,7 @@ class REMTraining(Training):
         if self._conf.warmup_Esteps == 0:
             d = trainer.eval_free_energies(self._conf.beta[0])
         self._log_epoch(logger, d)
-        yield EpochLog(epoch=0, results=d)
+        yield REM_EpochLog(epoch=0, results=d)
 
         # EM steps
         for (steps, beta) in zip(self._conf.beta_steps, self._conf.beta):
@@ -140,7 +206,7 @@ class REMTraining(Training):
                 d = trainer.em_step(compute_reconstruction, beta)
                 epoch_runtime = time.time() - start_t
                 self._log_epoch(logger, d)
-                yield EpochLog(e + 1, d, epoch_runtime)
+                yield REM_EpochLog(e + 1, d, epoch_runtime)
 
         # remove leftover ".old" logfiles produced by the logger
         rank = dist.get_rank() if dist.is_initialized() else 0

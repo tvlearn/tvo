@@ -41,6 +41,88 @@ class REM1_Trainer(Trainer):
             data_transform
             )
         
+    @staticmethod
+    def _do_e_step(
+        data: TVEMDataLoader,
+        states: TVEMVariationalStates,
+        model: Trainable,
+        N: int,
+        data_transform,
+        reconstruction: to.Tensor = None,
+        beta: float = 1.0,
+    ):
+        if reconstruction is not None and not isinstance(model, Reconstructor):
+            raise NotImplementedError(
+                f"reconstruction not implemented for model {type(model).__name__}"
+            )
+        F = to.tensor(0.0)
+        subs = to.tensor(0)
+        if isinstance(model, Optimized):
+            model.init_epoch()
+        for idx, batch in data:
+            batch = data_transform(batch)
+            if isinstance(model, Optimized):
+                model.init_batch()
+            subs += states.update(idx, batch, model)
+            F_beta += m.annealed_free_energy(idx, batch, train_states, beta)
+            F += model.free_energy(idx, batch, states)
+            if reconstruction is not None:
+                # full data estimation
+                reconstruction[idx] = model.data_estimator(idx, batch, states)  # type: ignore
+        all_reduce(F)
+        all_reduce(F_beta)
+        all_reduce(subs)
+        return F_beta.item() / N, F.item() / N, subs.item() / N, reconstruction
+
+    def e_step(self, compute_reconstruction: bool = False, beta: float = 1.0) -> Dict[str, Any]:
+        """Run one epoch of E-steps on training and/or test data, depending on what is available.
+
+        Only E-steps are executed.
+
+        :returns: a dictionary containing 'train_F', 'train_subs', 'test_F', 'test_subs'
+                  (keys might be missing depending on what is available)
+        """
+        ret = {}
+        model = self.model
+        train_data, train_states = self.train_data, self.train_states
+        test_data, test_states = self.test_data, self.test_states
+        train_reconstruction = (
+            self.train_reconstruction
+            if (compute_reconstruction and hasattr(self, "train_reconstruction"))
+            else None
+        )
+        test_reconstruction = (
+            self.test_reconstruction
+            if (compute_reconstruction and hasattr(self, "test_reconstruction"))
+            else None
+        )
+
+        # Training #
+        if self.can_train:
+            assert train_data is not None and train_states is not None  # to make mypy happy
+            ret["train_F_beta"], ret["train_F"], ret["train_subs"], train_rec = self._do_e_step(
+                train_data,
+                train_states,
+                model,
+                self.N_train,
+                self.data_transform,
+                train_reconstruction,
+                beta,
+            )
+            if train_rec is not None:
+                ret["train_rec"] = train_rec
+
+        # Validation/Testing #
+        if self.can_test:
+            assert test_data is not None and test_states is not None  # to make mypy happy
+            ret["test_F_beta"], ret["test_F"], ret["test_subs"], test_rec = self._do_e_step(
+                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+            )
+            if test_rec is not None:
+                ret["test_rec"] = test_rec
+
+        return ret
+
     def em_step(self, compute_reconstruction: bool = False, beta: float = 1.0) -> Dict[str, Any]:
         """Run a training or test epoch of REM1 with annealing-sheme
         
@@ -79,13 +161,14 @@ class REM1_Trainer(Trainer):
 
             assert test_data is not None and test_states is not None  # to make mypy happy
             res = self._do_e_step(
-                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction, beta
             )
-            ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
+            ret_dict["test_F_beta"], ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
             if test_reconstruction is not None:
                 ret_dict["test_rec"] = test_reconstruction
 
         return ret_dict
+
 
     def _train_epoch(self, compute_reconstruction: bool, beta: float = 1.0):
         model = self.model
