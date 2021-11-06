@@ -10,7 +10,7 @@ from tvem.utils import get, CyclicLR
 import torch.optim as opt
 import tvem
 import torch as to
-from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union
+from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union, Callable
 from math import pi as MATH_PI
 from abc import abstractmethod
 
@@ -89,6 +89,7 @@ class _TVAE(Trainable, Sampler, Reconstructor):
     _net_shape: Sequence[int]
     _scheduler: opt.lr_scheduler._LRScheduler
     _optimizer: opt.Optimizer
+    _activation: Callable
     _external_model: Optional[to.nn.Module] = None
 
     @abstractmethod
@@ -201,6 +202,7 @@ class GaussianTVAE(_TVAE):
         analytical_sigma_updates: bool = True,
         analytical_pi_updates: bool = True,
         clamp_sigma_updates: bool = False,
+        activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
     ):
@@ -225,6 +227,8 @@ class GaussianTVAE(_TVAE):
         :param analytical_pi_updates: Whether priors should be updated via the analytical
                                       max-likelihood solution rather than gradient descent.
         :param clamp_sigma_updates: Whether to limit the rate at which sigma can be updated.
+        :param activation: Decoder activation function used if external_model is not specified.
+                           Defaults to ReLU if not specified and external_model not used.
         :param external_model: Optional decoder neural network. One of shape, (W_init, b_init),
                                external_model must be specified exclusively.
         :param optimizer: Gradient optimizer (defaults to Adam if not specified)
@@ -251,6 +255,7 @@ class GaussianTVAE(_TVAE):
             assert hasattr(
                 external_model, "shape"
             ), "for externally defined models, shape has to be provided manually"
+            assert activation is None, "Must specify activation as part of external_model"
             H0 = external_model.H0
             self._net_shape = external_model.shape
             self.W = self.b = None
@@ -263,6 +268,8 @@ class GaussianTVAE(_TVAE):
             self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
             self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
             gd_parameters = self.W + self.b
+            self._activation = to.nn.ReLU() if activation is None else activation
+            assert isinstance(self._activation, Callable)
 
         self._theta["pies"] = _init_pi(
             precision, pi_init, H0, requires_grad=not analytical_pi_updates
@@ -303,6 +310,7 @@ class GaussianTVAE(_TVAE):
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
         self._config = dict(
             net_shape=self._net_shape,
+            activation=self._activation,
             external_model=self._external_model,
             precision=self.precision,
             min_lr=self._min_lr,
@@ -447,7 +455,8 @@ class GaussianTVAE(_TVAE):
 
             # middle layers (relu)
             for W, b in zip(self.W[:-1], self.b[:-1]):
-                output = to.relu(output @ W + b)
+                # output = self._activation(output @ W + b)
+                output = self._activation(output @ W + b)
 
             # output layer (linear)
             output = output @ self.W[-1] + self.b[-1]
@@ -467,6 +476,7 @@ class BernoulliTVAE(_TVAE):
         W_init: Sequence[to.Tensor] = None,
         b_init: Sequence[to.Tensor] = None,
         analytical_pi_updates: bool = True,
+        activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
     ):
@@ -486,6 +496,11 @@ class BernoulliTVAE(_TVAE):
         :param b_init: Optional list of tensors with initial.
         :param analytical_pi_updates: Whether priors should be updated via the analytical
                                       max-likelihood solution rather than gradient descent.
+        :param activation: Decoder activation function used if external_model is not specified.
+                           Defaults to ReLU if not specified and external_model not used.
+        :param external_model: Optional decoder neural network. One of shape, (W_init, b_init),
+                               external_model must be specified exclusively.
+        :param optimizer: Gradient optimizer (defaults to Adam if not specified)
         """
         self._theta: Dict[str, to.Tensor] = {}
         self._precision = precision
@@ -508,6 +523,7 @@ class BernoulliTVAE(_TVAE):
             assert hasattr(
                 external_model, "shape"
             ), "for externally defined models, shape has to be provided manually"
+            assert activation is None, "Must specify activation as part of external_model"
             H0 = external_model.H0
             self._net_shape = external_model.shape
             self.W = self.b = None
@@ -520,6 +536,8 @@ class BernoulliTVAE(_TVAE):
             self._theta.update({f"W_{i}": W for i, W in enumerate(self.W)})
             self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
             gd_parameters = self.W + self.b
+            self._activation = to.nn.ReLU() if activation is None else activation
+            assert isinstance(self._activation, Callable)
 
         self._theta["pies"] = _init_pi(
             precision, pi_init, H0, requires_grad=not analytical_pi_updates
@@ -550,6 +568,7 @@ class BernoulliTVAE(_TVAE):
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvem.get_device())
         self._config = dict(
             net_shape=self._net_shape,
+            activation=self._activation,
             external_model=self._external_model,
             precision=self.precision,
             min_lr=self._min_lr,
@@ -670,7 +689,7 @@ class BernoulliTVAE(_TVAE):
 
             # middle layers (relu)
             for W, b in zip(self.W[:-1], self.b[:-1]):
-                output = to.relu(output @ W + b)
+                output = self._activation(output @ W + b)
 
             # output layer (sigmoid)
             output = to.sigmoid(output @ self.W[-1] + self.b[-1])
