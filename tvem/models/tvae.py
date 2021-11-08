@@ -89,7 +89,7 @@ class _TVAE(Trainable, Sampler, Reconstructor):
     _net_shape: Sequence[int]
     _scheduler: opt.lr_scheduler._LRScheduler
     _optimizer: opt.Optimizer
-    _activation: Callable
+    _activation: Optional[Callable] = None
     _external_model: Optional[to.nn.Module] = None
 
     @abstractmethod
