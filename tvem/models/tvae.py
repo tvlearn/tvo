@@ -270,7 +270,7 @@ class GaussianTVAE(_TVAE):
             self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
             gd_parameters = self.W + self.b
             self._activation = to.nn.ReLU() if activation is None else activation
-            assert isinstance(self._activation, Callable)
+            assert callable(self._activation)
 
         self._theta["pies"] = _init_pi(
             precision, pi_init, H0, requires_grad=not analytical_pi_updates
@@ -453,6 +453,7 @@ class GaussianTVAE(_TVAE):
             assert isinstance(self.W, Sequence) and isinstance(
                 self.b, Sequence
             )  # to make mypy happy
+            assert callable(self._activation)  # to make mypy happy
 
             # middle layers (relu)
             for W, b in zip(self.W[:-1], self.b[:-1]):
@@ -539,7 +540,7 @@ class BernoulliTVAE(_TVAE):
             self._theta.update({f"b_{i}": b for i, b in enumerate(self.b)})
             gd_parameters = self.W + self.b
             self._activation = to.nn.ReLU() if activation is None else activation
-            assert isinstance(self._activation, Callable)
+            assert callable(self._activation)
 
         self._theta["pies"] = _init_pi(
             precision, pi_init, H0, requires_grad=not analytical_pi_updates
@@ -688,6 +689,7 @@ class BernoulliTVAE(_TVAE):
             assert isinstance(self.W, Sequence) and isinstance(
                 self.b, Sequence
             )  # to make mypy happy
+            assert callable(self._activation)  # to make mypy happy
 
             # middle layers (relu)
             for W, b in zip(self.W[:-1], self.b[:-1]):
