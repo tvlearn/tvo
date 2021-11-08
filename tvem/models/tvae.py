@@ -236,6 +236,7 @@ class GaussianTVAE(_TVAE):
         self._theta: Dict[str, to.Tensor] = {}
         self._clamp_sigma = clamp_sigma_updates
         self._precision = precision
+        self._activation = activation
         self._external_model = external_model
         assert (
             (shape is not None and W_init is None and b_init is None and external_model is None)
@@ -504,6 +505,7 @@ class BernoulliTVAE(_TVAE):
         """
         self._theta: Dict[str, to.Tensor] = {}
         self._precision = precision
+        self._activation = activation
         self._external_model = external_model
         assert (
             (shape is not None and W_init is None and b_init is None and external_model is None)
