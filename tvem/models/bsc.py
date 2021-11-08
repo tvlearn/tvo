@@ -194,7 +194,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         policy["sigma2"][0] = theta["sigma2"]
         fix_theta(theta_new, policy)
         for key in theta:
-            theta[key] = theta_new[key]
+            theta[key][:] = theta_new[key]
 
         self.my_Wp[:] = 0.0
         self.my_Wq[:] = 0.0
