@@ -126,3 +126,24 @@ class FullEMSingleCauseConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
+
+
+class RandomSamplingConfig(EStepConfig):
+    def __init__(self, n_states: int, n_samples: int, sparsity: float = 0.5):
+        """Configuration object for random sampling.
+
+        :param n_states: Number of variational states per datapoint to keep in memory.
+        :param n_samples: Number of new variational states to randomly draw.
+        :param sparsity: average fraction of active units in sampled states.
+        """
+        assert n_states > 0, f"n_states must be positive integer ({n_states})"
+        assert n_samples > 0, f"n_samples must be positive integer ({n_samples})"
+        assert sparsity > 0 and sparsity < 1, f"sparsity must be in [0, 1] ({sparsity})"
+
+        self.n_samples = n_samples
+        self.sparsity = sparsity
+
+        super().__init__(n_states)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
