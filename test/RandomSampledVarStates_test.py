@@ -20,9 +20,10 @@ class DummyModel(Trainable):
 @pytest.mark.gpu
 def test_update():
     device = tvem.get_device()
-    conf = {"N": 10, "H": 8, "S": 4, "precision": to.float32, "device": device}
-    var_states = RandomSampledVarStates(10, conf)
-    data = to.rand(conf["N"], 1, device=device)
+    precision = to.float32
+    N, H, S, S_new = 10, 8, 4, 10
+    var_states = RandomSampledVarStates(N, H, S, precision, S_new)
+    data = to.rand(N, 1, device=device)
     idx = to.arange(data.shape[0], device=device)
 
     # lpj simply counts active units in each latent state:

@@ -18,21 +18,16 @@ import numpy as np
 )
 def setup(request):
     class Setup:
-        N, D, S, H = 10, 16, 8, 8
-        model = NoisyOR(H, D, precision=to.float32)
-        _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
+        device = tvem.get_device()
+        precision = to.float32
+        N, D, S, H, S_new = 10, 16, 8, 8, 10
+        model = NoisyOR(H, D, precision=precision)
+        _td = to.randint(2, size=(N, D), dtype=to.uint8, device=device)
         data = TVEMDataLoader(_td, batch_size=N)
-        _td = to.randint(2, size=(N, D), dtype=to.uint8, device=tvem.get_device())
+        _td = to.randint(2, size=(N, D), dtype=to.uint8, device=device)
         test_data = TVEMDataLoader(_td, batch_size=N)
-        _varstates_conf = {
-            "N": N,
-            "H": H,
-            "S": S,
-            "precision": to.float32,
-            "device": tvem.get_device(),
-        }
-        var_states = RandomSampledVarStates(10, _varstates_conf)
-        test_states = RandomSampledVarStates(10, _varstates_conf)
+        var_states = RandomSampledVarStates(N, H, S, precision, S_new)
+        test_states = RandomSampledVarStates(N, H, S, precision, S_new)
 
     return Setup
 
