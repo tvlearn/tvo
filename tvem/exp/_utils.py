@@ -13,6 +13,7 @@ from tvem.variational import (
     EEMVariationalStates,
     FullEMSingleCauseModels,
     TVSVariationalStates,
+    RandomSampledVarStates,
 )
 from tvem.exp._EStepConfig import (
     FullEMConfig,
@@ -20,26 +21,35 @@ from tvem.exp._EStepConfig import (
     EStepConfig,
     FullEMSingleCauseConfig,
     TVSConfig,
+    RandomSamplingConfig,
 )
 from tvem.utils.parallel import scatter_to_processes
 
 
 def make_var_states(
     conf: EStepConfig, N: int, H: int, precision: to.dtype
-) -> Union[EEMVariationalStates, FullEM, FullEMSingleCauseModels, TVSVariationalStates]:
+) -> Union[
+    EEMVariationalStates,
+    FullEM,
+    FullEMSingleCauseModels,
+    TVSVariationalStates,
+    RandomSampledVarStates,
+]:
 
     if isinstance(conf, FullEMConfig):
         assert conf.n_states == 2 ** H, "FullEMConfig and model have different H"
         return FullEM(N, H, precision)
-    if isinstance(conf, FullEMSingleCauseConfig):
+    elif isinstance(conf, FullEMSingleCauseConfig):
         assert conf.n_states == H, "FullEMSingleCauseConfig and model have different H"
         return FullEMSingleCauseModels(N, H, precision)
     elif isinstance(conf, EEMConfig):
         return _make_EEM_var_states(conf, N, H, precision)
-    if isinstance(conf, TVSConfig):
+    elif isinstance(conf, TVSConfig):
         return TVSVariationalStates(
             N, H, conf.n_states, precision, conf.n_prior_samples, conf.n_marginal_samples
         )
+    elif isinstance(conf, RandomSamplingConfig):
+        return RandomSampledVarStates(N, H, conf.n_states, precision, conf.n_samples, conf.sparsity)
     else:  # pragma: no cover
         raise NotImplementedError()
 
