@@ -3,8 +3,6 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-
-from typing import Dict, Any
 from torch import Tensor
 from tvem.utils.model_protocols import Trainable, Optimized
 
@@ -13,17 +11,28 @@ from .TVEMVariationalStates import TVEMVariationalStates
 
 
 class RandomSampledVarStates(TVEMVariationalStates):
-    def __init__(self, S_new: int, conf: Dict[str, Any], sparsity: float = 0.5):
+    def __init__(
+        self, N: int, H: int, S: int, precision: to.dtype, S_new: int, sparsity: float = 0.5
+    ):
         """A TVEMVariationalStates implementation that performs random sampling.
 
+        :param N: number of datapoints
+        :param H: number of latents
+        :param S: number of variational states
+        :param precision: floating point precision to be used for log_joint values.
+                          Must be one of to.float32 or to.float64.
         :param S_new: number of states to be sampled at every call to ~update
-        :param conf: dictionary with hyper-parameters. See\
-          :func:`~tvem.variational.TVEMVariationalStates` for a list of required keys.
         :param sparsity: average fraction of active units in sampled states.
         """
-        conf["S_new"] = S_new
+        conf = dict(
+            N=N,
+            H=H,
+            S=S,
+            precision=precision,
+            S_new=S_new,
+            sparsity=sparsity,
+        )
         super().__init__(conf)
-        self.sparsity = sparsity
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
         """See :func:`tvem.variational.TVEMVariationalStates.update`."""
@@ -37,7 +46,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
         batch_size, S, H = K.shape
         self.lpj[idx] = lpj_fn(batch, K)
         new_K = (
-            to.rand(batch_size, self.config["S_new"], H, device=K.device) < self.sparsity
+            to.rand(batch_size, self.config["S_new"], H, device=K.device) < self.config["sparsity"]
         ).byte()
         new_lpj = lpj_fn(batch, new_K)
 
