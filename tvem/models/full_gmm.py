@@ -13,6 +13,7 @@ from typing import Union, Tuple
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
 from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
+from tvem.variational.fullem import FullEMSingleCauseModels
 from tvem.variational._utils import mean_posterior
 from tvem.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvem.utils.sanity import fix_theta
@@ -100,16 +101,24 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
             Kfloat, self.theta["W"].t()
         )  # N,C,D  # TODO Pre-allocate tensor and use `out` argument of to.matmul
         # Sigma is D, D , C  -> C , D , D inverse
-        #WEITER Matrix nicht invertierbar da alle werte gleich nach erster Iteration
         try:
             lpj = to.squeeze(
-                    -1/2* (Wbar - data[:, None, :]).unsqueeze(-2) 
-                    @ self.theta["Sigma"].transpose(0,2).inverse().unsqueeze(0) 
-                    @ (Wbar - data[:, None, :]).unsqueeze(-1)
-                    )
+                -1/2 * (Wbar - data[:, None, :]).unsqueeze(-2) 
+                @ to.linalg.solve(self.theta["Sigma"].permute(2,0,1).unsqueeze(0),
+                    (Wbar - data[:, None, :]).unsqueeze(-1)),
+                -1
+                ).squeeze(-1)
             lpj += to.matmul(Kfloat, to.log(self.theta["pies"]))
+
         except RuntimeError:
-            breakpoint()
+            lpj = to.squeeze(
+                    -1/2 * (Wbar - data[:, None, :]).unsqueeze(-2) 
+                    @ self.theta["Sigma"].permute(2, 1, 0).pinverse().unsqueeze(0) 
+                    @ (Wbar - data[:, None, :]).unsqueeze(-1),
+                    -1
+                    ).squeeze(-1)
+            lpj += to.matmul(Kfloat, to.log(self.theta["pies"]))
+            print('lpj calculated with pinverse')
 
         return lpj.to(device=states.device)
 
@@ -118,7 +127,7 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
         D = self.shape[0]
-        return lpj - D / 2 * to.log(to.tensor(2 * math.pi)) - 1 / 2 * to.log(to.det(self.theta["Sigma"].transpose(0,2)))
+        return lpj - D / 2 * to.log(to.tensor(2 * math.pi)) - 1 / 2 * to.log(to.det(self.theta["Sigma"].permute(2,0,1)))
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: Tensor) -> None:
         lpj = states.lpj[idx]
@@ -143,7 +152,7 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
         self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
         self.my_Wp.add_(to.sum(batch_Wp, dim=0))
         self.my_Wq.add_(to.sum(batch_s_pjc, dim=0)) # sum(r(n,h),dim=0)
-        self.my_Sigma.add_(to.sum(batch_Sigma, dim=0).transpose(0,2))#my_Sigma is D,D,H; batch_Sigma is N,H,D,D
+        self.my_Sigma.add_(to.sum(batch_Sigma, dim=0).permute(1,2,0))#my_Sigma is D,D,H; batch_Sigma is N,H,D,D
         self.my_N.add_(batch_size)
 
         return None
@@ -247,3 +256,66 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
         return mean_posterior(
             to.matmul(K.to(dtype=self.precision), self.theta["W"].t()), states.lpj[idx]
         )
+
+    def pdf(self, mesh: Tensor, states: TVEMVariationalStates) -> Tensor:
+        """ returns the probability density funktion of the whole model.
+        :param mesh: tensor of coordinates with shape N, N , D
+        :param states: TVEMVariationalStates containing all states for GMM,
+        i.E. all clusters; states.K is equal to to.eye(D).tile(N,1,1)
+        :returns: tensor of shape N
+        """
+        x_grid_points, y_grid_points, D = mesh.shape
+        mesh = mesh.flatten(end_dim=1)
+        lj = self.log_joint(mesh, states.K)
+        return to.sum(lj.exp(), dim=1).reshape(x_grid_points, y_grid_points)
+if __name__ == '__main__':
+    
+    model = FULL_GMM(
+        1,#H
+        2,#D 
+        to.tensor([0,0]).unsqueeze(-1),#W 
+        2 * to.eye(2).unsqueeze(-1),#sigma_init
+        to.tensor(1).unsqueeze(-1),#pies_init
+        )
+    data = to.ones(2).unsqueeze(0)
+    print(f"{data = }")
+    states = to.tensor([1]).unsqueeze(-1).unsqueeze(-1)
+    print(f"{states = }")
+    print(model.log_joint(data,states))
+
+
+    ### TESTING POSTERIOR CALCULATION ###
+    N = 2
+    H = 2
+    D = 2
+    var_states = FullEMSingleCauseModels(N,H,to.double)
+    W_init = to.tensor([[0,1],[0,0]]) #W_init is D, H
+    print(f'{W_init = }')
+    Sigma_init = to.eye(2).unsqueeze(-1).repeat(1,1,2)#sigma_init is D, D, H
+    print(f'{Sigma_init = }')
+    pies_init = to.tensor([0.5,0.5]) # is (H,)
+    print(f'{pies_init = }')
+
+    model = FULL_GMM(
+            H,
+            D,
+            W_init,
+            Sigma_init,
+            pies_init,
+        )
+    idx = to.arange(2) 
+    batch = to.tensor([[0,0],[1,0]])
+    var_states.update(idx, batch, model)
+    lpj = var_states.lpj[idx]
+    K = var_states.K[idx]
+    batch_size, S, _ = K.shape
+
+    Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
+    print(f'{Kfloat.shape = }')
+    Wbar = to.matmul(
+            Kfloat, model.theta["W"].t()
+            )  # N,S,D # TODO Find solution to re-use evaluations from E-step
+
+    batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H) mean_posterior(Kfloat, lpj) 
+    print(f'{batch_s_pjc = }')
+
