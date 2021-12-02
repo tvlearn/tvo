@@ -113,7 +113,7 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
         except RuntimeError:
             lpj = to.squeeze(
                     -1/2 * (Wbar - data[:, None, :]).unsqueeze(-2) 
-                    @ self.theta["Sigma"].permute(2, 1, 0).pinverse().unsqueeze(0) 
+                    @ self.theta["Sigma"].permute(2, 0, 1).pinverse().unsqueeze(0) 
                     @ (Wbar - data[:, None, :]).unsqueeze(-1),
                     -1
                     ).squeeze(-1)
