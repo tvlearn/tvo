@@ -111,14 +111,15 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
             lpj += to.matmul(Kfloat, to.log(self.theta["pies"]))
 
         except RuntimeError:
+            sigma_noisy = self.theta['Sigma'] + 0.1 * to.rand_like(self.theta['Sigma'])
             lpj = to.squeeze(
-                    -1/2 * (Wbar - data[:, None, :]).unsqueeze(-2) 
-                    @ self.theta["Sigma"].permute(2, 0, 1).pinverse().unsqueeze(0) 
-                    @ (Wbar - data[:, None, :]).unsqueeze(-1),
-                    -1
-                    ).squeeze(-1)
+                -1/2 * (Wbar - data[:, None, :]).unsqueeze(-2) 
+                @ to.linalg.solve(sigma_noisy.permute(2,0,1).unsqueeze(0),
+                    (Wbar - data[:, None, :]).unsqueeze(-1)),
+                -1
+                ).squeeze(-1)
             lpj += to.matmul(Kfloat, to.log(self.theta["pies"]))
-            print('lpj calculated with pinverse')
+            pprint('added noise to sigma')
 
         return lpj.to(device=states.device)
 
