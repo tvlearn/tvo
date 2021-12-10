@@ -322,7 +322,6 @@ class Trainer:
         new_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
         all_reduce(new_F)
         if new_F < old_F:
-            breakpoint()
             print('Rollback')
             for p in self._to_rollback:
                 m.theta[p][:] = old_params[p]
