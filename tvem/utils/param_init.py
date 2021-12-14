@@ -48,7 +48,7 @@ def init_sigma_default(
     return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)), dim=0, keepdim=True)
 
 def init_Sigma_default(
-    data_cov: Tensor, dtype: to.dtype = to.float64, device: to.device = None
+        data_cov: Tensor,  H: int, D: int, dtype: to.dtype = to.float64, device: to.device = None
 ) -> Tensor:
     """Initialize Sigma parameter based on variance of the data points.
 
@@ -64,11 +64,12 @@ def init_Sigma_default(
         device = tvem.get_device()
     
     # creation of a semmetric positive semidefinite matrix
-    a = [to.diag(to.rand(D, dtype=precision)) for k in range(H)]
+    tr_mean = to.trace(data_cov) / H 
+    a = [tr_mean * to.diag(to.rand(D, dtype=dtype, device=device)) for k in range(H)]
 
-    b = to.zeros(H, D, D, dtype=precision)
+    b = to.zeros(H, D, D, dtype=dtype, device=device)
     for h, cluster in enumerate(a):
-        V = to.tensor(special_ortho_group.rvs(D).T, dtype=precision)
+        V = to.tensor(special_ortho_group.rvs(D), dtype=dtype, device=device)
         b[h,:,:] = V @ cluster @ V.T
     # b = b.permute(1,2,0) # make D, D, H
     res = data_cov + b 
