@@ -1,6 +1,7 @@
 import tvem
 import torch as to
 from torch import Tensor
+from scipy.stats import special_ortho_group
 
 
 def init_W_data_mean(
@@ -46,6 +47,33 @@ def init_sigma_default(
         device = tvem.get_device()
     return to.mean(to.sqrt(data_var.to(dtype=dtype, device=device)), dim=0, keepdim=True)
 
+def init_Sigma_default(
+    data_cov: Tensor, dtype: to.dtype = to.float64, device: to.device = None
+) -> Tensor:
+    """Initialize Sigma parameter based on variance of the data points.
+
+    :param data_cov: Variance of all data points in each dimension d=1,...D of the data.
+    :param dtype: dtype of output Tensor. Defaults to torch.float64.
+    :param device: torch.device of output Tensor. Defaults to tvem.get_device().
+    :returns: Sigma parameter.
+
+    Returns the covariance of the whole data with some added noise maintaining a covariance matrix
+    """
+
+    if device is None:
+        device = tvem.get_device()
+    
+    # creation of a semmetric positive semidefinite matrix
+    a = [to.diag(to.rand(D, dtype=precision)) for k in range(H)]
+
+    b = to.zeros(H, D, D, dtype=precision)
+    for h, cluster in enumerate(a):
+        V = to.tensor(special_ortho_group.rvs(D).T, dtype=precision)
+        b[h,:,:] = V @ cluster @ V.T
+    # b = b.permute(1,2,0) # make D, D, H
+    res = data_cov + b 
+    
+    return res.permute(1,2,0)
 
 def init_pies_default(
     H: int, crowdedness: float = 2.0, dtype: to.dtype = to.float64, device: to.device = None
