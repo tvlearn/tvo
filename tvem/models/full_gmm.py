@@ -268,7 +268,7 @@ class FULL_GMM(Optimized, Sampler, Reconstructor):
         x_grid_points, y_grid_points, D = mesh.shape
         mesh = mesh.flatten(end_dim=1)
         lj = self.log_joint(mesh, states.K)
-        return to.sum(lj.exp(), dim=1).reshape(x_grid_points, y_grid_points)
+        return to.sum(lj.exp(), dim=1).reshape(x_grid_points, y_grid_points).t()
 if __name__ == '__main__':
     
     model = FULL_GMM(
