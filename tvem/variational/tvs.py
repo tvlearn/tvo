@@ -7,6 +7,7 @@ from tvem.variational.TVEMVariationalStates import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.model_protocols import Trainable, Optimized
 from ._utils import update_states_for_batch, set_redundant_lpj_to_low
+from typing import Optional
 
 
 class TVSVariationalStates(TVEMVariationalStates):
@@ -44,7 +45,9 @@ class TVSVariationalStates(TVEMVariationalStates):
         }
         super().__init__(conf)
 
-    def update(self, idx: to.Tensor, batch: to.Tensor, model: Trainable) -> int:
+    def update(
+        self, idx: to.Tensor, batch: to.Tensor, model: Trainable, notnan: Optional[to.Tensor] = None
+    ) -> int:
         """See :func:`tvem.variational.TVEMVariationalStates.update`."""
         if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
@@ -55,7 +58,7 @@ class TVSVariationalStates(TVEMVariationalStates):
 
         K, lpj = self.K, self.lpj
         batch_size, H = batch.shape[0], K.shape[2]
-        lpj[idx] = lpj_fn(batch, K[idx])
+        lpj[idx] = lpj_fn(batch, K[idx], notnan=notnan)
 
         new_K_prior = (
             to.rand(batch_size, self.config["S_new_prior"], H, device=K.device)
@@ -74,7 +77,7 @@ class TVSVariationalStates(TVEMVariationalStates):
 
         new_K = to.cat((new_K_prior, new_K_marg), dim=1)
 
-        new_lpj = lpj_fn(batch, new_K)
+        new_lpj = lpj_fn(batch, new_K, notnan=notnan)
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
