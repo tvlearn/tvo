@@ -51,8 +51,16 @@ class Trainer:
             assert (data is not None) == (
                 states is not None
             ), "Please provide both dataset and variational states, or neither"
-        train_data = TVEMDataLoader(train_data) if isinstance(train_data, to.Tensor) else train_data
-        test_data = TVEMDataLoader(test_data) if isinstance(test_data, to.Tensor) else test_data
+        train_data = (
+            TVEMDataLoader(*(train_data, to.logical_not(to.isnan(train_data))))
+            if isinstance(train_data, to.Tensor)
+            else train_data
+        )
+        test_data = (
+            TVEMDataLoader(*(test_data, to.logical_not(to.isnan(test_data))))
+            if isinstance(test_data, to.Tensor)
+            else test_data
+        )
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:  # pragma: no cover
@@ -102,21 +110,22 @@ class Trainer:
         subs = to.tensor(0)
         if isinstance(model, Optimized):
             model.init_epoch()
-        for idx, batch in data:
+        for idx, batch, notnan in data:
             batch = data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
-            subs += states.update(idx, batch, model)
-            F += model.free_energy(idx, batch, states)
+            subs += states.update(idx, batch, model, notnan=notnan)
+            F += model.free_energy(idx, batch, states, notnan=notnan)
             if reconstruction is not None:
                 # full data estimation
-                reconstruction[idx] = model.data_estimator(idx, batch, states)  # type: ignore
+                reconstruction[idx] = model.data_estimator(idx, batch, states, notnan)  # type: ignore  # noqa
         all_reduce(F)
         all_reduce(subs)
         return F.item() / N, subs.item() / N, reconstruction
 
     def e_step(self, compute_reconstruction: bool = False) -> Dict[str, Any]:
-        """Run one epoch of E-steps on training and/or test data, depending on what is available.
+        """Run one epoch of E-steps on training and/or test data, depending on what is
+        available.
 
         Only E-steps are executed.
 
@@ -231,22 +240,22 @@ class Trainer:
         subs = to.tensor(0)
         if isinstance(model, Optimized):
             model.init_epoch()
-        for idx, batch in train_data:
+        for idx, batch, notnan in train_data:
             batch = self.data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
             with to.no_grad():
-                subs += train_states.update(idx, batch, model)
+                subs += train_states.update(idx, batch, model, notnan=notnan)
                 if train_reconstruction is not None:
                     assert isinstance(model, Reconstructor)
                     train_reconstruction[idx] = model.data_estimator(
-                        idx, batch, train_states
+                        idx, batch, train_states, notnan
                     )  # full data estimation
-            if to.isnan(batch).any():
-                missing_data_mask = to.isnan(batch)
+            if not notnan.all():
+                missing_data_mask = to.logical_not(notnan)
                 batch[missing_data_mask] = train_reconstruction[idx][missing_data_mask]
                 train_reconstruction[idx] = batch
-            batch_F = model.update_param_batch(idx, batch, train_states)
+            batch_F = model.update_param_batch(idx, batch, train_states, notnan)
             if not self.eval_F_at_epoch_end:
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
@@ -271,12 +280,12 @@ class Trainer:
             F = to.tensor(0.0)
             if isinstance(m, Optimized):
                 m.init_epoch()
-            for idx, batch in train_data:
+            for idx, batch, notnan in train_data:
                 batch = self.data_transform(batch)
                 if isinstance(m, Optimized):
                     m.init_batch()
-                train_states.lpj[idx] = lpj_fn(batch, train_states.K[idx])
-                F += m.free_energy(idx, batch, train_states)
+                train_states.lpj[idx] = lpj_fn(batch, train_states.K[idx], notnan=notnan)
+                F += m.free_energy(idx, batch, train_states, notnan=notnan)
             all_reduce(F)
             ret["train_F"] = F.item() / self.N_train
             ret["train_subs"] = 0
@@ -286,12 +295,12 @@ class Trainer:
             F = to.tensor(0.0)
             if isinstance(m, Optimized):
                 m.init_epoch()
-            for idx, batch in test_data:
+            for idx, batch, notnan in test_data:
                 batch = self.data_transform(batch)
                 if isinstance(m, Optimized):
                     m.init_batch()
-                test_states.lpj[idx] = lpj_fn(batch, test_states.K[idx])
-                F += m.free_energy(idx, batch, test_states)
+                test_states.lpj[idx] = lpj_fn(batch, test_states.K[idx], notnan=notnan)
+                F += m.free_energy(idx, batch, test_states, notnan=notnan)
             all_reduce(F)
             ret["test_F"] = F.item() / self.N_test
             ret["test_subs"] = 0
@@ -312,14 +321,19 @@ class Trainer:
         assert self.train_data is not None and self.train_states is not None  # to make mypy happy
         all_data = self.train_data.dataset.tensors[1]
         states = self.train_states
+        all_notnan = self.train_data.dataset.tensors[2]
 
         old_params = {p: m.theta[p].clone() for p in self._to_rollback}
-        old_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        old_F = m.free_energy(
+            idx=to.arange(all_data.shape[0]), batch=all_data, states=states, notnan=all_notnan
+        )
         all_reduce(old_F)
         old_lpj = states.lpj.clone()
         m.update_param_epoch()
-        states.lpj[:] = lpj_fn(all_data, states.K)
-        new_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        states.lpj[:] = lpj_fn(all_data, states.K, notnan=all_notnan)
+        new_F = m.free_energy(
+            idx=to.arange(all_data.shape[0]), batch=all_data, states=states, notnan=all_notnan
+        )
         all_reduce(new_F)
         if new_F < old_F:
             for p in self._to_rollback:
