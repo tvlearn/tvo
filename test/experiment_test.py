@@ -31,7 +31,7 @@ class LogJointOnly(Trainable):
         self._shape = (D, H)
         self._config = {}
 
-    def log_joint(self, data, states):
+    def log_joint(self, data, states, notnan=None):
         N, S = data.shape[0], states.shape[1]
         return to.ones(N, S, dtype=self.precision, device=tvem.get_device())
 

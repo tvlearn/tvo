@@ -14,6 +14,7 @@ import pytest
 from itertools import combinations
 import numpy as np
 from tvem.utils.model_protocols import Trainable
+from typing import Optional
 
 
 def reset_rng_state(seed):
@@ -27,8 +28,10 @@ class DummyModel(Trainable):
     def update_param_batch(self):
         pass
 
-    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
-        """Dummy log-pseudo-joint. """
+    def log_joint(  # type: ignore
+        self, data: Tensor, states: Tensor, lpj: Tensor = None, notnan: Optional[Tensor] = None
+    ) -> Tensor:
+        """Dummy log-pseudo-joint."""
         N, S, H = states.shape
 
         s_ids = to.empty((H,), dtype=to.int64, device=states.device)

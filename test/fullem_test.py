@@ -11,7 +11,7 @@ from munch import Munch
 
 
 class DummyModel(Trainable):
-    def log_joint(self, data, states):
+    def log_joint(self, data, states, notnan=None):
         return states.sum(dim=2, dtype=to.float32)
 
     def update_param_batch(self):
