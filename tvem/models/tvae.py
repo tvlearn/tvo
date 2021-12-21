@@ -93,21 +93,43 @@ class _TVAE(Trainable, Sampler, Reconstructor):
     _external_model: Optional[to.nn.Module] = None
 
     @abstractmethod
-    def log_joint(self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None) -> to.Tensor:
+    def log_joint(  # type: ignore
+        self,
+        data: to.Tensor,
+        states: to.Tensor,
+        lpj: to.Tensor = None,
+        notnan: Optional[to.Tensor] = None,
+    ) -> to.Tensor:
         ...
 
-    def _log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
+    def _log_pseudo_joint(
+        self,
+        data: to.Tensor,
+        states: to.Tensor,
+        notnan: Optional[to.Tensor] = None,
+    ) -> to.Tensor:
         with to.no_grad():
-            lpj, _ = self._lpj_and_mlpout(data, states)
+            lpj, _ = self._lpj_and_mlpout(data, states, notnan)
         return lpj
 
     @abstractmethod
-    def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
+    def _lpj_and_mlpout(
+        self,
+        data: to.Tensor,
+        states: to.Tensor,
+        notnan: Optional[to.Tensor] = None,
+    ) -> Tuple[to.Tensor, to.Tensor]:
         ...
 
-    def free_energy(self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates) -> float:
+    def free_energy(
+        self,
+        idx: to.Tensor,
+        batch: to.Tensor,
+        states: TVEMVariationalStates,
+        notnan: Optional[to.Tensor] = None,
+    ) -> float:
         with to.no_grad():
-            return super().free_energy(idx, batch, states)
+            return super().free_energy(idx, batch, states, notnan)
 
     def _free_energy_from_logjoints(self, logjoints: to.Tensor) -> to.Tensor:
         Fn = to.logsumexp(logjoints, dim=1)
@@ -116,7 +138,11 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         return Fn.sum()
 
     def update_param_batch(
-        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
+        self,
+        idx: to.Tensor,
+        batch: to.Tensor,
+        states: TVEMVariationalStates,
+        notnan: Optional[to.Tensor] = None,
     ) -> float:
         if to.isnan(batch).any():
             raise RuntimeError("There are NaNs in this batch")
@@ -148,8 +174,7 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         :returns: F and mlp_output _before_ the weight update
         """
         assert self._optimizer is not None  # to make mypy happy
-
-        lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
+        lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx], None)
         F = self._free_energy_from_logjoints(self.log_joint(data, states.K[idx], lpj))
         loss = -F / data.shape[0]
         loss.backward()
@@ -167,7 +192,11 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         pass
 
     def data_estimator(
-        self, idx: to.Tensor, batch: to.Tensor, states: TVEMVariationalStates
+        self,
+        idx: to.Tensor,
+        batch: to.Tensor,
+        states: TVEMVariationalStates,
+        notnan: Optional[to.Tensor] = None,
     ) -> to.Tensor:  # type: ignore
         r"""
         :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa
@@ -323,7 +352,9 @@ class GaussianTVAE(_TVAE):
             device=tvem.get_device(),
         )
 
-    def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
+    def _lpj_and_mlpout(
+        self, data: to.Tensor, states: to.Tensor, notnan: Optional[to.Tensor] = None
+    ) -> Tuple[to.Tensor, to.Tensor]:
         N = data.shape[0]
         N_, S, H = states.shape
         assert N == N_, "Shape mismatch between data and states"
@@ -333,6 +364,7 @@ class GaussianTVAE(_TVAE):
         mlp_out = self.forward(states)  # (N, S, D)
 
         # nansum used to automatically ignore missing data
+        # TODO: Check efficiency of notnan indexing
         s1 = to.nansum((data.unsqueeze(1) - mlp_out).pow_(2), dim=2).div_(2 * sigma2)  # (N, S)
         s2 = states @ to.log(pi / (1.0 - pi))  # (N, S)
         lpj = s2 - s1
@@ -340,12 +372,12 @@ class GaussianTVAE(_TVAE):
         assert not to.isnan(lpj).any() and not to.isinf(lpj).any()
         return lpj, mlp_out
 
-    def log_joint(self, data, states, lpj=None):
+    def log_joint(self, data, states, lpj=None, notnan=None):
         pi, sigma2 = get(self.theta, "pies", "sigma2")
         D = data.shape[1] - to.isnan(data).sum(dim=1)  # (N,): ignores missing data
         D = D.unsqueeze(1)  # (N, 1)
         if lpj is None:
-            lpj = self._log_pseudo_joint(data, states)
+            lpj = self._log_pseudo_joint(data, states, notnan)
         # TODO: could pre-evaluate the constant factor once per epoch
         logjoints = lpj - D / 2 * to.log(2 * MATH_PI * sigma2) + to.log(1 - pi).sum()
         return logjoints
@@ -581,7 +613,9 @@ class BernoulliTVAE(_TVAE):
             device=tvem.get_device(),
         )
 
-    def _lpj_and_mlpout(self, data: to.Tensor, states: to.Tensor) -> Tuple[to.Tensor, to.Tensor]:
+    def _lpj_and_mlpout(
+        self, data: to.Tensor, states: to.Tensor, notnan: Optional[to.Tensor] = None
+    ) -> Tuple[to.Tensor, to.Tensor]:
         N, D = data.shape
         N_, S, H = states.shape
         assert N == N_, "Shape mismatch between data and states"
@@ -591,6 +625,7 @@ class BernoulliTVAE(_TVAE):
         mlp_out = self.forward(states)  # (N, S, D)
 
         # nansum used to automatically ignore missing data
+        # TODO: Check efficiency of notnan indexing
         s1 = to.nansum(
             to.nn.functional.binary_cross_entropy(
                 mlp_out, data.unsqueeze(1).expand(N, S, D), reduction="none"
@@ -603,11 +638,11 @@ class BernoulliTVAE(_TVAE):
         assert not to.isnan(lpj).any() and not to.isinf(lpj).any()
         return lpj, mlp_out
 
-    def log_joint(self, data, states, lpj=None):
+    def log_joint(self, data, states, lpj=None, notnan=None):
         D = data.shape[1] - to.isnan(data).sum(dim=1)  # (N,): ignores missing data
         D = D.unsqueeze(1)  # (N, 1)
         if lpj is None:
-            lpj = self._log_pseudo_joint(data, states)
+            lpj = self._log_pseudo_joint(data, states, notnan)
         # TODO: could pre-evaluate the constant factor once per epoch
         logjoints = lpj + to.log(1 - self.theta["pies"]).sum()
         return logjoints
