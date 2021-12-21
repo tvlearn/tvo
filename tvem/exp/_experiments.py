@@ -95,8 +95,12 @@ class _TrainingAndOrValidation(Experiment):
         if dataset.dtype is not to.uint8:
             dataset = dataset.to(dtype=self._precision)
         dataset = dataset.to(device=tvem.get_device())
+        not_nan = to.logical_not(to.isnan(dataset))
         return TVEMDataLoader(
-            dataset, batch_size=conf.batch_size, shuffle=conf.shuffle, drop_last=conf.drop_last
+            *(dataset, not_nan),
+            batch_size=conf.batch_size,
+            shuffle=conf.shuffle,
+            drop_last=conf.drop_last,
         )
 
     def _make_states(
