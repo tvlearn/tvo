@@ -77,7 +77,9 @@ class EEMVariationalStates(TVEMVariationalStates):
         )
         super().__init__(conf)
 
-    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
+    def update(
+        self, idx: Tensor, batch: Tensor, model: Trainable, notnan: Optional[Tensor] = None
+    ) -> int:
         if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
             sort_by_lpj = model.sorted_by_lpj
@@ -92,10 +94,10 @@ class EEMVariationalStates(TVEMVariationalStates):
             self.config, "parent_selection", "mutation", "n_parents", "n_children", "n_generations"
         )
 
-        lpj[idx] = lpj_fn(batch, K[idx])
+        lpj[idx] = lpj_fn(batch, K[idx], notnan=notnan)
 
         def lpj_fn_(states):
-            return lpj_fn(batch, states)
+            return lpj_fn(batch, states, notnan=notnan)
 
         new_states, new_lpj = evolve_states(
             lpj=lpj[idx].to(device="cpu"),
