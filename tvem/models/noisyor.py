@@ -64,8 +64,11 @@ class NoisyOR(Optimized, Sampler):
         self._config = dict(H=H, D=D, precision=self.precision, device=device)
         self._shape = self.theta["W"].shape
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
-        """Evaluate log-pseudo-joints for NoisyOR."""
+    def log_pseudo_joint(self, data: Tensor, states: Tensor, notnan: Optional[Tensor] = None) -> Tensor:  # type: ignore  # noqa
+        """Evaluate log-pseudo-joints for NoisyOR.
+
+        TODO: Make use of  notnan to neglect missing data
+        """
         K = states
         Y = data
         assert K.dtype == to.uint8 and Y.dtype == to.uint8
@@ -105,12 +108,13 @@ class NoisyOR(Optimized, Sampler):
         ), "some NoisyOR lpj values are invalid!"
         return lpj.to(device=states.device)  # (N, S)
 
-    def update_param_batch(
+    def update_param_batch(  # type: ignore
         self,
         idx: Tensor,
         batch: Tensor,
         states: TVEMVariationalStates,
         mstep_factors: Dict[str, Tensor] = None,
+        notnan: Optional[Tensor] = None,
     ) -> Optional[float]:
         lpj = states.lpj[idx]
         K = states.K[idx]
@@ -154,10 +158,10 @@ class NoisyOR(Optimized, Sampler):
 
         self._train_datapoints[:] = 0
 
-    def log_joint(self, data, states, lpj=None):
+    def log_joint(self, data, states, lpj=None, notnan: Optional[Tensor] = None):  # type: ignore
         pi = self.theta["pies"]
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, states)
+            lpj = self.log_pseudo_joint(data, notnan, states)
         # TODO: could pre-evaluate the constant factor once per epoch
         return to.sum(to.log(1 - pi)) + lpj
 
