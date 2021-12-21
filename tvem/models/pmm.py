@@ -8,7 +8,7 @@ import math
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
 from torch import Tensor
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
@@ -76,8 +76,11 @@ class PMM(Optimized, Sampler, Reconstructor):
         self._config = dict(H=H, D=D, precision=precision, device=device)
         self._shape = self.theta["W"].shape
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
-        """Evaluate log-pseudo-joints for GMM."""
+    def log_pseudo_joint(self, data: Tensor, states: Tensor, notnan: Optional[Tensor] = None) -> Tensor:  # type: ignore  # noqa
+        """Evaluate log-pseudo-joints for GMM.
+
+        TODO: Make use of notnan to neglect missing data
+        """
         Kfloat = states.to(
             dtype=self.theta["W"].dtype
         )  # N,C,C # TODO Find solution to avoid byte->float casting
@@ -93,13 +96,17 @@ class PMM(Optimized, Sampler, Reconstructor):
         )
         return lpj.to(device=states.device)
 
-    def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
+    def log_joint(  # type: ignore
+        self, data: Tensor, states: Tensor, lpj: Tensor = None, notnan: Optional[Tensor] = None
+    ) -> Tensor:
         """Evaluate log-joints for PMM."""
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, states)
+            lpj = self.log_pseudo_joint(data, states, notnan)
         return lpj - to.sum(to.lgamma(data + 1), dim=1)[:, None]
 
-    def update_param_batch(self, idx: Tensor, batch: Tensor, states: Tensor) -> None:
+    def update_param_batch(
+        self, idx: Tensor, batch: Tensor, states: Tensor, notnan: Optional[Tensor] = None
+    ) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
         batch_size, S, _ = K.shape
@@ -185,7 +192,13 @@ class PMM(Optimized, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates) -> Tensor:
+    def data_estimator(
+        self,
+        idx: Tensor,
+        batch: Tensor,
+        states: TVEMVariationalStates,
+        notnan: Optional[Tensor] = None,
+    ) -> Tensor:
 
         # Not yet implemented
 
