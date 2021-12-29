@@ -30,6 +30,7 @@ class EEMConfig(EStepConfig):
         n_children: int = None,
         mutation: str = "uniform",
         bitflip_frequency: float = None,
+        K_init_file: str = None,
     ):
         """Configuration object for EEM E-step.
 
@@ -52,6 +53,7 @@ class EEMConfig(EStepConfig):
         :param bitflip_frequency: Probability of flipping a bit during the mutation step (e.g.
                                   2/H for an average of 2 bitflips per mutation). Required when
                                   using the 'sparsity' mutation algorithm.
+        :param K_init_file: Full path to H5 file providing initial states
         """
         assert (
             not crossover or n_children is None
@@ -74,6 +76,7 @@ class EEMConfig(EStepConfig):
         self.crossover = crossover
         self.mutation = mutation
         self.bitflip_frequency = bitflip_frequency
+        self.K_init_file = K_init_file
 
         super().__init__(n_states)
 
@@ -87,6 +90,7 @@ class TVSConfig(EStepConfig):
         n_states: int,
         n_prior_samples: int,
         n_marginal_samples: int,
+        K_init_file: str = None,
     ):
         """Configuration object for TVS E-step.
 
@@ -94,6 +98,7 @@ class TVSConfig(EStepConfig):
         :param n_prior_samples: Number of new variational states to be sampled from prior.
         :param n_marginal_samples: Number of new variational states to be sampled from\
                                    approximated marginal p(s_h=1|vec{y}^{(n)}, Theta).
+        :param K_init_file: Full path to H5 file providing initial states
         """
         assert n_states > 0, f"n_states must be positive integer ({n_states})"
         assert n_prior_samples > 0, f"n_prior_samples must be positive integer ({n_prior_samples})"
@@ -103,6 +108,7 @@ class TVSConfig(EStepConfig):
 
         self.n_prior_samples = n_prior_samples
         self.n_marginal_samples = n_marginal_samples
+        self.K_init_file = K_init_file
 
         super().__init__(n_states)
 
@@ -129,12 +135,15 @@ class FullEMSingleCauseConfig(EStepConfig):
 
 
 class RandomSamplingConfig(EStepConfig):
-    def __init__(self, n_states: int, n_samples: int, sparsity: float = 0.5):
+    def __init__(
+        self, n_states: int, n_samples: int, sparsity: float = 0.5, K_init_file: str = None
+    ):
         """Configuration object for random sampling.
 
         :param n_states: Number of variational states per datapoint to keep in memory.
         :param n_samples: Number of new variational states to randomly draw.
         :param sparsity: average fraction of active units in sampled states.
+        :param K_init_file: Full path to H5 file providing initial states
         """
         assert n_states > 0, f"n_states must be positive integer ({n_states})"
         assert n_samples > 0, f"n_samples must be positive integer ({n_samples})"
@@ -142,6 +151,7 @@ class RandomSamplingConfig(EStepConfig):
 
         self.n_samples = n_samples
         self.sparsity = sparsity
+        self.K_init_file = K_init_file
 
         super().__init__(n_states)
 
