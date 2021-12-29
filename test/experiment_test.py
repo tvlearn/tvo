@@ -305,8 +305,8 @@ def test_reconstruction_with_missing(
         assert to.allclose(
             train_data[inds_not_is_nan],
             train_reconstruction[inds_not_is_nan],
-            rtol=1e-04,
-            atol=1e-06,
+            rtol=1e-03,
+            atol=1e-04,
         )
 
 
