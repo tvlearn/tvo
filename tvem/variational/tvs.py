@@ -18,6 +18,7 @@ class TVSVariationalStates(TVEMVariationalStates):
         precision: to.dtype,
         S_new_prior: int,
         S_new_marg: int,
+        K_init_file: str = None,
     ):
         """Truncated Variational Sampling class.
 
@@ -29,6 +30,7 @@ class TVSVariationalStates(TVEMVariationalStates):
         :param S_new_prior: number of states to be sampled from prior at every call to ~update
         :param S_new_marg: number of states to be sampled from approximated marginal\
                            p(s_h=1|vec{y}^{(n)}, Theta) at every call to ~update
+        :param K_init_file: Full path to H5 file providing initial states
         """
         conf = {
             "N": N,
@@ -38,6 +40,7 @@ class TVSVariationalStates(TVEMVariationalStates):
             "S_new_marg": S_new_marg,
             "S_new": S_new_prior + S_new_marg,
             "precision": precision,
+            "K_init_file": K_init_file,
         }
         super().__init__(conf)
 
