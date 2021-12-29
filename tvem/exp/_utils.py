@@ -42,10 +42,18 @@ def make_var_states(
         return _make_EEM_var_states(conf, N, H, precision)
     elif isinstance(conf, TVSConfig):
         return TVSVariationalStates(
-            N, H, conf.n_states, precision, conf.n_prior_samples, conf.n_marginal_samples
+            N,
+            H,
+            conf.n_states,
+            precision,
+            conf.n_prior_samples,
+            conf.n_marginal_samples,
+            conf.K_init_file,
         )
     elif isinstance(conf, RandomSamplingConfig):
-        return RandomSampledVarStates(N, H, conf.n_states, precision, conf.n_samples, conf.sparsity)
+        return RandomSampledVarStates(
+            N, H, conf.n_states, precision, conf.n_samples, conf.sparsity, conf.K_init_file
+        )
     else:  # pragma: no cover
         raise NotImplementedError()
 
@@ -53,17 +61,17 @@ def make_var_states(
 def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
     selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
     mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
-    eem_conf = {
-        "parent_selection": selection,
-        "mutation": mutation,
-        "n_parents": conf.n_parents,
-        "n_children": conf.n_children if not conf.crossover else None,
-        "n_generations": conf.n_generations,
-        "S": conf.n_states,
-        "N": N,
-        "H": H,
-        "crossover": conf.crossover,
-        "precision": precision,
-        "bitflip_frequency": conf.bitflip_frequency,
-    }
-    return EEMVariationalStates(**eem_conf)
+    return EEMVariationalStates(
+        N=N,
+        H=H,
+        S=conf.n_states,
+        precision=precision,
+        parent_selection=selection,
+        mutation=mutation,
+        n_parents=conf.n_parents,
+        n_generations=conf.n_generations,
+        n_children=conf.n_children if not conf.crossover else None,
+        crossover=conf.crossover,
+        bitflip_frequency=conf.bitflip_frequency,
+        K_init_file=conf.K_init_file,
+    )
