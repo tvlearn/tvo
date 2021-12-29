@@ -31,6 +31,7 @@ class EEMVariationalStates(TVEMVariationalStates):
         n_children: int = None,
         crossover: bool = False,
         bitflip_frequency: float = None,
+        K_init_file: str = None,
     ):
         """Evolutionary Expectation Maximization class.
 
@@ -49,6 +50,7 @@ class EEMVariationalStates(TVEMVariationalStates):
         :param bitflip_frequency: Probability of flipping a bit during the mutation step (e.g.
                                   2/H for an average of 2 bitflips per mutation). Required when
                                   using the 'sparsity' mutation algorithm.
+        :param K_init_file: Full path to H5 file providing initial states
         """
         assert (
             not crossover or n_children is None
@@ -71,6 +73,7 @@ class EEMVariationalStates(TVEMVariationalStates):
             n_children=n_children,
             n_generations=n_generations,
             p_bf=bitflip_frequency,
+            K_init_file=K_init_file,
         )
         super().__init__(conf)
 
