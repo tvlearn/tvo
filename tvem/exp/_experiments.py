@@ -5,8 +5,13 @@
 from abc import ABC, abstractmethod
 from tvem.utils.data import TVEMDataLoader
 from tvem.utils.model_protocols import Trainable
-from tvem.utils.parallel import pprint, init_processes, gather_from_processes
-from tvem.exp._utils import make_var_states, get_h5_dataset_to_processes
+from tvem.utils.parallel import (
+    pprint,
+    init_processes,
+    gather_from_processes,
+    get_h5_dataset_to_processes,
+)
+from tvem.exp._utils import make_var_states
 from tvem.utils import get, H5Logger
 from tvem.trainer import Trainer
 from tvem.exp._EStepConfig import EStepConfig

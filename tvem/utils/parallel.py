@@ -4,11 +4,12 @@
 
 import platform
 import math
+import h5py
 
 import torch
 import torch.distributed as dist
 from torch import Tensor
-from typing import Iterable, Union, Dict
+from typing import Iterable, Union, Dict, Tuple
 
 import tvem
 
@@ -281,3 +282,20 @@ def mpi_average_grads(theta: Dict[str, torch.Tensor]) -> None:
         for p in parameters:
             all_reduce(p.grad)
             p.grad /= n_procs
+
+
+def get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> torch.Tensor:
+    """Return dataset with the first of `possible_keys` that is found in hdf5 file `fname`."""
+    rank = dist.get_rank() if dist.is_initialized() else 0
+
+    f = h5py.File(fname, "r")
+    for dataset in possible_keys:
+        if dataset in f.keys():
+            break
+    else:  # pragma: no cover
+        raise ValueError(f'File "{fname}" does not contain any of keys {possible_keys}')
+    if rank == 0:
+        data = torch.tensor(f[dataset][...], device=tvem.get_device())
+    else:
+        data = None
+    return scatter_to_processes(data)
