@@ -12,7 +12,14 @@ from .TVEMVariationalStates import TVEMVariationalStates
 
 class RandomSampledVarStates(TVEMVariationalStates):
     def __init__(
-        self, N: int, H: int, S: int, precision: to.dtype, S_new: int, sparsity: float = 0.5
+        self,
+        N: int,
+        H: int,
+        S: int,
+        precision: to.dtype,
+        S_new: int,
+        sparsity: float = 0.5,
+        K_init_file: str = None,
     ):
         """A TVEMVariationalStates implementation that performs random sampling.
 
@@ -23,6 +30,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
                           Must be one of to.float32 or to.float64.
         :param S_new: number of states to be sampled at every call to ~update
         :param sparsity: average fraction of active units in sampled states.
+        :param K_init_file: Full path to H5 file providing initial states
         """
         conf = dict(
             N=N,
@@ -31,6 +39,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
             precision=precision,
             S_new=S_new,
             sparsity=sparsity,
+            K_init_file=K_init_file,
         )
         super().__init__(conf)
 
