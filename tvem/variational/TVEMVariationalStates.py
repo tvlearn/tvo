@@ -38,7 +38,7 @@ class TVEMVariationalStates(ABC):
 
         if _K_init is not None:
             assert _K_init.shape == (N, S, H)
-            self.K = _K_init.clone()
+            self.K = _K_init.clone().to(dtype=to.uint8)
         else:
             self.K = generate_unique_states(S, H).repeat(N, 1, 1)  # (N, S, H)
         self.lpj = to.empty((N, S), dtype=precision, device=tvem.get_device())
