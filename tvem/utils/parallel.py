@@ -83,6 +83,7 @@ def bcast_dtype(data: Tensor, src: int = 0) -> torch.dtype:
             torch.int16,
             torch.int32,
             torch.int64,
+            torch.bool,
         ]
 
         ind_dtype = torch.empty((1,), dtype=torch.uint8)
@@ -136,6 +137,9 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
         for data in tensors:
 
             this_dtype = bcast_dtype(data, src)
+            is_bool = this_dtype == torch.bool
+            if is_bool:  # workaround to avoid `IndexError: map::at` when scattering to.bool tensor
+                this_dtype = torch.uint8
             this_device = tvem.get_device()
 
             shape = bcast_shape(data, src)
@@ -171,6 +175,9 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             )
 
             dist.scatter(my_data, src=src, scatter_list=chunks)
+
+            if is_bool:
+                my_data = my_data.to(dtype=torch.bool)
 
             my_data = my_data[:local_length]
 
