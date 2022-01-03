@@ -258,7 +258,7 @@ class Trainer:
             batch_F = model.update_param_batch(idx, batch, train_states, notnan)
             if not self.eval_F_at_epoch_end:
                 if batch_F is None:
-                    batch_F = model.free_energy(idx, batch, train_states)
+                    batch_F = model.free_energy(idx, batch, train_states, notnan=notnan)
                 F += batch_F
         self._update_parameters_with_rollback()
         return F, subs, train_reconstruction
