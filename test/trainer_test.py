@@ -23,10 +23,9 @@ def setup(request):
         N, D, S, H, S_new = 10, 16, 8, 8, 10
         model = NoisyOR(H, D, precision=precision)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=device)
-        notnan = to.logical_not(to.isnan(_td))
-        data = TVEMDataLoader(*(_td, notnan), batch_size=N)
+        data = TVEMDataLoader(_td, batch_size=N)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=device)
-        test_data = TVEMDataLoader(*(_td, notnan), batch_size=N)
+        test_data = TVEMDataLoader(_td, batch_size=N)
         var_states = RandomSampledVarStates(N, H, S, precision, S_new)
         test_states = RandomSampledVarStates(N, H, S, precision, S_new)
 
@@ -91,8 +90,7 @@ def test_rollback():
     eps = 1e-6
     N, H, D = 10, 4, 32
     data = (to.rand(N, D, device=tvem.get_device()) < 0.8).byte()  # noisy data
-    notnan = to.logical_not(to.isnan(data))
-    dataloader = TVEMDataLoader(*(data, notnan), batch_size=N)
+    dataloader = TVEMDataLoader(data, batch_size=N)
 
     # make two identical copies of the model: we'll train twice with same initial conditions
     # parameters are initialized stochastically.
