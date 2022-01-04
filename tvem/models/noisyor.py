@@ -4,12 +4,12 @@
 
 
 from tvem.utils.model_protocols import Optimized, Sampler
-from tvem.variational import TVEMVariationalStates  # type: ignore
+from tvem.variational import TVEMVariationalStates
 from tvem.variational._utils import mean_posterior
 from tvem.utils.parallel import all_reduce, broadcast
 from torch import Tensor
 import torch as to
-from typing import Dict, Optional, Union, Tuple
+from typing import Dict, Optional, Union, Tuple, Any
 import tvem
 
 
@@ -64,11 +64,8 @@ class NoisyOR(Optimized, Sampler):
         self._config = dict(H=H, D=D, precision=self.precision, device=device)
         self._shape = self.theta["W"].shape
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor, notnan: Optional[Tensor] = None) -> Tensor:  # type: ignore  # noqa
-        """Evaluate log-pseudo-joints for NoisyOR.
-
-        TODO: Make use of  notnan to neglect missing data
-        """
+    def log_pseudo_joint(self, data: Tensor, states: Tensor, **kwargs: Dict[str, Any]) -> Tensor:
+        """Evaluate log-pseudo-joints for NoisyOR"""
         K = states
         Y = data
         assert K.dtype == to.uint8 and Y.dtype == to.uint8
@@ -108,13 +105,13 @@ class NoisyOR(Optimized, Sampler):
         ), "some NoisyOR lpj values are invalid!"
         return lpj.to(device=states.device)  # (N, S)
 
-    def update_param_batch(  # type: ignore
+    def update_param_batch(
         self,
         idx: Tensor,
         batch: Tensor,
         states: TVEMVariationalStates,
         mstep_factors: Dict[str, Tensor] = None,
-        notnan: Optional[Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> Optional[float]:
         lpj = states.lpj[idx]
         K = states.K[idx]
@@ -158,10 +155,10 @@ class NoisyOR(Optimized, Sampler):
 
         self._train_datapoints[:] = 0
 
-    def log_joint(self, data, states, lpj=None, notnan: Optional[Tensor] = None):  # type: ignore
+    def log_joint(self, data, states, lpj=None, **kwargs: Dict[str, Any]):
         pi = self.theta["pies"]
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, notnan, states)
+            lpj = self.log_pseudo_joint(data, states, **kwargs)
         # TODO: could pre-evaluate the constant factor once per epoch
         return to.sum(to.log(1 - pi)) + lpj
 
