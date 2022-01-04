@@ -28,7 +28,7 @@ class DummyModel(Trainable):
         pass
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
-        """Dummy log-pseudo-joint. """
+        """Dummy log-pseudo-joint."""
         N, S, H = states.shape
 
         s_ids = to.empty((H,), dtype=to.int64, device=states.device)
