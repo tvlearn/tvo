@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from typing import Optional
+from typing import Any, Dict
 from torch import Tensor
 from tvem.utils.model_protocols import Trainable, Optimized
 
@@ -44,9 +44,7 @@ class RandomSampledVarStates(TVEMVariationalStates):
         )
         super().__init__(conf)
 
-    def update(
-        self, idx: Tensor, batch: Tensor, model: Trainable, notnan: Optional[Tensor] = None
-    ) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable, **kwargs: Dict[str, Any]) -> int:
         """See :func:`tvem.variational.TVEMVariationalStates.update`."""
         if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
@@ -56,11 +54,11 @@ class RandomSampledVarStates(TVEMVariationalStates):
             sort_by_lpj = {}
         K = self.K[idx]
         batch_size, S, H = K.shape
-        self.lpj[idx] = lpj_fn(batch, K, notnan=notnan)
+        self.lpj[idx] = lpj_fn(batch, K, **kwargs)
         new_K = (
             to.rand(batch_size, self.config["S_new"], H, device=K.device) < self.config["sparsity"]
         ).byte()
-        new_lpj = lpj_fn(batch, new_K, notnan=notnan)
+        new_lpj = lpj_fn(batch, new_K, **kwargs)
 
         return update_states_for_batch(
             new_K, new_lpj, idx, self.K, self.lpj, sort_by_lpj=sort_by_lpj
