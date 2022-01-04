@@ -6,7 +6,7 @@ import math
 import torch as to
 
 from torch import Tensor
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Dict, Any
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
@@ -107,7 +107,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         )
         self._shape = self.theta["W"].shape
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor, notnan: Optional[to.Tensor] = None) -> Tensor:  # type: ignore  # noqa
+    def log_pseudo_joint(self, data: Tensor, states: Tensor, **kwargs: Dict[str, Any]) -> Tensor:
         """Evaluate log-pseudo-joints for BSC"""
         Kfloat = states.to(
             dtype=self.theta["W"].dtype
@@ -120,7 +120,6 @@ class BSC(Optimized, Sampler, Reconstructor):
             if self.config["individual_priors"]
             else to.log(self.theta["pies"] / (1 - self.theta["pies"])) * Kfloat.sum(dim=2)
         )
-        # TODO Check efficiency of notnan indexing
         lpj = (
             to.mul(
                 to.nansum(to.pow(Wbar - data.unsqueeze(1), 2), dim=2), -1 / 2 / self.theta["sigma2"]
@@ -129,13 +128,17 @@ class BSC(Optimized, Sampler, Reconstructor):
         )
         return lpj.to(device=states.device)
 
-    def log_joint(  # type: ignore
-        self, data: Tensor, states: Tensor, lpj: Tensor = None, notnan: Optional[to.Tensor] = None
+    def log_joint(
+        self, data: Tensor, states: Tensor, lpj: Tensor = None, **kwargs: Dict[str, Any]
     ) -> Tensor:
         """Evaluate log-joints for BSC."""
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, states, notnan)
-        _notnan = notnan if notnan is not None else to.logical_not(to.isnan(data))
+            lpj = self.log_pseudo_joint(data, states, **kwargs)
+        _notnan = (
+            kwargs["notnan"]
+            if ("notnan" in kwargs and kwargs["notnan"] is not None)
+            else to.logical_not(to.isnan(data))
+        )
         D = to.sum(_notnan, dim=1)  # (N,)
         H = self.shape[1]
         priorterm = (
@@ -146,11 +149,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         return lpj + priorterm - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
     def update_param_batch(
-        self,
-        idx: Tensor,
-        batch: Tensor,
-        states: TVEMVariationalStates,
-        notnan: Optional[to.Tensor] = None,
+        self, idx: Tensor, batch: Tensor, states: TVEMVariationalStates, **kwargs: Dict[str, Any]
     ) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
@@ -263,7 +262,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         idx: Tensor,
         batch: Tensor,
         states: TVEMVariationalStates,
-        notnan: Optional[Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
