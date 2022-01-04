@@ -22,7 +22,9 @@ def init_W_data_mean(
     :returns: Weight matrix W with shape (D,H).
     """
     device_ = tvem.get_device() if device is None else device
-    data_nanmean = to.from_numpy(np.nanmean(data, axis=0)).to(dtype=dtype, device=device_)
+    data_nanmean = to.from_numpy(np.nanmean(data.detach().cpu().numpy(), axis=0)).to(
+        dtype=dtype, device=device_
+    )
     var = init_sigma_default(data, dtype, device_)
     return data_nanmean.repeat((H, 1)).t() + std_factor * to.sqrt(var) * to.randn(
         (len(data_nanmean), H), dtype=dtype, device=device_
@@ -42,7 +44,7 @@ def init_sigma_default(
     Returns the mean of the variance in each dimension d=1,...,D.
     """
     _device = tvem.get_device() if device is None else device
-    cov = to.from_numpy(np.cov(data.numpy().T)).to(device=_device, dtype=dtype)
+    cov = to.from_numpy(np.cov(data.detach().cpu().numpy().T)).to(device=_device, dtype=dtype)
     return to.mean(to.diag(cov)) + to.tensor([0.001], device=_device, dtype=dtype)
 
 
