@@ -7,10 +7,11 @@ import torch as to
 from tvem.variational import RandomSampledVarStates
 import tvem
 from tvem.utils.model_protocols import Trainable
+from typing import Dict, Any
 
 
 class DummyModel(Trainable):
-    def log_joint(self, data, states, notnan=None):
+    def log_joint(self, data, states, **kwargs: Dict[str, Any]):
         return states.sum(dim=2, dtype=to.float32)
 
     def update_param_batch(self):

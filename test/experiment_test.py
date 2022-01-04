@@ -18,6 +18,7 @@ import torch.distributed as dist
 from munch import Munch
 from contextlib import suppress
 from tvem.trainer import Trainer
+from typing import Dict, Any
 
 
 class LogJointOnly(Trainable):
@@ -31,7 +32,7 @@ class LogJointOnly(Trainable):
         self._shape = (D, H)
         self._config = {}
 
-    def log_joint(self, data, states, notnan=None):
+    def log_joint(self, data, states, **kwargs: Dict[str, Any]):
         N, S = data.shape[0], states.shape[1]
         return to.ones(N, S, dtype=self.precision, device=tvem.get_device())
 

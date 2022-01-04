@@ -1,7 +1,7 @@
 from tvem.exp import ExpConfig, EEMConfig, Training
 from tvem.utils.model_protocols import Trainable
 from tvem.variational import FullEM
-from typing import Optional
+from typing import Dict, Any
 
 import tvem
 import numpy as np
@@ -17,14 +17,16 @@ class BlackBoxBSC(Trainable):
         self._k = to.log(to.tensor(2.0 * math.pi)) / 2
 
     def log_joint(
-        self, data: to.Tensor, states: to.Tensor, notnan: Optional[to.Tensor] = None
+        self,
+        data: to.Tensor,
+        states: to.Tensor,
+        **kwargs: Dict[str, Any],
     ) -> to.Tensor:
         pi, logsigma, W = self._theta.values()
         pi_ = pi.clamp(1e-2, 1.0 - 1e-2)
         H, D = W.shape
         Kfloat = states.type_as(pi)
         logprior = Kfloat @ to.log(pi_ / (1 - pi_)) + to.sum(to.log(1 - pi_))
-        # TODO Make use of notnan
         logpygs = (
             -(data.unsqueeze(1) - Kfloat @ W).pow_(2).sum(dim=2).div_(2 * to.exp(2 * logsigma))
             - D * self._k

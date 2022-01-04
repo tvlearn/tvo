@@ -14,7 +14,7 @@ import pytest
 from itertools import combinations
 import numpy as np
 from tvem.utils.model_protocols import Trainable
-from typing import Optional
+from typing import Dict, Any
 
 
 def reset_rng_state(seed):
@@ -29,7 +29,11 @@ class DummyModel(Trainable):
         pass
 
     def log_joint(  # type: ignore
-        self, data: Tensor, states: Tensor, lpj: Tensor = None, notnan: Optional[Tensor] = None
+        self,
+        data: Tensor,
+        states: Tensor,
+        lpj: Tensor = None,
+        **kwargs: Dict[str, Any],
     ) -> Tensor:
         """Dummy log-pseudo-joint."""
         N, S, H = states.shape
