@@ -51,16 +51,8 @@ class Trainer:
             assert (data is not None) == (
                 states is not None
             ), "Please provide both dataset and variational states, or neither"
-        train_data = (
-            TVEMDataLoader(*(train_data, to.logical_not(to.isnan(train_data))))
-            if isinstance(train_data, to.Tensor)
-            else train_data
-        )
-        test_data = (
-            TVEMDataLoader(*(test_data, to.logical_not(to.isnan(test_data))))
-            if isinstance(test_data, to.Tensor)
-            else test_data
-        )
+        train_data = TVEMDataLoader(train_data) if isinstance(train_data, to.Tensor) else train_data
+        test_data = TVEMDataLoader(test_data) if isinstance(test_data, to.Tensor) else test_data
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:  # pragma: no cover
@@ -97,7 +89,7 @@ class Trainer:
     def _do_e_step(
         data: TVEMDataLoader,
         states: TVEMVariationalStates,
-        model: Trainable,
+        model: Union[Trainable, Optimized, Reconstructor],
         N: int,
         data_transform,
         reconstruction: to.Tensor = None,
@@ -106,6 +98,7 @@ class Trainer:
             raise NotImplementedError(
                 f"reconstruction not implemented for model {type(model).__name__}"
             )
+        assert isinstance(model, Trainable)  # to make mypy happy
         F = to.tensor(0.0)
         subs = to.tensor(0)
         if isinstance(model, Optimized):
@@ -118,7 +111,8 @@ class Trainer:
             F += model.free_energy(idx, batch, states, notnan=notnan)
             if reconstruction is not None:
                 # full data estimation
-                reconstruction[idx] = model.data_estimator(idx, batch, states, notnan)  # type: ignore  # noqa
+                assert isinstance(model, Reconstructor)  # to make mypy happy
+                reconstruction[idx] = model.data_estimator(idx, batch, states, notnan=notnan)
         all_reduce(F)
         all_reduce(subs)
         return F.item() / N, subs.item() / N, reconstruction
@@ -249,13 +243,13 @@ class Trainer:
                 if train_reconstruction is not None:
                     assert isinstance(model, Reconstructor)
                     train_reconstruction[idx] = model.data_estimator(
-                        idx, batch, train_states, notnan
+                        idx, batch, train_states, notnan=notnan
                     )  # full data estimation
             if not notnan.all():
                 missing_data_mask = to.logical_not(notnan)
                 batch[missing_data_mask] = train_reconstruction[idx][missing_data_mask]
                 train_reconstruction[idx] = batch
-            batch_F = model.update_param_batch(idx, batch, train_states, notnan)
+            batch_F = model.update_param_batch(idx, batch, train_states, notnan=notnan)
             if not self.eval_F_at_epoch_end:
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states, notnan=notnan)
