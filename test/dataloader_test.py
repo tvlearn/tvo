@@ -20,17 +20,10 @@ def setup(request):
     return Munch(N=N, D=D, batch_size=2, set1=to.rand(N, D), set2=to.rand(N, D))
 
 
-def test_one_dataset(setup):
+def test_dataset(setup):
     DataLoader = TVEMDataLoader(setup.set1, batch_size=setup.batch_size)
     assert DataLoader.dataset.tensors[0].equal(to.arange(setup.N))
     assert to.allclose(DataLoader.dataset.tensors[1], setup.set1)
-
-
-def test_two_datasets(setup):
-    DataLoader = TVEMDataLoader(setup.set1, setup.set2, batch_size=setup.batch_size)
-    assert DataLoader.dataset.tensors[0].equal(to.arange(setup.N))
-    assert to.allclose(DataLoader.dataset.tensors[1], setup.set1)
-    assert to.allclose(DataLoader.dataset.tensors[2], setup.set2)
 
 
 @pytest.mark.mpi
@@ -44,7 +37,7 @@ def test_shuffling_sampler(setup):
     sampler = ShufflingSampler(data, n_samples)
     dl = TVEMDataLoader(data, batch_size=setup.batch_size, sampler=sampler)
     n_entries_per_proc = 0
-    for idx, batch in dl:
+    for idx, batch, notnan in dl:
         n_entries_per_proc += idx.numel()
     # check all processes looped over n_samples datapoints, independently of the dataset size
     assert n_entries_per_proc == n_samples
