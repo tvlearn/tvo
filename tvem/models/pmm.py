@@ -8,7 +8,7 @@ import math
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
 from torch import Tensor
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Any, Dict
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
@@ -76,11 +76,8 @@ class PMM(Optimized, Sampler, Reconstructor):
         self._config = dict(H=H, D=D, precision=precision, device=device)
         self._shape = self.theta["W"].shape
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor, notnan: Optional[Tensor] = None) -> Tensor:  # type: ignore  # noqa
-        """Evaluate log-pseudo-joints for GMM.
-
-        TODO: Make use of notnan to neglect missing data
-        """
+    def log_pseudo_joint(self, data: Tensor, states: Tensor, **kwargs: Dict[str, Any]) -> Tensor:
+        """Evaluate log-pseudo-joints for PMM."""
         Kfloat = states.to(
             dtype=self.theta["W"].dtype
         )  # N,C,C # TODO Find solution to avoid byte->float casting
@@ -96,16 +93,24 @@ class PMM(Optimized, Sampler, Reconstructor):
         )
         return lpj.to(device=states.device)
 
-    def log_joint(  # type: ignore
-        self, data: Tensor, states: Tensor, lpj: Tensor = None, notnan: Optional[Tensor] = None
+    def log_joint(
+        self,
+        data: Tensor,
+        states: Tensor,
+        lpj: Tensor = None,
+        **kwargs: Dict[str, Any],
     ) -> Tensor:
         """Evaluate log-joints for PMM."""
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, states, notnan)
+            lpj = self.log_pseudo_joint(data, states, **kwargs)
         return lpj - to.sum(to.lgamma(data + 1), dim=1)[:, None]
 
     def update_param_batch(
-        self, idx: Tensor, batch: Tensor, states: Tensor, notnan: Optional[Tensor] = None
+        self,
+        idx: Tensor,
+        batch: Tensor,
+        states: Tensor,
+        **kwargs: Dict[str, Any],
     ) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
@@ -197,7 +202,7 @@ class PMM(Optimized, Sampler, Reconstructor):
         idx: Tensor,
         batch: Tensor,
         states: TVEMVariationalStates,
-        notnan: Optional[Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> Tensor:
 
         # Not yet implemented
