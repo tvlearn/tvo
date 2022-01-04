@@ -6,7 +6,7 @@ import torch as to
 from torch import Tensor
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from tvem.variational._utils import generate_unique_states
 from tvem.utils import get
@@ -45,15 +45,13 @@ class TVEMVariationalStates(ABC):
         self.precision = precision
 
     @abstractmethod
-    def update(
-        self, idx: Tensor, batch: Tensor, model: Trainable, notnan: Optional[to.Tensor] = None
-    ) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable, **kwargs: Dict[str, Any]) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 
         :param idx: data point indices of batch w.r.t. K
         :param batch: batch of data points
         :param model: the model being used
-        :param notnan: batch of booleans indicating non-nan entries of batch
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
         :returns: average number of variational state substitutions per datapoint performed
         """
         pass  # pragma: no cover
