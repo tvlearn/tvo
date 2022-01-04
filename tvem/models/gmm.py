@@ -8,7 +8,7 @@ import math
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
 from torch import Tensor
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Dict, Any
 
 import tvem
 from tvem.utils.parallel import pprint, all_reduce, broadcast
@@ -89,7 +89,7 @@ class GMM(Optimized, Sampler, Reconstructor):
         self._config = dict(H=H, D=D, precision=precision, device=device)
         self._shape = self.theta["W"].shape
 
-    def log_pseudo_joint(self, data: Tensor, states: Tensor, notnan: Optional[Tensor] = None) -> Tensor:  # type: ignore  # noqa
+    def log_pseudo_joint(self, data: Tensor, states: Tensor, **kwargs: Dict[str, Any]) -> Tensor:
         """Evaluate log-pseudo-joints for GMM.
 
         TODO: Make use of notnan to neglect missing data
@@ -105,12 +105,16 @@ class GMM(Optimized, Sampler, Reconstructor):
         ) + to.matmul(Kfloat, to.log(self.theta["pies"]))
         return lpj.to(device=states.device)
 
-    def log_joint(  # type: ignore
-        self, data: Tensor, states: Tensor, lpj: Tensor = None, notnan: Optional[Tensor] = None
+    def log_joint(
+        self,
+        data: Tensor,
+        states: Tensor,
+        lpj: Tensor = None,
+        **kwargs: Dict[str, Any],
     ) -> Tensor:
         """Evaluate log-joints for GMM."""
         if lpj is None:
-            lpj = self.log_pseudo_joint(data, notnan, states)
+            lpj = self.log_pseudo_joint(data, states, **kwargs)
         D = self.shape[0]
         return lpj - D / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
@@ -119,7 +123,7 @@ class GMM(Optimized, Sampler, Reconstructor):
         idx: Tensor,
         batch: Tensor,
         states: Tensor,
-        notnan: Optional[Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
@@ -223,7 +227,7 @@ class GMM(Optimized, Sampler, Reconstructor):
         idx: Tensor,
         batch: Tensor,
         states: TVEMVariationalStates,
-        notnan: Optional[Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> Tensor:
 
         # Not yet implemented
