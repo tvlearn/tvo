@@ -15,8 +15,19 @@ from tvem.variational._utils import mean_posterior, lpj2pjc
 from tvem.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvem.utils.sanity import fix_theta
 
-# pytorch 1.2 deprecates to.gels in favour of to.lstsq
-lstsq = to.lstsq if int(to.__version__.split(".")[1]) >= 2 else to.gels
+torch_minor_version = int(to.__version__.split(".")[1])
+if torch_minor_version >= 10:
+    # pytorch 1.10 deprecates to.lstsq in favour of to.linalg.lstsq,
+    # which takes arguments in reversed order
+    def lstsq(a, b):
+        return to.linalg.lstsq(b, a)
+
+
+elif torch_minor_version >= 2:
+    # pytorch 1.2 deprecates to.gels in favour of to.lstsq
+    lstsq = to.lstsq
+else:
+    lstsq = to.gels
 
 
 class BSC(Optimized, Sampler, Reconstructor):
