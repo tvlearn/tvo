@@ -11,30 +11,30 @@ from tvem.utils.parallel import broadcast
 
 
 class TVEMDataLoader(DataLoader):
-    def __init__(self, *data: to.Tensor, **kwargs):
+    def __init__(self, data: to.Tensor, **kwargs):
         """TVEM DataLoader class. Derived from torch.utils.data.DataLoader.
 
         :param data: Tensor containing the input dataset. Must have exactly two dimensions (N,D).
         :param kwargs: forwarded to pytorch's DataLoader.
 
         TVEMDataLoader is constructed exactly the same way as pytorch's DataLoader,
-        but it restricts datasets to TensorDataset constructed from the *data passed
+        but it restricts datasets to TensorDataset constructed from the data passed
         as parameter. All other arguments are forwarded to pytorch's DataLoader.
 
         When iterated over, TVEMDataLoader yields a tuple containing the indeces of
-        the datapoints in each batch as well as the actual datapoints for each
-        tensor in the input Tensor.
+        the datapoints in each batch, the actual datapoints for each tensor in the input Tensor
+        as well as and index tensor indicating the entries of each datapoint that are not nan.
 
         TVEMDataLoader instances optionally expose the attribute `precision`, which is set to the
-        dtype of the first dataset in *data if it is a floating point dtype.
+        dtype of the dataset in data if it is a floating point dtype.
         """
-        N = data[0].shape[0]
-        assert all(d.shape[0] == N for d in data), "Dimension mismatch in data sets."
+        N = data.shape[0]
 
-        if data[0].dtype is not to.uint8:
-            self.precision = data[0].dtype
+        if data.dtype is not to.uint8:
+            self.precision = data.dtype
 
-        dataset = TensorDataset(to.arange(N), *data)
+        notnan = to.logical_not(to.isnan(data))
+        dataset = TensorDataset(to.arange(N), data, notnan)
 
         if tvem.get_run_policy() == "mpi" and "sampler" not in kwargs:
             # Number of _desired_ datapoints per worker: the last worker might have less actual
