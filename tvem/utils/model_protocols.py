@@ -25,13 +25,13 @@ class Trainable(Protocol):
         self,
         data: to.Tensor,
         states: to.Tensor,
-        notnan: Optional[to.Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
 
         :param data: shape is (N,D)
         :param states: shape is (N,S,H)
-        :param notnan: bool tensor indicating non-nan entries of data, shape is (N,D)
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
         :returns: log-joints for data and states - shape is (N,S)
         """
         ...
@@ -41,17 +41,14 @@ class Trainable(Protocol):
         idx: to.Tensor,
         batch: to.Tensor,
         states: "TVEMVariationalStates",
-        notnan: Optional[to.Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> Optional[float]:
         """Execute batch-wise M-step or batch-wise section of an M-step computation.
 
         :param idx: indexes of the datapoints that compose the batch within the dataset
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all variational states for this dataset
-        :param notnan: batch of booleans indicating non-nan entries of data batch, Tensor with
-                       shape (N,D)
-        :param mstep_factors: optional dictionary containing the Tensors that were evaluated\
-            by the lpj_fn function returned by get_lpj_func during this batch's E-step.
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
 
         If the model allows it, as an optimization this method can return this batch's free energy
         evaluated _before_ the model parameter update. If the batch's free energy is returned here,
@@ -63,7 +60,7 @@ class Trainable(Protocol):
                 t.requires_grad_(True)
             self._optimizer = to.optim.Adam(self._theta.values())
         assert self._optimizer is not None  # to make mypy happy
-        log_joints = self.log_joint(batch, states.K[idx], notnan)
+        log_joints = self.log_joint(batch, states.K[idx], **kwargs)
         F = to.logsumexp(log_joints, dim=1).sum(dim=0)
         loss = -F / batch.shape[0]
         loss.backward()
@@ -88,14 +85,14 @@ class Trainable(Protocol):
         idx: to.Tensor,
         batch: to.Tensor,
         states: "TVEMVariationalStates",
-        notnan: Optional[to.Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
         :param idx: indexes of the datapoints in batch within the full dataset
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all TVEMVariationalStates states for this dataset
-        :param notnan: batch of booleans, Tensor with shape (N,D)
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
 
         .. note::
         This default implementation of free_energy is only appropriate for Trainable models
@@ -161,12 +158,12 @@ class Optimized(Trainable, Protocol):
     """Additionally implements log_pseudo_joint, init_storage, init_batch, init_epoch."""
 
     @abstractmethod
-    def log_joint(  # type: ignore
+    def log_joint(
         self,
         data: to.Tensor,
         states: to.Tensor,
         lpj: to.Tensor = None,
-        notnan: Optional[to.Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
 
@@ -175,20 +172,23 @@ class Optimized(Trainable, Protocol):
         :param lpj: shape is (N,S). When lpj is not None it must contain pre-evaluated
                     log-pseudo joints for the given data and states. The implementation can take
                     advantage of the extra argument to save computation.
-        :param notnan: shape is (N,D)
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
         :returns: log-joints for data and states - shape is (N,S)
         """
         raise NotImplementedError
 
     @abstractmethod
     def log_pseudo_joint(
-        self, data: to.Tensor, states: to.Tensor, notnan: Optional[to.Tensor] = None
+        self,
+        data: to.Tensor,
+        states: to.Tensor,
+        **kwargs: Dict[str, Any],
     ) -> to.Tensor:
         """Evaluate log-pseudo-joint probabilities for this model.
 
         :param data: shape is (N,D)
         :param states: shape is (N,S,H)
-        :param notnan: shape is (N,D)
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
         :returns: log-pseudo-joints for data and states - shape is (N,S)
 
         Log-pseudo-joint probabilities are the log-joint probabilities of the model
@@ -204,21 +204,20 @@ class Optimized(Trainable, Protocol):
         idx: to.Tensor,
         batch: to.Tensor,
         states: "TVEMVariationalStates",
-        notnan: Optional[to.Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> float:
         """Evaluate free energy for the given batch of datapoints.
 
         :param idx: indexes of the datapoints in batch within the full dataset
         :param batch: batch of datapoints, Tensor with shape (N,D)
         :param states: all TVEMVariationalStates states for this dataset
-        :param notnan: batch of booleans indicating non-nan entries in data batch, Tensor with
-                      shape (N,D)
+        :param kwargs: optional metadata (e.g. non-nan entries of data)
 
         .. note::
         This default implementation of free_energy is only appropriate for Optimized models.
         """
         with to.no_grad():
-            log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx], notnan)
+            log_joints = self.log_joint(batch, states.K[idx], states.lpj[idx], **kwargs)
         return to.logsumexp(log_joints, dim=1).sum(dim=0).item()
 
     def init_storage(self, S: int, Snew: int, batch_size: int) -> None:
@@ -289,7 +288,7 @@ class Reconstructor(Protocol):
         idx: to.Tensor,
         batch: to.Tensor,
         states: "TVEMVariationalStates",
-        notnan: Optional[to.Tensor] = None,
+        **kwargs: Dict[str, Any],
     ) -> to.Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
