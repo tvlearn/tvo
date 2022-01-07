@@ -26,7 +26,6 @@ class REM_EpochLog:
             pprint(f"Epoch {self.epoch}")
         for data_kind in "train", "test":
             if (data_kind + "_F" not in self._results) and (data_kind + "_F_beta" not in self._results):
-                pprint("free energy AND annealed free energy not supplied")
                 continue
             # log_kind is one of "train", "valid" or "test"
             # (while data_kind is one of "train" or "test")

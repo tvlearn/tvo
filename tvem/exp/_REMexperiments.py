@@ -112,7 +112,6 @@ class REMTraining(Training):
         """
         for data_kind in "train", "test":
             if (data_kind + "_F" not in epoch_results) and (data_kind + "_F_beta" not in epoch_results):
-                print("no free energies provided")
                 continue
 
             # log_kind is one of "train", "valid" or "test"
