@@ -5,5 +5,6 @@ from .gmm import GMM
 from .rem_gmm import REM1_GMM
 from .pmm import PMM
 from .full_gmm import FULL_GMM
+from .rem_full_gmm import REM1_FULL_GMM
 
-__all__ = ["NoisyOR", "BSC", "TVAE", "REM1_GMM", "GMM", "PMM"]
+__all__ = ["NoisyOR", "BSC", "TVAE", "REM1_GMM", "GMM", "PMM", "REM1_FULL_GMM",]
