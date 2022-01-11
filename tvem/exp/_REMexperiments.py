@@ -172,7 +172,7 @@ class REMTraining(Training):
     def run(self, epochs: int) -> Generator[REM_EpochLog, None, None]:#modifizieren
         """Run training and/o testing.
 
-        :param epochs: Number of epochs to train for
+        :param epochs: Maximum number of epochs to train for
         """
         trainer = self.trainer
         logger = self.logger
@@ -193,11 +193,14 @@ class REMTraining(Training):
         if self._conf.warmup_Esteps == 0:
             d = trainer.eval_free_energies(self._conf.beta[0])
         self._log_epoch(logger, d)
-        yield REM_EpochLog(epoch=0, results=d)
+        yield REM_EpochLog(epoch=0, results=d, save=False)
 
         # EM steps
-        for (steps, beta) in zip(self._conf.beta_steps, self._conf.beta):
-            for e in range(int(steps)):
+        e = 0
+        for beta in self._conf.beta:
+            pprint(f"{beta = }")
+            free_energy_old = -to.inf
+            while e < epochs:
                 start_t = time.time()
                 compute_reconstruction = (
                     self._conf.reco_epochs is not None and e in self._conf.reco_epochs
@@ -205,7 +208,19 @@ class REMTraining(Training):
                 d = trainer.em_step(compute_reconstruction, beta)
                 epoch_runtime = time.time() - start_t
                 self._log_epoch(logger, d)
-                yield REM_EpochLog(e + 1, d, epoch_runtime)
+                e += 1
+                converged = free_energy_old + self._conf.eps_F > d['train_F_beta']
+                free_energy_old = d['train_F_beta']
+                
+                if converged and beta == self._conf.beta[-1]:
+                    save = True
+                else:
+                    save = False
+                
+                yield REM_EpochLog(e, d, save, epoch_runtime)
+                
+                if converged:
+                    break
 
         # remove leftover ".old" logfiles produced by the logger
         rank = dist.get_rank() if dist.is_initialized() else 0

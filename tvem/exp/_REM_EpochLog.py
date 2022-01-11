@@ -9,9 +9,10 @@ from tvem.utils import get
 class REM_EpochLog:
     """Experiment epoch log."""
 
-    def __init__(self, epoch, results, runtime=None):
+    def __init__(self, epoch, results, save, runtime=None):
         self.epoch = epoch
         self.runtime = runtime
+        self.save = save
 
         self._results = results
 

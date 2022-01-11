@@ -25,17 +25,17 @@ class REMExpConfig(ExpConfig):
         eval_F_at_epoch_end: bool = False,
         data_transform: Callable[[to.Tensor], to.Tensor] = None,
         beta: to.tensor = to.tensor([1.0]),
-        beta_steps: to.Tensor = to.tensor([100]),
+        eps_F: float = 0.001,
         beta_warmup: float = 1.0
     ):
         assert to.all(beta <= 1) and to.all(beta >= 0), "temperature has to be between 0 and 1"
-        assert to.numel(beta) == to.numel(beta_steps), "beta and beta_steps must have the same number of elements"
+        assert eps_F > 0, "eps_F has to be positive"
         if not (warmup_reco_epochs==0):
             assert beta_warmup <= 1 and beta_warmup >= 0, 'beta_warmup has to be between  0 and 1'
 
 
         self.beta = beta
-        self.beta_steps = beta_steps
+        self.eps_F = eps_F
         self.beta_warmup = beta_warmup
         super().__init__(
             batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, warmup_Esteps=warmup_Esteps,
