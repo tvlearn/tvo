@@ -12,6 +12,8 @@ To run this example, make sure to have completed the installation instructions [
 conda activate tvo
 ```
 
+To run the example with `--gif_framerate ...` (see below), additionally an installation of `ffmpeg` is required.
+
 
 ## Get started
 To start the experiment, run `python main.py <model>` with `<model>` being one of `nor` or `bsc`. To see possible options, run, e.g., 

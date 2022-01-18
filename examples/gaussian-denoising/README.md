@@ -12,6 +12,8 @@ To run this example, make sure to have completed the installation instructions [
 conda activate tvo
 ```
 
+The example additionally requires `ffmpeg`, `imageio`, and `tvutil` to be installed (for details on tvutil see [here](https://github.com/tvlearn/tvutil)). 
+
 
 ## Get started
 To start the experiment, run `python main.py`. To see possible options, run, e.g.:
