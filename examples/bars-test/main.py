@@ -9,6 +9,7 @@ from tvo.exp import EVOConfig, ExpConfig, Training
 from tvo.models import NoisyOR, BSC
 from tvo.utils.parallel import pprint, broadcast, barrier
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
+from tvo.utils.model_protocols import Sampler
 
 from params import get_args
 from utils import init_processes, stdout_logger
@@ -51,6 +52,7 @@ if __name__ == "__main__":
         gfs = get_bars_gfs(no_bars=args.H_gen, bar_amp=args.bar_amp, precision=PRECISION)
         assert gfs.shape == (D, args.H_gen)
         pi_gen = args.pi_gen if args.pi_gen is not None else 2 / args.H_gen
+        gen_model: Sampler
         if args.model == "nor":
             gen_model = NoisyOR(
                 H=args.H_gen,

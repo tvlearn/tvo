@@ -88,7 +88,10 @@ def generate_data_and_write_to_h5(
 
     data = model.generate_data(no_data_points)[0]
 
-    ll_gen = _compute_log_likelihood(model, data) if compute_ll else None
+    ll_gen = None
+    if compute_ll:
+        assert isinstance(model, Trainable)  # to make mypy happy
+        ll_gen = _compute_log_likelihood(model, data)
 
     to_store_dict = {
         **{f"{k}_gen": model.theta[k] for k in model.theta},  # type: ignore
