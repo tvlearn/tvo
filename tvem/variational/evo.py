@@ -17,7 +17,7 @@ from tvem.variational._utils import update_states_for_batch, set_redundant_lpj_t
 from tvem.utils.model_protocols import Optimized, Trainable
 
 
-class EEMVariationalStates(TVEMVariationalStates):
+class EVOVariationalStates(TVEMVariationalStates):
     def __init__(
         self,
         N: int,
@@ -33,7 +33,7 @@ class EEMVariationalStates(TVEMVariationalStates):
         bitflip_frequency: float = None,
         K_init_file: str = None,
     ):
-        """Evolutionary Expectation Maximization class.
+        """Evolutionary Variational Optimization class.
 
         :param N: number of datapoints
         :param H: number of latents
@@ -130,7 +130,7 @@ def evolve_states(
     """
     Take old variational states states (N,K,H) with lpj values (N,K) and
     return new states and their log-pseudo-joints for each datapoint. The
-    helper function `eem.get_n_new_states` can be used to retrieve the
+    helper function `evo.get_n_new_states` can be used to retrieve the
     exact number S of states generated depending on the chosen genetic
     algorithm. lpj_fn must be a callable that takes a set of states with
     shape (N,M,H) as arguments and returns a tuple of log-pseudo-joint

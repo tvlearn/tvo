@@ -19,7 +19,7 @@ class EStepConfig(ABC):
         raise NotImplementedError  # pragma: no cover
 
 
-class EEMConfig(EStepConfig):
+class EVOConfig(EStepConfig):
     def __init__(
         self,
         n_states: int,
@@ -32,20 +32,20 @@ class EEMConfig(EStepConfig):
         bitflip_frequency: float = None,
         K_init_file: str = None,
     ):
-        """Configuration object for EEM E-step.
+        """Configuration object for EVO E-step.
 
         :param n_states: Number of variational states per datapoint to keep in memory.
-        :param n_parents: Number of parent states to select at each EEM generation.
+        :param n_parents: Number of parent states to select at each EVO generation.
                           Must be <= n_states.
-        :param parent_selection: Parent selection algorithm for EEM. Must be one of:
+        :param parent_selection: Parent selection algorithm for EVO. Must be one of:
 
                                  - 'fitness': fitness-proportional parent selection
                                  - 'uniform': random uniform parent selection
         :param crossover: Whether crossover should be applied or not.
                           Must be False if n_children is specified.
         :param n_children: Number of children per parent to generate via mutation
-                           at each EEM generation. Required if crossover is False.
-        :param mutation: Mutation algorithm for EEM. Must be one of:
+                           at each EVO generation. Required if crossover is False.
+        :param mutation: Mutation algorithm for EVO. Must be one of:
 
                          - 'sparsity': bits are flipped so that states tend
                            towards current model sparsity.

@@ -1,4 +1,4 @@
-from tvem.exp import ExpConfig, EEMConfig, Training
+from tvem.exp import ExpConfig, EVOConfig, Training
 from tvem.utils.model_protocols import Trainable
 from tvem.variational import FullEM
 
@@ -97,7 +97,7 @@ def test_training() -> None:
     with h5py.File("blackbox_test.h5", "w") as f:
         f.create_dataset("data", data=np.random.rand(100, 8))
     model = BlackBoxBSC(H=8, D=8)
-    estep_conf = EEMConfig(n_states=8, n_parents=3, n_generations=2)
+    estep_conf = EVOConfig(n_states=8, n_parents=3, n_generations=2)
     exp = Training(ExpConfig(), estep_conf, model, train_data_file="blackbox_test.h5")
     for log in exp.run(10):
         log.print()

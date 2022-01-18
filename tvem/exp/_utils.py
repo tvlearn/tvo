@@ -7,14 +7,14 @@ from typing import Union
 
 from tvem.variational import (
     FullEM,
-    EEMVariationalStates,
+    EVOVariationalStates,
     FullEMSingleCauseModels,
     TVSVariationalStates,
     RandomSampledVarStates,
 )
 from tvem.exp._EStepConfig import (
     FullEMConfig,
-    EEMConfig,
+    EVOConfig,
     EStepConfig,
     FullEMSingleCauseConfig,
     TVSConfig,
@@ -25,7 +25,7 @@ from tvem.exp._EStepConfig import (
 def make_var_states(
     conf: EStepConfig, N: int, H: int, precision: to.dtype
 ) -> Union[
-    EEMVariationalStates,
+    EVOVariationalStates,
     FullEM,
     FullEMSingleCauseModels,
     TVSVariationalStates,
@@ -38,8 +38,8 @@ def make_var_states(
     elif isinstance(conf, FullEMSingleCauseConfig):
         assert conf.n_states == H, "FullEMSingleCauseConfig and model have different H"
         return FullEMSingleCauseModels(N, H, precision)
-    elif isinstance(conf, EEMConfig):
-        return _make_EEM_var_states(conf, N, H, precision)
+    elif isinstance(conf, EVOConfig):
+        return _make_EVO_var_states(conf, N, H, precision)
     elif isinstance(conf, TVSConfig):
         return TVSVariationalStates(
             N,
@@ -58,10 +58,10 @@ def make_var_states(
         raise NotImplementedError()
 
 
-def _make_EEM_var_states(conf: EEMConfig, N: int, H: int, precision: to.dtype):
+def _make_EVO_var_states(conf: EVOConfig, N: int, H: int, precision: to.dtype):
     selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
     mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
-    return EEMVariationalStates(
+    return EVOVariationalStates(
         N=N,
         H=H,
         S=conf.n_states,

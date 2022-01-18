@@ -1,6 +1,6 @@
 from ._experiments import Training, Testing
 from ._EStepConfig import (
-    EEMConfig,
+    EVOConfig,
     TVSConfig,
     RandomSamplingConfig,
     FullEMConfig,
@@ -12,7 +12,7 @@ from ._EpochLog import EpochLog
 __all__ = [
     "Training",
     "Testing",
-    "EEMConfig",
+    "EVOConfig",
     "FullEMConfig",
     "TVSConfig",
     "FullEMSingleCauseConfig",

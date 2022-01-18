@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import ExpConfig, EEMConfig, FullEMConfig, Training, Testing as _Testing
+from tvem.exp import ExpConfig, EVOConfig, FullEMConfig, Training, Testing as _Testing
 from tvem.models import NoisyOR, BSC, GaussianTVAE
 from tvem.utils.model_protocols import Trainable, Reconstructor
 from tvem.utils.parallel import init_processes, broadcast
@@ -114,7 +114,7 @@ def estep_conf(request, hyperparams):
     parent_selection = ["fitness", "uniform"][np.random.randint(2)]
     mutation = ["sparsity", "uniform"][np.random.randint(2)]
     crossover = request.param
-    return EEMConfig(
+    return EVOConfig(
         n_states=hyperparams.S,
         n_parents=3,
         n_children=2 if not crossover else None,

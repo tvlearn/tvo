@@ -8,7 +8,7 @@ import torch as to
 from torch import Tensor
 
 from tvem.variational.TVEMVariationalStates import generate_unique_states
-from tvem.variational import eem
+from tvem.variational import evo
 import tvem
 import pytest
 from itertools import combinations
@@ -28,7 +28,7 @@ class DummyModel(Trainable):
         pass
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
-        """Dummy log-pseudo-joint. """
+        """Dummy log-pseudo-joint."""
         N, S, H = states.shape
 
         s_ids = to.empty((H,), dtype=to.int64, device=states.device)
@@ -43,12 +43,12 @@ class DummyModel(Trainable):
 
 
 @pytest.mark.gpu
-class TestEEM(unittest.TestCase):
+class TestEVO(unittest.TestCase):
     """Define unittests for tvem.variational.TVEMVariationalStates module.
 
     Can be executed individually with:
         ```
-            python -m unittest test/eem_test.py
+            python -m unittest test/evo_test.py
         ```
     """
 
@@ -62,7 +62,7 @@ class TestEEM(unittest.TestCase):
 
         for x in range(self.n_runs):
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-            children = eem.randflip(parents, n_children)  # is (n_parents*n_children, H)
+            children = evo.randflip(parents, n_children)  # is (n_parents*n_children, H)
 
             self.assertEqual(children.shape[0], n_parents * n_children)
 
@@ -78,7 +78,7 @@ class TestEEM(unittest.TestCase):
             parents = generate_unique_states(n_states=n_parents, H=H)
             parents = parents.unsqueeze(0).expand((N, -1, -1))
             # children have shape (N, n_parents*n_children, H)
-            children = eem.batch_randflip(parents, n_children)
+            children = evo.batch_randflip(parents, n_children)
 
             self.assertEqual(children.shape, (N, n_parents * n_children, H))
 
@@ -96,9 +96,9 @@ class TestEEM(unittest.TestCase):
         parents = parents.unsqueeze(0).expand((N, -1, -1))
         seed = np.random.randint(10000)
         reset_rng_state(seed)
-        children_batch = eem.batch_randflip(parents, n_children)
+        children_batch = evo.batch_randflip(parents, n_children)
         reset_rng_state(seed)
-        children = eem.randflip(parents[0], n_children)
+        children = evo.randflip(parents[0], n_children)
 
         self.assertTrue(to.equal(children, children_batch[0]))
 
@@ -109,7 +109,7 @@ class TestEEM(unittest.TestCase):
         for x in range(self.n_runs):
 
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-            children = eem.sparseflip(parents, n_children, sparsity, p_bf)
+            children = evo.sparseflip(parents, n_children, sparsity, p_bf)
 
             self.assertEqual(children.shape[0], n_parents * n_children)
             self.assertTrue(
@@ -131,7 +131,7 @@ class TestEEM(unittest.TestCase):
             parents = generate_unique_states(n_states=n_parents, H=H)
             parents = parents.unsqueeze(0).expand((N, -1, -1))
             # children have shape (N, n_parents*n_children, H)
-            children = eem.batch_sparseflip(parents, n_children, sparsity, p_bf)
+            children = evo.batch_sparseflip(parents, n_children, sparsity, p_bf)
 
             self.assertEqual(children.shape, (N, n_parents * n_children, H))
             for n in range(N):
@@ -153,9 +153,9 @@ class TestEEM(unittest.TestCase):
         parents = parents.unsqueeze(0).expand((N, -1, -1))
         seed = np.random.randint(10000)
         reset_rng_state(seed)
-        children_batch = eem.batch_sparseflip(parents, n_children, sparsity, p_bf)
+        children_batch = evo.batch_sparseflip(parents, n_children, sparsity, p_bf)
         reset_rng_state(seed)
-        children = eem.sparseflip(parents[0], n_children, sparsity, p_bf)
+        children = evo.sparseflip(parents[0], n_children, sparsity, p_bf)
         self.assertTrue(to.equal(children_batch[0], children))
 
     def test_cross(self):
@@ -165,7 +165,7 @@ class TestEEM(unittest.TestCase):
         for x in range(self.n_runs):
 
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
-            children = eem.cross(parents)  # is (n_parents*n_children, H)
+            children = evo.cross(parents)  # is (n_parents*n_children, H)
 
             self.assertEqual(children.shape[0], n_parents * (n_parents - 1))
             # The sum of the two crossover children must be equal, element by element,
@@ -189,7 +189,7 @@ class TestEEM(unittest.TestCase):
             parents = generate_unique_states(n_states=n_parents, H=H)
             parents = parents.unsqueeze(0).expand((N, -1, -1))
             # children have shape (N, n_parents*n_children, H)
-            children = eem.batch_cross(parents)
+            children = evo.batch_cross(parents)
 
             self.assertEqual(children.shape, (N, n_parents * (n_parents - 1), H))
             # The sum of the two crossover children must be equal, element by element,
@@ -210,9 +210,9 @@ class TestEEM(unittest.TestCase):
         parents = parents.unsqueeze(0).expand((N, -1, -1))
         seed = np.random.randint(10000)
         reset_rng_state(seed)
-        children_batch = eem.batch_cross(parents)
+        children_batch = evo.batch_cross(parents)
         reset_rng_state(seed)
-        children = eem.cross(parents[0])
+        children = evo.cross(parents[0])
         self.assertTrue(to.equal(children_batch[0], children))
 
     def test_cross_randflip(self):
@@ -226,10 +226,10 @@ class TestEEM(unittest.TestCase):
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
             reset_rng_state(seed)
-            children_wth_flip = eem.cross(parents)
+            children_wth_flip = evo.cross(parents)
 
             reset_rng_state(seed)
-            children_w_flip = eem.cross_randflip(parents, n_children=1)  # (n_parents*n_children, H)
+            children_w_flip = evo.cross_randflip(parents, n_children=1)  # (n_parents*n_children, H)
 
             self.assertEqual(children_w_flip.shape[0], n_parents * (n_parents - 1))
             flips_per_child = (children_wth_flip != children_w_flip).sum(dim=1)
@@ -246,11 +246,11 @@ class TestEEM(unittest.TestCase):
 
             to.manual_seed(seed)
             to.cuda.manual_seed_all(seed)
-            children_wth_flip = eem.cross(parents)
+            children_wth_flip = evo.cross(parents)
 
             to.manual_seed(seed)
             to.cuda.manual_seed_all(seed)
-            children_w_flip = eem.cross_sparseflip(
+            children_w_flip = evo.cross_sparseflip(
                 parents, n_children_, sparsity, p_bf
             )  # is (n_parents*n_children, H)
 
@@ -283,7 +283,7 @@ class TestEEM(unittest.TestCase):
             lpj = DummyModel().log_joint(None, candidates)
 
             # is (batch_size, n_parents, H)
-            parents = eem.batch_fitparents(candidates, n_parents, lpj)
+            parents = evo.batch_fitparents(candidates, n_parents, lpj)
 
             self.assertTrue((list(parents.shape) == [batch_size, n_parents, H]))
             # TODO Find more tests
@@ -294,18 +294,18 @@ class TestEEM(unittest.TestCase):
         candidates = generate_unique_states(n_states=n_candidates, H=H).repeat(batch_size, 1, 1)
 
         # check that parents have the expected shape
-        parents = eem.batch_randparents(candidates, n_parents, lpj=None)
+        parents = evo.batch_randparents(candidates, n_parents, lpj=None)
         self.assertTrue(parents.shape == (batch_size, n_parents, H))
 
         # check that the parents we selected for each batch were in candidates in the first place
-        parents = eem.batch_randparents(candidates, n_candidates, lpj=None)
+        parents = evo.batch_randparents(candidates, n_candidates, lpj=None)
         for batch in range(batch_size):
             for p in parents[batch]:
                 self.assertTrue(any(to.equal(p, c) for c in candidates[batch]))
 
     def test_update(self):
 
-        eem_conf = {
+        evo_conf = {
             "precision": self.precision,
             "N": 2,
             "S": 3,
@@ -321,10 +321,10 @@ class TestEEM(unittest.TestCase):
 
         for x in range(self.n_runs):
 
-            idx = to.arange(eem_conf["N"], device=device)
+            idx = to.arange(evo_conf["N"], device=device)
             data_dummy = to.empty((1,), device=device)
 
-            var_states = eem.EEMVariationalStates(**eem_conf)
+            var_states = evo.EVOVariationalStates(**evo_conf)
 
             # is (batch_size, n_candidates)
             var_states.lpj[:] = DummyModel().log_joint(data=data_dummy, states=var_states.K[idx])
@@ -342,5 +342,5 @@ class TestEEM(unittest.TestCase):
             self.assertTrue(nsubs >= 0)
             self.assertEqual(no_datapoints_with_lpj_decrease, 0)
             if no_datapoints_without_lpj_increase > 0:
-                self.assertTrue(nsubs < (eem_conf["N"] * eem_conf["S"]))
+                self.assertTrue(nsubs < (evo_conf["N"] * evo_conf["S"]))
             # TODO Find more tests
