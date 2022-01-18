@@ -4,7 +4,7 @@
 
 # otherwise Testing is picked up as a test class
 from tvo.exp import ExpConfig, EVOConfig, FullEMConfig, Training, Testing as _Testing
-from tvo.models import NoisyOR, BSC, GaussianTVAE
+from tvo.models import NoisyOR, BSC
 from tvo.utils.model_protocols import Trainable, Reconstructor
 from tvo.utils.parallel import init_processes, broadcast
 from tvo.utils import get
@@ -134,7 +134,7 @@ def batch_size(request):
 
 @pytest.fixture(
     scope="function",
-    params=("NoisyOR", "BSC", "BSC_incmpl", "GaussianTVAE", "GaussianTVAE_incmpl", "LogJointOnly"),
+    params=("NoisyOR", "BSC", "BSC_incmpl", "LogJointOnly"),
 )
 def model_and_data(request, hyperparams, input_files, precision):
     """Return a tuple of a model and a filename (dataset for the model).
@@ -148,13 +148,6 @@ def model_and_data(request, hyperparams, input_files, precision):
         return BSC(H=H, D=D, precision=precision), input_files.continuous_data
     elif request.param == "BSC_incmpl":
         return BSC(H=H, D=D, precision=precision), input_files.continuous_data_incmpl
-    elif request.param == "GaussianTVAE":
-        return GaussianTVAE(shape=(D, H * 2, H), precision=precision), input_files.continuous_data
-    elif request.param == "GaussianTVAE_incmpl":
-        return (
-            GaussianTVAE(shape=(D, H * 2, H), precision=precision),
-            input_files.continuous_data_incmpl,
-        )
     elif request.param == "LogJointOnly":
         return LogJointOnly(H, D, precision), input_files.continuous_data
 
