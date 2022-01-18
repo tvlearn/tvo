@@ -22,6 +22,10 @@ git clone git@gitlab.com:mloldenburg/tvem.git# clone this repo
 python -m pip install .
 ```
 
+## Get started
+Examples how to setup and run the algorithms can be found [here](/examples).
+
+
 ## Running tests
 
 To run the tests, first make sure `cython`, `pytest` and `setuptools` are installed in your local environment.
