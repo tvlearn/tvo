@@ -11,3 +11,5 @@ tags
 *.c
 *.so
 build/*
+*.png
+*.DS_Store
