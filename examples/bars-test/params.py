@@ -130,7 +130,7 @@ viz_parser = argparse.ArgumentParser(add_help=False)
 viz_parser.add_argument(
     "--viz_every",
     type=int,
-    help="Create visualizations every X'th epoch. Set to no_epochs if not specified.",
+    help="Create visualizations every Xth epoch. Set to no_epochs if not specified.",
     default=1,
 )
 

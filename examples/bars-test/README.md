@@ -46,7 +46,7 @@ optional arguments:
   --no_epochs NO_EPOCHS
                         Number of epochs to train (default: 40)
   --viz_every VIZ_EVERY
-                        Create visualizations every X'th epoch. Set to no_epochs if not specified.
+                        Create visualizations every Xth epoch. Set to no_epochs if not specified.
                         (default: 1)
   --gif_framerate GIF_FRAMERATE
                         Frames per second for gif animation (e.g., 2/1 for 2 fps). If not
