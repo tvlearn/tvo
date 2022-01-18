@@ -4,25 +4,25 @@ import time
 import datetime
 import torch as to
 
-import tvem
-from tvem.exp import EEMConfig, ExpConfig, Training
-from tvem.models import NoisyOR, BSC
-from tvem.utils.parallel import pprint, broadcast, barrier
-from tvem.utils.param_init import init_W_data_mean, init_sigma2_default
+import tvo
+from tvo.exp import EVOConfig, ExpConfig, Training
+from tvo.models import NoisyOR, BSC
+from tvo.utils.parallel import pprint, broadcast, barrier
+from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 
 from params import get_args
 from utils import init_processes, stdout_logger
 from data import get_bars_gfs, generate_data_and_write_to_h5
 from viz import Visualizer as _Visualizer, BSCVisualizer
 
-DEVICE = tvem.get_device()
+DEVICE = tvo.get_device()
 PRECISION = to.float32
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
 if __name__ == "__main__":
 
-    # initialize MPI (if executed with env TVEM_MPI=...), otherwise pass
+    # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
     # get hyperparameters
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     }[args.model]
 
     # define hyperparameters of the variational optimization
-    estep_conf = EEMConfig(
+    estep_conf = EVOConfig(
         n_states=args.Ksize,
         n_parents=args.no_parents,
         n_children=args.no_children,

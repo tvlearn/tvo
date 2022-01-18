@@ -2,8 +2,8 @@ import sys
 import torch.distributed as dist
 from typing import Tuple
 
-from tvem import get_run_policy
-from tvem.utils.parallel import init_processes as _init_processes
+from tvo import get_run_policy
+from tvo.utils.parallel import init_processes as _init_processes
 
 
 def init_processes() -> Tuple[int, int]:

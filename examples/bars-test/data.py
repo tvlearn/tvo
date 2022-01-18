@@ -4,8 +4,8 @@ import torch as to
 from torch import Tensor
 from typing import Tuple, Optional, Dict
 
-from tvem.utils.model_protocols import Sampler, Trainable
-from tvem.variational import FullEM
+from tvo.utils.model_protocols import Sampler, Trainable
+from tvo.variational import FullEM
 
 
 def get_bars_gfs(

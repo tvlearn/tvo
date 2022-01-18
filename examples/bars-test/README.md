@@ -63,13 +63,13 @@ optional arguments:
 For distributed execution on multiple CPU cores (requires MPI to be installed), run with `mpirun -n <n_proc> python ...`. For example, to run the NoisyOR example on four cores, run:
 
 ```bash
-env TVEM_MPI=1 mpirun -n 4 python main.py nor
+env TVO_MPI=1 mpirun -n 4 python main.py nor
 ```
 
 To run on GPU (requires cudatoolkit to be installed), run, e.g.:
 
 ```bash
-env TVEM_GPU=0 python main.py nor
+env TVO_GPU=0 python main.py nor
 ```
 
 
