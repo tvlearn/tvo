@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2022 Machine Learning Group of the University of Oldenburg.
+# Licensed under the Academic Free License version 3.0
 
 from __future__ import division, print_function
 

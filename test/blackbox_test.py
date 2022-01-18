@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
+# Licensed under the Academic Free License version 3.0
+
 from tvo.exp import ExpConfig, EVOConfig, Training
 from tvo.utils.model_protocols import Trainable
 from tvo.variational import FullEM

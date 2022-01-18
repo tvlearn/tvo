@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright (C) 2022 Machine Learning Group of the University of Oldenburg.
+# Licensed under the Academic Free License version 3.0
+
 import sys
 import torch.distributed as dist
 from typing import Tuple
