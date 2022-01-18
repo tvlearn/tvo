@@ -13,3 +13,5 @@ tags
 build/*
 *.png
 *.DS_Store
+*.gif
+*.txt
