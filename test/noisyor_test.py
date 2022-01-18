@@ -5,18 +5,18 @@
 import numpy as np
 import torch as to
 import pytest
-from tvem.models import NoisyOR
-from tvem.variational import FullEM
+from tvo.models import NoisyOR
+from tvo.variational import FullEM
 import math
-import tvem
+import tvo
 
 
 @pytest.fixture(
-    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+    scope="function", params=[pytest.param(tvo.get_device().type, marks=pytest.mark.gpu)]
 )
 def setup(request):
     class Setup:
-        _device = tvem.get_device()
+        _device = tvo.get_device()
         N, D, H = 2, 1, 2
         pi_init = to.full((H,), 0.5)
         W_init = to.full((D, H), 0.5)
@@ -69,7 +69,7 @@ def test_train(setup):
 
 def test_generate_from_hidden(setup):
     N = 1
-    S = to.zeros(N, setup.H, dtype=to.uint8, device=tvem.get_device())
+    S = to.zeros(N, setup.H, dtype=to.uint8, device=tvo.get_device())
     data = setup.m.generate_data(N, S)
     assert data.shape == (N, setup.D)
     assert (data == to.zeros(N, setup.D).to(S)).all()

@@ -1,4 +1,4 @@
-# TVEM - Truncated Variational Expectation Maximization <br>
+# TVO - Truncated Variational Optimization <br>
 <!-- [![build status](https://img.shields.io/gitlab/pipeline/mloldenburg/tvem.svg?style=flat-square)](https://gitlab.com/mloldenburg/tvem/pipelines)-->
 [![pipeline status](https://gitlab.com/mloldenburg/tvem/badges/master/pipeline.svg)](https://gitlab.com/mloldenburg/tvem/commits/master)
 [![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg?style=flat-square)](https://trello.com/b/EuWTcm4w/tvem-repo)
@@ -9,7 +9,7 @@
 
 ## Installing
 
-TVEM is available on [conda](https://anaconda.org/mloldenburg/tvem):
+TVO is available on [conda](https://anaconda.org/mloldenburg/tvem):
 
 ```bash
 conda install -c conda-forge -c pytorch -c mloldenburg tvem

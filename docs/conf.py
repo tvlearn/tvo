@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-project = "TVEM"
+project = "TVO"
 copyright = "2019, Machine Learning Group of the University of Oldenburg"
 author = "Jakob Drefs & Enrico Guiraud"
 
@@ -108,7 +108,7 @@ html_static_path = []  # ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "TVEMdoc"
+htmlhelp_basename = "TVOdoc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -132,7 +132,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "TVEM.tex", "TVEM Documentation", "Jakob Drefs \\& Enrico Guiraud", "manual")
+    (master_doc, "TVO.tex", "TVO Documentation", "Jakob Drefs \\& Enrico Guiraud", "manual")
 ]
 
 
@@ -140,7 +140,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "tvem", "TVEM Documentation", [author], 1)]
+man_pages = [(master_doc, "tvo", "TVO Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -151,10 +151,10 @@ man_pages = [(master_doc, "tvem", "TVEM Documentation", [author], 1)]
 texinfo_documents = [
     (
         master_doc,
-        "TVEM",
-        "TVEM Documentation",
+        "TVO",
+        "TVO Documentation",
         author,
-        "TVEM",
+        "TVO",
         "One line description of project.",
         "Miscellaneous",
     )

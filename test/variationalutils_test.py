@@ -7,23 +7,23 @@ import unittest
 
 import torch as to
 
-from tvem.variational._utils import (
+from tvo.variational._utils import (
     generate_unique_states,
     update_states_for_batch,
     set_redundant_lpj_to_low,
     _unique_ind,
 )
-import tvem
+import tvo
 import pytest
 
 
 @pytest.mark.gpu
-class TestTVEM(unittest.TestCase):
-    """Define unittests for tvem.variational.TVEMVariationalStates module.
+class TestTVO(unittest.TestCase):
+    """Define unittests for tvo.variational.TVOVariationalStates module.
 
     Can be executed individually with:
         ```
-            python -m unittest test/TVEMVariationalStates_test.py
+            python -m unittest test/TVOVariationalStates_test.py
         ```
     """
 
@@ -43,7 +43,7 @@ class TestTVEM(unittest.TestCase):
 
         n_states, H = 5, 8
 
-        device = tvem.get_device()
+        device = tvo.get_device()
         states = generate_unique_states(n_states=n_states, H=H, device=device)
         _, reverse_ind = to.unique(states, return_inverse=True, dim=0)
 
@@ -79,7 +79,7 @@ class TestTVEM(unittest.TestCase):
 
         precision = self.precision
 
-        device = tvem.get_device()
+        device = tvo.get_device()
         old_states = to.tensor(
             [[[0, 1, 1], [1, 0, 0]], [[0, 1, 1], [1, 0, 1]], [[0, 1, 1], [1, 1, 1]]],
             dtype=to.uint8,

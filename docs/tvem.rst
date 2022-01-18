@@ -1,6 +1,0 @@
-tvem
-====
-
-.. automodule:: tvem
-   :members:
-

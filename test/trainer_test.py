@@ -2,11 +2,11 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-import tvem
-from tvem.trainer import Trainer
-from tvem.models import NoisyOR
-from tvem.variational import RandomSampledVarStates, FullEM
-from tvem.utils.data import TVEMDataLoader
+import tvo
+from tvo.trainer import Trainer
+from tvo.models import NoisyOR
+from tvo.variational import RandomSampledVarStates, FullEM
+from tvo.utils.data import TVODataLoader
 
 import pytest
 import torch as to
@@ -14,18 +14,18 @@ import numpy as np
 
 
 @pytest.fixture(
-    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+    scope="function", params=[pytest.param(tvo.get_device().type, marks=pytest.mark.gpu)]
 )
 def setup(request):
     class Setup:
-        device = tvem.get_device()
+        device = tvo.get_device()
         precision = to.float32
         N, D, S, H, S_new = 10, 16, 8, 8, 10
         model = NoisyOR(H, D, precision=precision)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=device)
-        data = TVEMDataLoader(_td, batch_size=N)
+        data = TVODataLoader(_td, batch_size=N)
         _td = to.randint(2, size=(N, D), dtype=to.uint8, device=device)
-        test_data = TVEMDataLoader(_td, batch_size=N)
+        test_data = TVODataLoader(_td, batch_size=N)
         var_states = RandomSampledVarStates(N, H, S, precision, S_new)
         test_states = RandomSampledVarStates(N, H, S, precision, S_new)
 
@@ -89,8 +89,8 @@ def test_rollback():
 
     eps = 1e-6
     N, H, D = 10, 4, 32
-    data = (to.rand(N, D, device=tvem.get_device()) < 0.8).byte()  # noisy data
-    dataloader = TVEMDataLoader(data, batch_size=N)
+    data = (to.rand(N, D, device=tvo.get_device()) < 0.8).byte()  # noisy data
+    dataloader = TVODataLoader(data, batch_size=N)
 
     # make two identical copies of the model: we'll train twice with same initial conditions
     # parameters are initialized stochastically.

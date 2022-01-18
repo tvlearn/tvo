@@ -1,5 +1,5 @@
 package:
-  name: tvem
+  name: tvo
   version: 0.6
 
 about:
@@ -9,7 +9,7 @@ about:
   summary: Library for truncated variational expectation maximization
   doc_url: https://mloldenburg.gitlab.io/tvem
   description: |
-   Library for truncated variational expectation maximization.
+   Library for truncated variational optimization.
    Install with `conda install -c conda-forge -c pytorch -c mloldenburg tvem`
 
 source:
@@ -38,4 +38,4 @@ requirements:
 
 test:
   imports:
-    - tvem
+    - tvo

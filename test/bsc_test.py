@@ -7,13 +7,13 @@ import torch as to
 import pytest
 import math
 
-import tvem
-from tvem.models import BSC
-from tvem.variational import FullEM
+import tvo
+from tvo.models import BSC
+from tvo.variational import FullEM
 
 
 @pytest.fixture(
-    scope="module", params=[pytest.param(tvem.get_device().type, marks=[pytest.mark.gpu])]
+    scope="module", params=[pytest.param(tvo.get_device().type, marks=[pytest.mark.gpu])]
 )
 def add_gpu_mark():
     """No-op fixture, use it to add the 'gpu' mark to a test or fixture."""
@@ -23,7 +23,7 @@ def add_gpu_mark():
 @pytest.fixture(scope="function", params=["single-prior", "individual-priors"])
 def setup(request, add_gpu_mark):
     class Setup:
-        _device = tvem.get_device()
+        _device = tvo.get_device()
         individual = request.param == "individual-priors"
         N, D, H = 2, 1, 2
         precision = to.float32
@@ -100,7 +100,7 @@ def test_train(setup):
 
 
 def test_generate_from_hidden(setup):
-    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvem.get_device())
+    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvo.get_device())
     assert setup.m.generate_data(zeros.shape[0], zeros).shape == (1, setup.D)
 
 

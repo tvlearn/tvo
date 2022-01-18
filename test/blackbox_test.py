@@ -1,8 +1,8 @@
-from tvem.exp import ExpConfig, EVOConfig, Training
-from tvem.utils.model_protocols import Trainable
-from tvem.variational import FullEM
+from tvo.exp import ExpConfig, EVOConfig, Training
+from tvo.utils.model_protocols import Trainable
+from tvo.variational import FullEM
 
-import tvem
+import tvo
 import numpy as np
 import h5py
 import torch as to
@@ -29,12 +29,10 @@ class BlackBoxBSC(Trainable):
         return logprior + logpygs
 
 
-@pytest.fixture(
-    scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
-)
+@pytest.fixture(scope="module", params=[pytest.param(tvo.get_device().type, marks=pytest.mark.gpu)])
 def setup(request):
     class Setup:
-        _device = tvem.get_device()
+        _device = tvo.get_device()
         N, D, H = 2, 1, 2
         precision = to.float32
         pies_init = to.full((H,), 0.5, dtype=precision, device=_device)

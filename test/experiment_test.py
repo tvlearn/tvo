@@ -3,12 +3,13 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import ExpConfig, EVOConfig, FullEMConfig, Training, Testing as _Testing
-from tvem.models import NoisyOR, BSC, GaussianTVAE
-from tvem.utils.model_protocols import Trainable, Reconstructor
-from tvem.utils.parallel import init_processes, broadcast
-from tvem.utils import get
-import tvem
+from tvo.exp import ExpConfig, EVOConfig, FullEMConfig, Training, Testing as _Testing
+from tvo.models import NoisyOR, BSC, GaussianTVAE
+from tvo.utils.model_protocols import Trainable, Reconstructor
+from tvo.utils.parallel import init_processes, broadcast
+from tvo.utils import get
+import tvo
+
 import os
 import numpy as np
 import h5py
@@ -17,7 +18,7 @@ import torch as to
 import torch.distributed as dist
 from munch import Munch
 from contextlib import suppress
-from tvem.trainer import Trainer
+from tvo.trainer import Trainer
 
 
 class LogJointOnly(Trainable):
@@ -33,13 +34,13 @@ class LogJointOnly(Trainable):
 
     def log_joint(self, data, states):
         N, S = data.shape[0], states.shape[1]
-        return to.ones(N, S, dtype=self.precision, device=tvem.get_device())
+        return to.ones(N, S, dtype=self.precision, device=tvo.get_device())
 
     def update_param_batch(self, *args, **kwargs):
         pass
 
 
-gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
+gpu_and_mpi_marks = pytest.param(tvo.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
 
 
 @pytest.fixture(scope="module", params=(gpu_and_mpi_marks,))
@@ -62,7 +63,7 @@ def precision(request):
 @pytest.fixture(scope="module")
 def input_files(hyperparams):
     """Create hd5 input files for tests, remove them before exiting the module."""
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         init_processes()
     rank = dist.get_rank() if dist.is_initialized() else 0
 
@@ -90,7 +91,7 @@ def input_files(hyperparams):
         data[:] = data_
         f.close()
 
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         dist.barrier()
 
     yield Munch(
@@ -104,7 +105,7 @@ def input_files(hyperparams):
             os.remove(binary_fname)
             os.remove(continuous_fname)
             os.remove(continuous_fname_incmpl)
-            os.remove("tvem_exp.h5")  # default experiment output file
+            os.remove("tvo_exp.h5")  # default experiment output file
 
 
 @pytest.fixture(scope="function", params=(True, False), ids=("cross", "nocross"))
@@ -183,7 +184,7 @@ def exp_conf(precision, batch_size, warmup_Esteps):
 
 
 def check_file(fname, *prefixes: str):
-    rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    rank = dist.get_rank() if tvo.get_run_policy() == "mpi" else 0
     if rank != 0:
         return
 
@@ -257,7 +258,7 @@ def test_reconstruction(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_ma
     for log in exp.run(10):
         log.print()
 
-    rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    rank = dist.get_rank() if tvo.get_run_policy() == "mpi" else 0
     if rank == 0:
         f = h5py.File(exp_conf.output, "r")
         assert "train_reconstruction" in f.keys()
@@ -280,7 +281,7 @@ def test_reconstruction_with_missing(
         return
     if not isinstance(model, Reconstructor):
         return
-    comm_rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    comm_rank = dist.get_rank() if tvo.get_run_policy() == "mpi" else 0
 
     exp_conf.reco_epochs = range(10)
     exp_conf.warmup_Esteps = 0

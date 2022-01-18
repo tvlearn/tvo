@@ -2,11 +2,11 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.utils import H5Logger
+from tvo.utils import H5Logger
 import torch as to
 import torch.distributed as dist
-from tvem.utils.parallel import init_processes
-import tvem
+from tvo.utils.parallel import init_processes
+import tvo
 import pytest
 import h5py
 import os
@@ -14,7 +14,7 @@ import os
 
 @pytest.fixture(scope="module")
 def init_mpi_if_needed():
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         init_processes()
 
 

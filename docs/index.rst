@@ -1,4 +1,4 @@
-TVEM user guide
+TVO user guide
 ================================
 * :ref:`genindex`
 * :ref:`modindex`
@@ -7,10 +7,10 @@ TVEM user guide
    :maxdepth: 2
    :caption: Contents:
 
-   tvem
-   tvem.exp
-   tvem.models
-   tvem.variational
-   tvem.utils
-   tvem.utils.parallel
-   tvem.trainer
+   tvo
+   tvo.exp
+   tvo.models
+   tvo.variational
+   tvo.utils
+   tvo.utils.parallel
+   tvo.trainer

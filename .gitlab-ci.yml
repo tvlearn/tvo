@@ -1,4 +1,4 @@
-# Configuration to run TVEM CI on our workstations
+# Configuration to run TVO CI on our workstations
 # It assumes conda is installed, in path, and the tvem environment has been created from our repo's environment.yml file.
 # The special environment python/3.6.4-ompi (pytorch+CUDA+MPI) is loaded to run parallelization tests.
 # Documentation generation with sphinx additionally requires
@@ -20,14 +20,14 @@ test:
     # static checkers
     - black --check -q . || { black --diff -q . && false; }
     - pylama
-    - mypy tvem test
+    - mypy tvo test
     # compile extension modules
     - python setup.py build_ext --inplace
     # CPU tests
-    - pytest --cov=tvem -v test
+    - pytest --cov=tvo -v test
     # GPU tests
     # FIXME: re-enable when we go back to self-hosted runners
-    #- env TVEM_GPU=0 pytest --cov=tvem --cov-append -v -m gpu test
+    #- env TVO_GPU=0 pytest --cov=tvo --cov-append -v -m gpu test
     # mpi tests (force a timeout because mpi might hang in case of python runtime errors)
     # FIXME: re-enable when we have a working pytorch+MPI environment
     # - module load python/3.6.4-ompi

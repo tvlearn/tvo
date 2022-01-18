@@ -1,4 +1,4 @@
-name: tvem
+name: tvo
 channels:
   - pytorch
   - conda-forge

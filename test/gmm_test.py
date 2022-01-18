@@ -7,17 +7,15 @@ import torch as to
 import pytest
 import math
 
-import tvem
-from tvem.models import GMM
-from tvem.variational import FullEMSingleCauseModels
+import tvo
+from tvo.models import GMM
+from tvo.variational import FullEMSingleCauseModels
 
 
-@pytest.fixture(
-    scope="module", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
-)
+@pytest.fixture(scope="module", params=[pytest.param(tvo.get_device().type, marks=pytest.mark.gpu)])
 def setup(request):
     class Setup:
-        _device = tvem.get_device()
+        _device = tvo.get_device()
         N, D, H = 2, 1, 2
         precision = to.float32
         pies_init = to.full((H,), 0.5, dtype=precision, device=_device)
@@ -85,7 +83,7 @@ def test_train(setup):
 
 
 def test_generate_from_hidden(setup):
-    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvem.get_device())
+    zeros = to.zeros(1, setup.H, dtype=to.uint8, device=tvo.get_device())
     assert setup.m.generate_data(zeros.shape[0], zeros).shape == (1, setup.D)
 
 

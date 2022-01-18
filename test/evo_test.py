@@ -7,13 +7,13 @@ import torch as to
 
 from torch import Tensor
 
-from tvem.variational.TVEMVariationalStates import generate_unique_states
-from tvem.variational import evo
-import tvem
+from tvo.variational.TVOVariationalStates import generate_unique_states
+from tvo.variational import evo
+import tvo
 import pytest
 from itertools import combinations
 import numpy as np
-from tvem.utils.model_protocols import Trainable
+from tvo.utils.model_protocols import Trainable
 
 
 def reset_rng_state(seed):
@@ -44,7 +44,7 @@ class DummyModel(Trainable):
 
 @pytest.mark.gpu
 class TestEVO(unittest.TestCase):
-    """Define unittests for tvem.variational.TVEMVariationalStates module.
+    """Define unittests for tvo.variational.TVOVariationalStates module.
 
     Can be executed individually with:
         ```
@@ -317,7 +317,7 @@ class TestEVO(unittest.TestCase):
             "n_generations": 1,
         }
 
-        device = tvem.get_device()
+        device = tvo.get_device()
 
         for x in range(self.n_runs):
 

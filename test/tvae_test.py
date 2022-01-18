@@ -3,10 +3,10 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
-from tvem.models import GaussianTVAE, BernoulliTVAE, BSC
-from tvem.variational import FullEM
-from tvem.utils.parallel import init_processes
-import tvem
+from tvo.models import GaussianTVAE, BernoulliTVAE, BSC
+from tvo.variational import FullEM
+from tvo.utils.parallel import init_processes
+import tvo
 from math import pi as MATH_PI
 import math
 import pytest
@@ -15,7 +15,7 @@ import copy
 
 
 @pytest.fixture(
-    scope="module", params=[pytest.param(tvem.get_device().type, marks=[pytest.mark.gpu])]
+    scope="module", params=[pytest.param(tvo.get_device().type, marks=[pytest.mark.gpu])]
 )
 def add_gpu_mark():
     """No-op fixture, use it to add the 'gpu' mark to a test or fixture."""
@@ -43,7 +43,7 @@ def simple_tvae(request, add_gpu_mark):
 def test_forward(simple_tvae):
     D, H1, H0 = simple_tvae.net_shape
 
-    mlp_in = to.zeros((2, H0), device=tvem.get_device(), dtype=simple_tvae.precision)
+    mlp_in = to.zeros((2, H0), device=tvo.get_device(), dtype=simple_tvae.precision)
     mlp_in[1, -1] = 1.0
 
     # assuming all W==1, all b==0 and ReLU activation
@@ -53,7 +53,7 @@ def test_forward(simple_tvae):
     out = simple_tvae.forward(mlp_in)
     assert to.allclose(out, expected_output)
 
-    mlp_in = to.rand(100, H0, device=tvem.get_device(), dtype=simple_tvae.precision)
+    mlp_in = to.rand(100, H0, device=tvo.get_device(), dtype=simple_tvae.precision)
     e = H1 * mlp_in.sum(dim=1, keepdim=True)
     expected_output = to.sigmoid(e) if isinstance(simple_tvae, BernoulliTVAE) else e
     out = simple_tvae.forward(mlp_in)
@@ -63,7 +63,7 @@ def test_forward(simple_tvae):
 def true_lpj(tvae_model, data, states):
     # true lpj calculations make certain simplifying assumptions on tvae
     # parameters. check they are satisfied.
-    d = tvem.get_device()
+    d = tvo.get_device()
     pi = tvae_model.theta["pies"]
     assert all(math.isclose(pi[0], p) for p in pi)
     assert all(w.allclose(to.ones(1, device=d, dtype=tvae_model.precision)) for w in tvae_model.W)
@@ -116,7 +116,7 @@ def test_lpj(simple_tvae):
     states = fullem_for(simple_tvae, N=N)
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     assert states.K.shape == (N, S, H0)
-    data = to.tensor([[0.0], [1.0]], device=tvem.get_device(), dtype=simple_tvae.precision)
+    data = to.tensor([[0.0], [1.0]], device=tvo.get_device(), dtype=simple_tvae.precision)
     assert data.shape == (N, D)
 
     lpj = simple_tvae._log_pseudo_joint(data, states.K)
@@ -131,7 +131,7 @@ def test_free_energy(simple_tvae):
     D, H1, H0 = simple_tvae.net_shape
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     states = fullem_for(simple_tvae, N)
-    data = to.tensor([[0.0], [1.0]], device=tvem.get_device(), dtype=simple_tvae.precision)
+    data = to.tensor([[0.0], [1.0]], device=tvo.get_device(), dtype=simple_tvae.precision)
     assert data.shape == (N, D)
 
     states.lpj[:] = simple_tvae.log_joint(data, states.K)
@@ -143,7 +143,7 @@ def test_free_energy(simple_tvae):
 @pytest.fixture(scope="function")
 def tvae_and_corresponding_bsc(add_gpu_mark):
     precision = to.float64
-    d = tvem.get_device()
+    d = tvo.get_device()
 
     D, H0, H1 = 10, 2, 2
     assert H0 == H1
@@ -163,7 +163,7 @@ def tvae_and_corresponding_bsc(add_gpu_mark):
 def test_same_as_bsc(tvae_and_corresponding_bsc):
     tvae, bsc = tvae_and_corresponding_bsc
 
-    data = to.tensor([[0.0] * 10, [1.0] * 10], dtype=tvae.precision, device=tvem.get_device())
+    data = to.tensor([[0.0] * 10, [1.0] * 10], dtype=tvae.precision, device=tvo.get_device())
     N = data.shape[0]
 
     states = fullem_for(tvae, N)
@@ -180,7 +180,7 @@ def test_same_as_bsc(tvae_and_corresponding_bsc):
 @pytest.fixture(scope="module")
 def train_setup():
     N, D = 100, 25
-    return Munch(N=N, D=D, shape=(D, 10, 10), data=to.rand(N, D, device=tvem.get_device()))
+    return Munch(N=N, D=D, shape=(D, 10, 10), data=to.rand(N, D, device=tvo.get_device()))
 
 
 @pytest.fixture(scope="function", params=["with_external", "without_external"])
@@ -271,7 +271,7 @@ def tvae(request, train_setup, external_model, add_gpu_mark):
 
 @pytest.mark.gpu
 def test_train(train_setup, tvae):
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         init_processes()
 
     N = train_setup.N
@@ -330,7 +330,7 @@ def test_gradients_independent_of_estep(train_setup, tvae):
     This could not be the case if we screwed up gradient updates and they pick up on other
     calculations performed outside of the M-step.
     """
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         init_processes()
 
     tvae_copy = copy_tvae(tvae)
@@ -356,7 +356,7 @@ def test_gradients_independent_of_estep(train_setup, tvae):
 def test_generate_from_hidden(tvae):
     N = 1
     D, H0 = tvae.shape
-    S = to.zeros(N, H0, dtype=to.uint8, device=tvem.get_device())
+    S = to.zeros(N, H0, dtype=to.uint8, device=tvo.get_device())
     data = tvae.generate_data(N, S)
     assert data.shape == (N, D)
 

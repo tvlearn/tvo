@@ -3,11 +3,11 @@
 # Licensed under the Academic Free License version 3.0
 
 # otherwise Testing is picked up as a test class
-from tvem.exp import ExpConfig, FullEMConfig, Training
-from tvem.models import NoisyOR, BSC
-from tvem.utils.parallel import init_processes, broadcast
-from tvem.utils import get, generate_bars
-import tvem
+from tvo.exp import ExpConfig, FullEMConfig, Training
+from tvo.models import NoisyOR, BSC
+from tvo.utils.parallel import init_processes, broadcast
+from tvo.utils import get, generate_bars
+import tvo
 import os
 import numpy as np
 import h5py
@@ -16,7 +16,7 @@ import torch as to
 import torch.distributed as dist
 from munch import Munch
 
-gpu_and_mpi_marks = pytest.param(tvem.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
+gpu_and_mpi_marks = pytest.param(tvo.get_device().type, marks=(pytest.mark.gpu, pytest.mark.mpi))
 
 
 @pytest.fixture(scope="module", params=(gpu_and_mpi_marks,))
@@ -53,7 +53,7 @@ def model_and_data(request, hyperparams, estep_conf):
 
     Parametrized fixture, use it to test on several models.
     """
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         init_processes()
 
     precision, N, D, H, batch_size = get(hyperparams, "precision", "N", "D", "H", "batch_size")
@@ -61,16 +61,16 @@ def model_and_data(request, hyperparams, estep_conf):
     if request.param == "BSC":
 
         W_gt = generate_bars(H, bar_amp=10.0, precision=precision)
-        sigma2_gt = to.ones((1,), dtype=precision, device=tvem.get_device())
-        pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
+        sigma2_gt = to.ones((1,), dtype=precision, device=tvo.get_device())
+        pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvo.get_device())
 
         to.manual_seed(999)
         W_init = to.rand((D, H), dtype=precision)
-        W_init = W_init.to(device=tvem.get_device())
+        W_init = W_init.to(device=tvo.get_device())
         broadcast(W_init)
 
-        sigma2_init = to.tensor([1.0], dtype=precision, device=tvem.get_device())
-        pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
+        sigma2_init = to.tensor([1.0], dtype=precision, device=tvo.get_device())
+        pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvo.get_device())
 
         model = BSC(
             H=H, D=D, W_init=W_gt, sigma2_init=sigma2_gt, pies_init=pies_gt, precision=precision
@@ -87,13 +87,13 @@ def model_and_data(request, hyperparams, estep_conf):
     elif request.param == "NoisyOR":
 
         W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, precision=precision)
-        pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvem.get_device())
+        pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvo.get_device())
 
         to.manual_seed(999)
         W_init = to.rand((D, H), dtype=precision)
-        W_init = W_init.to(device=tvem.get_device())
+        W_init = W_init.to(device=tvo.get_device())
         broadcast(W_init)
-        pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvem.get_device())
+        pies_init = to.full((H,), 1.0 / H, dtype=precision, device=tvo.get_device())
 
         model = NoisyOR(H=H, D=D, W_init=W_gt, pi_init=pies_gt, precision=precision)
 
@@ -104,7 +104,7 @@ def model_and_data(request, hyperparams, estep_conf):
         model.theta["W"] = W_init
         model.theta["pies"] = pies_init
 
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         dist.barrier()
 
     return model, fname
@@ -116,7 +116,7 @@ def exp_conf(hyperparams):
 
 
 def check_file(input_file):
-    rank = dist.get_rank() if tvem.get_run_policy() == "mpi" else 0
+    rank = dist.get_rank() if tvo.get_run_policy() == "mpi" else 0
     if rank != 0:
         return
 
@@ -158,10 +158,10 @@ def check_file(input_file):
 def test_training(model_and_data, exp_conf, estep_conf, add_gpu_and_mpi_marks):
     model, input_file = model_and_data
 
-    if tvem.get_run_policy() == "mpi":
+    if tvo.get_run_policy() == "mpi":
         suffix = "mpi"
-    elif tvem.get_run_policy() == "seq":
-        suffix = "seq_%s" % tvem.get_device().type
+    elif tvo.get_run_policy() == "seq":
+        suffix = "seq_%s" % tvo.get_device().type
     exp_conf.output = input_file.replace("data", "exp").replace(".h5", "_%s.h5" % suffix)
 
     model, input_file = model_and_data

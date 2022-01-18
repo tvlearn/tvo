@@ -2,13 +2,13 @@
 # Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from tvem.utils.parallel import (
+from tvo.utils.parallel import (
     init_processes,
     scatter_to_processes,
     gather_from_processes,
     all_reduce,
 )
-import tvem
+import tvo
 
 import os
 import torch as to
@@ -18,10 +18,10 @@ from munch import Munch
 
 @pytest.fixture(scope="module")
 def setup(request):
-    if tvem.get_run_policy() == "seq":
+    if tvo.get_run_policy() == "seq":
         rank, n_procs = 0, 1
     else:
-        assert tvem.get_run_policy() == "mpi"
+        assert tvo.get_run_policy() == "mpi"
         init_processes()
         rank = to.distributed.get_rank()
         n_procs = to.distributed.get_world_size()
@@ -100,7 +100,7 @@ def test_all_reduce(setup):
 @pytest.mark.gpu
 @pytest.mark.mpi
 def test_device(setup):
-    if "TVEM_GPU" in os.environ:
-        assert tvem.get_device().type == "cuda"
+    if "TVO_GPU" in os.environ:
+        assert tvo.get_device().type == "cuda"
     else:
-        assert tvem.get_device() == to.device("cpu")
+        assert tvo.get_device() == to.device("cpu")

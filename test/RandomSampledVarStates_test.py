@@ -4,9 +4,9 @@
 
 import pytest
 import torch as to
-from tvem.variational import RandomSampledVarStates
-import tvem
-from tvem.utils.model_protocols import Trainable
+from tvo.variational import RandomSampledVarStates
+import tvo
+from tvo.utils.model_protocols import Trainable
 
 
 class DummyModel(Trainable):
@@ -19,7 +19,7 @@ class DummyModel(Trainable):
 
 @pytest.mark.gpu
 def test_update():
-    device = tvem.get_device()
+    device = tvo.get_device()
     precision = to.float32
     N, H, S, S_new = 10, 8, 4, 10
     var_states = RandomSampledVarStates(N, H, S, precision, S_new)

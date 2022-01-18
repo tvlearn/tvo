@@ -4,9 +4,9 @@
 
 import pytest
 import torch as to
-from tvem.variational import FullEM
-import tvem
-from tvem.utils.model_protocols import Trainable
+from tvo.variational import FullEM
+import tvo
+from tvo.utils.model_protocols import Trainable
 from munch import Munch
 
 
@@ -19,7 +19,7 @@ class DummyModel(Trainable):
 
 
 @pytest.fixture(
-    scope="function", params=[pytest.param(tvem.get_device().type, marks=pytest.mark.gpu)]
+    scope="function", params=[pytest.param(tvo.get_device().type, marks=pytest.mark.gpu)]
 )
 def setup(request):
     s = Munch(N=10, H=8, precision=to.float32)
@@ -35,8 +35,8 @@ def test_init(setup):
 
 def test_update(setup):
     var_states = setup.var_states
-    data = to.rand(setup.N, 1, device=tvem.get_device())
-    idx = to.arange(data.shape[0], device=tvem.get_device())
+    data = to.rand(setup.N, 1, device=tvo.get_device())
+    idx = to.arange(data.shape[0], device=tvo.get_device())
     lpj = DummyModel().log_joint(data=None, states=var_states.K)
     n_subs = var_states.update(idx, data, model=DummyModel())
     assert n_subs == 0
