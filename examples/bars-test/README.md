@@ -1,6 +1,8 @@
 # Standard Bars Test
 
-![Bars Test for NoisyOR for H=8 different bars and pi=2/H bars on average per image](training.gif)
+![](training.gif)
+
+Bars Test for NoisyOR for $`H^{gen}=8`$ bars and $`\pi^{gen}H=2`$ bars on average per image.
 
 
 ## Requirements
