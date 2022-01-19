@@ -6,7 +6,7 @@ Denoising House (σ=50) with EBSC using $`D=8\times8`$ image patches and $`H=256
 
 
 ## Requirements
-To run this example, make sure to have completed the installation instructions [described here](/../../README.md) and to have the `tvo` environment activated.
+To run this example, make sure to have completed the installation instructions [described here](../../README.md) and to have the `tvo` environment activated.
 
 ```bash
 conda activate tvo

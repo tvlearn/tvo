@@ -6,7 +6,7 @@ Bars Test for NoisyOR for $`H^{gen}=8`$ bars and $`\pi^{gen}H=2`$ bars on averag
 
 
 ## Requirements
-To run this example, make sure to have completed the installation instructions [described here](/../../README.md) and to have the `tvo` environment activated.
+To run this example, make sure to have completed the installation instructions [described here](../../README.md) and to have the `tvo` environment activated.
 
 ```bash
 conda activate tvo
