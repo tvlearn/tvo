@@ -1,4 +1,4 @@
-name: tvo-test
+name: test
 
 on: [push]
 
