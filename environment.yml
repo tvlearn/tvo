@@ -14,7 +14,7 @@ dependencies:
   - pytest
   - mypy
   - pytest-cov
-  - black
+  - black>=21
   - munch
   - cython
   - gcc_linux-64
