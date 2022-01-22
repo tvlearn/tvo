@@ -1,0 +1,43 @@
+name: tvo-test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 5
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3
+    - name: Add conda to system path
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Create the tvo conda env
+      run: conda env create
+    - name: Check formatting with black
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate tvo && black --version
+        black --check -q . || { black --diff -q . && false; }
+    - name: Lint with pylama
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate tvo
+        pylama
+    - name: Check with mypy
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate tvo
+        mypy tvo test
+    - name: Test with pytest
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate tvo
+        python setup.py build_ext --inplace
+        pytest --cov=tvo -v test
