@@ -1,0 +1,49 @@
+name: docs
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build-docs:
+    permissions: write-all
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3
+    - name: Add conda to system path
+      run: |
+        # $CONDA is an environment variable pointing to the root of the miniconda directory
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Create the tvo conda env
+      run: conda env create
+    - name: Generate docs
+      run: |
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate tvo
+        conda install -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints
+        python setup.py build_ext --inplace
+        sphinx-build docs docs-build
+        touch docs-build/.nojekyll
+    - name: Update gh-pages branch with the new docs
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "github-actions[bot]"
+        git branch gh-pages
+        git checkout gh-pages
+        git rm -r docs
+        mv docs-build docs
+        git add docs
+        # `git commit` will fail if no changes are present, so we ignore the return code.
+        git commit --message="Update documentation" -a || true
+    - name: Push new gh-pages branch
+      uses: ad-m/github-push-action@master
+      with:
+        branch: gh-pages
+        force: true
+        github_token: ${{ secrets.GITHUB_TOKEN }}
