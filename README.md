@@ -1,5 +1,5 @@
 # TVO - Truncated Variational Optimization <br>
-![build status](https://github.com/github/docs/actions/workflows/test.yml/badge.svg?branch=master)
+![build status](https://github.com/tvlearn/tvo/actions/workflows/test.yml/badge.svg)
 [![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg?style=flat-square)](https://trello.com/b/EuWTcm4w/tvem-repo)
 [![docs](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://mloldenburg.gitlab.io/tvem)
 [![coverage](https://mloldenburg.gitlab.io/tvem/cov_badge.svg)](https://mloldenburg.gitlab.io/tvem/htmlcov)
