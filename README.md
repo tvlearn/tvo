@@ -1,9 +1,8 @@
 # TVO - Truncated Variational Optimization <br>
 [![build status](https://github.com/tvlearn/tvo/actions/workflows/test.yml/badge.svg)](https://github.com/tvlearn/tvo/actions/workflows/test.yml?query=branch%3Amaster)
-[![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg?style=flat-square)](https://trello.com/b/EuWTcm4w/tvem-repo)
 [![docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://tvlearn.github.io/tvo)
-[![coverage](https://mloldenburg.gitlab.io/tvem/cov_badge.svg)](https://mloldenburg.gitlab.io/tvem/htmlcov)
-[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg?style=flat-square)](https://github.com/ambv/black)
+[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+[![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg)](https://trello.com/b/EuWTcm4w/tvem-repo)
 
 This repository provides a PyTorch package for Truncated Variational Optimization. For related publications, see [1-3]. Check out the [examples](/examples) to get started.
 
