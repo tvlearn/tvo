@@ -35,6 +35,8 @@ jobs:
         python .ci_scripts/make_coverage_html_report.py docs-build/htmlcov
     - name: Update gh-pages branch with the new docs
       run: |
+        ls docs-build
+        ls docs-build/htmlcov
         git config --local user.email "action@github.com"
         git config --local user.name "github-actions[bot]"
         git branch gh-pages
