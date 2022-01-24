@@ -3,6 +3,7 @@ name: docs
 on:
   push:
     branches: [master]
+  pull_request:
 
 jobs:
   build-docs:
@@ -27,8 +28,11 @@ jobs:
         conda activate tvo
         conda install -c conda-forge sphinx sphinx_rtd_theme sphinx-autodoc-typehints
         python setup.py build_ext --inplace
+        pytest --cov=tvo -v test
         sphinx-build docs docs-build
         touch docs-build/.nojekyll
+        python .ci_scripts/make_coverage_badge.py docs-build/cov_badge.svg
+        python .ci_scripts/make_coverage_html_report.py docs-build/htmlcov
     - name: Update gh-pages branch with the new docs
       run: |
         git config --local user.email "action@github.com"
@@ -37,7 +41,7 @@ jobs:
         git checkout gh-pages
         git rm -r docs
         mv docs-build docs
-        git add docs
+        git add -f docs
         # `git commit` will fail if no changes are present, so we ignore the return code.
         git commit --message="Update documentation" -a || true
     - name: Push new gh-pages branch
