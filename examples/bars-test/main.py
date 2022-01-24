@@ -25,7 +25,7 @@ PRECISION = to.float32
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
-if __name__ == "__main__":
+def bars_test():
 
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
@@ -179,3 +179,7 @@ if __name__ == "__main__":
         visualizer.finalize()
 
     barrier()
+
+
+if __name__ == "__main__":
+    bars_test()
