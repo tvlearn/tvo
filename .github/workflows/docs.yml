@@ -35,15 +35,13 @@ jobs:
         python .ci_scripts/make_coverage_html_report.py docs-build/htmlcov
     - name: Update gh-pages branch with the new docs
       run: |
-        ls docs-build
-        ls docs-build/htmlcov
         git config --local user.email "action@github.com"
         git config --local user.name "github-actions[bot]"
         git branch gh-pages
         git checkout gh-pages
         git rm -r docs
         mv docs-build docs
-        git add docs
+        git add -f docs
         # `git commit` will fail if no changes are present, so we ignore the return code.
         git commit --message="Update documentation" -a || true
     - name: Push new gh-pages branch
