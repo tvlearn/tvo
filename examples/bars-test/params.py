@@ -98,7 +98,7 @@ sssc_parser.add_argument(
 sssc_parser.add_argument(
     "--Psi_gen",
     type=float,
-    help="Latent standard deviation used for data generation",
+    help="Latent variances used for data generation",
     default=1.0,
 )
 
