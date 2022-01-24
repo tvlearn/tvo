@@ -21,7 +21,7 @@ cov.load()
 total = round(cov.report())
 color = pick_color(total)
 
-badge_url = f"https://img.shields.io/badge/coverage-{total}%25-{color}.svg?style=flat-square"
+badge_url = f"https://img.shields.io/badge/coverage-{total}%25-{color}.svg"
 # shields.io blocks the urllib user agent
 req = Request(badge_url, headers={"User-Agent": "Mozilla/5.0"})
 badge_img = urlopen(req).read()
