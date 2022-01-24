@@ -43,4 +43,4 @@ jobs:
         source $CONDA/etc/profile.d/conda.sh
         conda activate tvo
         python setup.py build_ext --inplace
-        pytest --cov=tvo -v test
+        pytest -v test
