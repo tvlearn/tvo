@@ -74,7 +74,7 @@ class Visualizer(object):
             eps=0.02,
         )
 
-        self._handles["datapoints"] = ax.imshow(np.squeeze(grid))
+        self._handles["datapoints"] = ax.imshow(np.squeeze(grid), interpolation="none")
         ax.axis("off")
 
         self._handles["datapoints"].set_cmap(cmap)
@@ -99,7 +99,7 @@ class Visualizer(object):
         )
 
         if self._handles["W_gen"] is None:
-            self._handles["W_gen"] = ax.imshow(np.squeeze(grid))
+            self._handles["W_gen"] = ax.imshow(np.squeeze(grid), interpolation="none")
             ax.axis("off")
         else:
             self._handles["W_gen"].set_data(np.squeeze(grid))
@@ -125,7 +125,7 @@ class Visualizer(object):
         )
 
         if self._handles["W"] is None:
-            self._handles["W"] = ax.imshow(np.squeeze(grid))
+            self._handles["W"] = ax.imshow(np.squeeze(grid), interpolation="none")
             ax.axis("off")
         else:
             self._handles["W"].set_data(np.squeeze(grid))
@@ -345,3 +345,142 @@ class BSCVisualizer(Visualizer):
     def _viz_epoch(self, epoch, F, theta):
         super(BSCVisualizer, self)._viz_epoch(epoch, F, theta)
         self._viz_sigma2()
+
+
+class SSSCVisualizer(Visualizer):
+    def __init__(self, sort_acc_to_desc_priors=False, **kwargs):
+        super(SSSCVisualizer, self).__init__(
+            memorize=("F", "sigma2"),
+            positions={
+                "datapoints": [0.0, 0.0, 0.07, 0.94],
+                "W_gen": [0.09, 0.0, 0.1, 0.94],
+                "W": [0.21, 0.0, 0.1, 0.94],
+                "F": [0.40, 0.76, 0.25, 0.23],
+                "sigma2": [0.40, 0.43, 0.25, 0.23],
+                "pies": [0.40, 0.1, 0.25, 0.23],
+                "mus": [0.74, 0.76, 0.25, 0.23],
+                "Psi": [0.74, 0.36, 0.25, 0.23],
+                "Psi_gen": [0.74, 0.04, 0.25, 0.23],
+            },
+            **kwargs
+        )
+        self._sort_acc_to_desc_priors = sort_acc_to_desc_priors
+        if sort_acc_to_desc_priors:
+            print("Sorting according to priors ascendingly")
+        self._viz_Psi_gen()
+
+    def _viz_sigma2(self):
+        memory = self._memory
+        assert "sigma2" in memory
+        assert "sigma2" in self._axes
+        ax = self._axes["sigma2"]
+        xdata = np.arange(1, len(memory["sigma2"]) + 1)
+        ydata_learned = np.squeeze(np.array(memory["sigma2"]))
+        if self._handles["sigma2"] is None:
+            (self._handles["sigma2"],) = ax.plot(
+                xdata,
+                ydata_learned,
+                "b",
+                label=r"$\sigma^2$",
+            )
+            ax.set_xlabel("Epoch", fontsize=self._labelsize)
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            add_legend = True
+        else:
+            self._handles["sigma2"].set_xdata(xdata)
+            self._handles["sigma2"].set_ydata(ydata_learned)
+            ax.relim()
+            ax.autoscale_view()
+            add_legend = True
+
+        ydata_gen = self._theta_gen["sigma2"] * np.ones_like(ydata_learned)
+        if self._handles["sigma2_gen"] is None:
+            (self._handles["sigma2_gen"],) = ax.plot(
+                xdata,
+                ydata_gen,
+                "b--",
+                label=r"$(\sigma^{\mathrm{gen}})^2$",
+            )
+        else:
+            self._handles["sigma2_gen"].set_xdata(xdata)
+            self._handles["sigma2_gen"].set_ydata(ydata_gen)
+
+        if add_legend:
+            ax.legend(prop={"size": self._legendfontsize}, ncol=2)
+
+    def _viz_mus(self, epoch, mus, inds_sort=None):
+        assert "mus" in self._axes
+        ax = self._axes["mus"]
+        xdata = np.arange(1, len(mus) + 1)
+        ydata_learned = mus[inds_sort] if inds_sort is not None else mus
+        if self._handles["mus"] is None:
+            (self._handles["mus"],) = ax.plot(
+                xdata,
+                ydata_learned,
+                "b",
+                linestyle="none",
+                marker=".",
+                markersize=4,
+                label=r"$\mu_h$ @ {}".format(epoch),
+            )
+            ax.set_xlabel(r"$h$", fontsize=self._labelsize)
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        else:
+            self._handles["mus"].set_xdata(xdata)
+            self._handles["mus"].set_ydata(ydata_learned)
+            self._handles["mus"].set_label(r"$\mu_h$ @ {}".format(epoch))
+            ax.relim()
+            ax.autoscale_view()
+
+        ydata_gen = (
+            self._theta_gen["mus"][inds_sort] if inds_sort is not None else self._theta_gen["mus"]
+        )
+        if self._handles["mus_gen"] is None:
+            (self._handles["mus_gen"],) = ax.plot(
+                xdata,
+                ydata_gen,
+                "b",
+                linestyle="none",
+                marker="o",
+                fillstyle=Line2D.fillStyles[-1],
+                markersize=4,
+                label=r"$\mu_h^{\mathrm{gen}}$",
+            )
+        else:
+            self._handles["mus_gen"].set_xdata(xdata)
+            self._handles["mus_gen"].set_ydata(ydata_gen)
+
+        ax.legend(prop={"size": self._legendfontsize}, ncol=2)
+
+    def _viz_Psi(self, epoch, Psi):
+        assert "Psi" in self._axes
+        ax = self._axes["Psi"]
+        if self._handles["Psi"] is None:
+            self._handles["Psi"] = ax.imshow(Psi)
+            ax.axis("off")
+        else:
+            self._handles["Psi"].set_data(Psi)
+        self._handles["Psi"].set_cmap(plt.cm.jet)
+        max_abs = to.max(to.abs(Psi))
+        self._handles["Psi"].set_clim(vmin=-max_abs, vmax=max_abs)
+        ax.set_title(r"$\Psi$ @ {}".format(epoch))
+
+    def _viz_Psi_gen(self):
+        assert "Psi_gen" in self._axes
+        ax = self._axes["Psi_gen"]
+        Psi_gen = self._theta_gen["Psi"]
+        self._handles["Psi_gen"] = ax.imshow(Psi_gen)
+        ax.axis("off")
+        self._handles["Psi_gen"].set_cmap(plt.cm.jet)
+        max_abs = to.max(to.abs(Psi_gen))
+        self._handles["Psi_gen"].set_clim(vmin=-max_abs, vmax=max_abs)
+        ax.set_title(r"$\Psi^{\mathrm{gen}}$")
+
+    def _viz_epoch(self, epoch, F, theta):
+        super(SSSCVisualizer, self)._viz_epoch(epoch, F, theta)
+        inds_sort = (
+            to.argsort(theta["pies"], descending=True) if self._sort_acc_to_desc_priors else None
+        )
+        self._viz_sigma2()
+        self._viz_mus(epoch, theta["mus"], inds_sort=inds_sort)
+        self._viz_Psi(epoch, theta["Psi"])
