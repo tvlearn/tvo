@@ -51,7 +51,7 @@ def lpj_looped(data: to.Tensor, states: to.Tensor, theta: Dict[str, to.tensor]) 
         theta["W"],
         theta["sigma2"],
         theta["pies"],
-        theta["mu"],
+        theta["mus"],
         theta["Psi"],
     )
     pies = _pies.clamp(1e-2, 1.0 - 1e-2)
