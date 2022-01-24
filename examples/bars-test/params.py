@@ -73,6 +73,42 @@ bsc_parser.add_argument(
     default=None,
 )
 
+sssc_parser = argparse.ArgumentParser(add_help=False)
+sssc_parser.add_argument(
+    "--pi_gen",
+    type=float,
+    help="Sparsity used for data generation (defaults to 2/H if not specified)",
+    default=None,
+)
+
+sssc_parser.add_argument(
+    "--sigma2_gen",
+    type=float,
+    help="Noise level used for data generation",
+    default=0.01,
+)
+
+sssc_parser.add_argument(
+    "--mu_gen",
+    type=float,
+    help="Latent means used for data generation",
+    default=0.0,
+)
+
+sssc_parser.add_argument(
+    "--Psi_gen",
+    type=float,
+    help="Latent standard deviation used for data generation",
+    default=1.0,
+)
+
+sssc_parser.add_argument(
+    "-H",
+    type=int,
+    help="Number of generative fields to learn (set to H_gen if not specified)",
+    default=None,
+)
+
 variational_parser = argparse.ArgumentParser(add_help=False)
 variational_parser.add_argument(
     "--Ksize",
@@ -164,6 +200,16 @@ def get_args():
         parents=comm_parents
         + [
             bsc_parser,
+        ],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    algo_parsers.add_parser(
+        "sssc",
+        help="Run experiment with SSSC",
+        parents=comm_parents
+        + [
+            sssc_parser,
         ],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

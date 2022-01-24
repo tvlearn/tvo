@@ -10,7 +10,7 @@ import torch as to
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
-from tvo.models import NoisyOR, BSC
+from tvo.models import NoisyOR, BSC, SSSC
 from tvo.utils.parallel import pprint, broadcast, barrier
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 from tvo.utils.model_protocols import Sampler
@@ -18,7 +18,7 @@ from tvo.utils.model_protocols import Sampler
 from params import get_args
 from utils import init_processes, stdout_logger
 from data import get_bars_gfs, generate_data_and_write_to_h5
-from viz import Visualizer as _Visualizer, BSCVisualizer
+from viz import Visualizer as _Visualizer, BSCVisualizer, SSSCVisualizer
 
 DEVICE = tvo.get_device()
 PRECISION = to.float32
@@ -74,6 +74,17 @@ if __name__ == "__main__":
                 pies_init=to.full((args.H_gen,), pi_gen, **dtype_device_kwargs),
                 precision=PRECISION,
             )
+        elif args.model == "sssc":
+            gen_model = SSSC(
+                H=args.H_gen,
+                D=D,
+                W_init=gfs,
+                sigma2_init=to.tensor([args.sigma2_gen], **dtype_device_kwargs),
+                pies_init=to.full((args.H_gen,), pi_gen, **dtype_device_kwargs),
+                mus_init=to.full((args.H_gen,), args.mu_gen, **dtype_device_kwargs),
+                Psi_init=to.eye(args.H_gen, **dtype_device_kwargs) * args.Psi_gen,
+                precision=PRECISION,
+            )
         else:
             raise NotImplementedError("Generative model {} not supported".format(args.model))
         compute_ll = args.H_gen <= 10
@@ -109,6 +120,7 @@ if __name__ == "__main__":
     model = {
         "nor": NoisyOR(pi_init=pies_init, **model_kwargs),
         "bsc": BSC(sigma2_init=sigma2_init, pies_init=pies_init, **model_kwargs),
+        "sssc": SSSC(sigma2_init=sigma2_init, pies_init=pies_init, **model_kwargs),
     }[args.model]
 
     # define hyperparameters of the variational optimization
@@ -128,7 +140,11 @@ if __name__ == "__main__":
 
     # initialize visualizer
     pprint("Initializing visualizer")
-    Visualizer = {"nor": _Visualizer, "bsc": BSCVisualizer}[args.model] if comm_rank == 0 else None
+    Visualizer = (
+        {"nor": _Visualizer, "bsc": BSCVisualizer, "sssc": SSSCVisualizer}[args.model]
+        if comm_rank == 0
+        else None
+    )
     visualizer = (
         None
         if comm_rank != 0
