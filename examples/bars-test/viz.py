@@ -478,7 +478,9 @@ class SSSCVisualizer(Visualizer):
 
     def _viz_epoch(self, epoch, F, theta):
         super(SSSCVisualizer, self)._viz_epoch(epoch, F, theta)
-        inds_sort = to.argsort(pies, descending=True) if self._sort_acc_to_desc_priors else None
+        inds_sort = (
+            to.argsort(theta["pies"], descending=True) if self._sort_acc_to_desc_priors else None
+        )
         self._viz_sigma2()
         self._viz_mus(epoch, theta["mus"], inds_sort=inds_sort)
         self._viz_Psi(epoch, theta["Psi"])
