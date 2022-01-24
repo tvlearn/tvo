@@ -247,6 +247,22 @@ class SSSC(Sampler, Optimized, Reconstructor):
             Lambda_s_W_s_sigma2inv,
         )
 
+    def _check_if_storage_reliable(self, incomplete: bool, batch_size: int):
+        """Disable the storage logic by setting `self._use_storage=False` if data is incomplete
+        and if the specified batch_size is larger than one. The terms stored by the storage are
+        only data-independent if the data does not contain missing values; otherwise,
+        data-dependent indices of missing values are included in the computations of the
+        respective terms.
+
+        :param incomplete: Boolean indicating whether the data contains missing values
+        :param batch_size: Batch size
+        """
+
+        use_storage = self._use_storage if not (incomplete and batch_size > 1) else False
+        if self._use_storage != use_storage:
+            pprint("Disabled storage (inaccurate for incomplete data and batch_size > 1)")
+            self._use_storage = use_storage
+
     def _reformulated_lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """
         Batchified implementation of log-pseudo joint for SSSC using matrix determinant lemma and
@@ -262,12 +278,8 @@ class SSSC(Sampler, Optimized, Reconstructor):
         Kfloat = states.to(dtype=precision)
         batch_size, S = data.shape[0], Kbool.shape[1]
 
-        use_storage = (
-            self._use_storage if not to.isnan(data).any() else False
-        )  # storage usage unrealiable for incomplete data points with differently missing entries
-        if self._use_storage != use_storage:
-            pprint("Disabled storage (inaccurate for incomplete data)")
-        self._use_storage = use_storage
+        self._check_if_storage_reliable(incomplete=to.isnan(data).any(), batch_size=batch_size)
+        use_storage = self._use_storage
 
         notnan = to.logical_not(to.isnan(data))
 
