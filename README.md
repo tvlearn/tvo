@@ -31,11 +31,8 @@ pytest test # run tests
 
 ## References
 
-[1] "Evolutionary Variational Optimization of Generative Models." Jakob Drefs, Enrico Guiraud, Jörg Lücke. Journal of Machine Learning Research, in press, 2022. We will link the paper very soon, see [here](https://arxiv.org/abs/2012.12294) for a preliminary arXiv version.
+[1] Evolutionary Variational Optimization of Generative Models. Jakob Drefs, Enrico Guiraud, Jörg Lücke. _Journal of Machine Learning Research_ 23(21):1-51, 2022. [(online access)](https://www.jmlr.org/papers/v23/20-233.html)
 
-[2] "Truncated Variational Sampling for ‘Black Box’ Optimization of Generative Models." Jörg Lücke, Zhenwen Dai, Georgios Exarchakis. [International Conference on Latent Variable Analysis and Signal Separation, Springer, Cham, 2018](https://link.springer.com/chapter/10.1007/978-3-319-93764-9_43).
+[2] Truncated Variational Sampling for ‘Black Box’ Optimization of Generative Models. Jörg Lücke, Zhenwen Dai, Georgios Exarchakis. _International Conference on Latent Variable Analysis and Signal Separation_, Springer, Cham, 2018. [(online access)]](https://link.springer.com/chapter/10.1007/978-3-319-93764-9_43)
 
-[3] "Truncated Variational Expectation Maximization." Jörg Lücke. [arXiv preprint arXiv:1610.03113 (2019)](https://arxiv.org/abs/1610.03113).
-
-
-
+[3] Truncated Variational Expectation Maximization. Jörg Lücke. _arXiv preprint_ arXiv:1610.03113, 2019. [(online access)](https://arxiv.org/abs/1610.03113)
