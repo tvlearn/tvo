@@ -5,10 +5,10 @@
 import torch as to
 
 from torch import Tensor
-from abc import ABC
 
 import tvo
 from tvo.utils.model_protocols import Trainable, Optimized
+from tvo.variational.TVOVariationalStates import TVOVariationalStates
 
 
 def state_matrix(H: int, device: to.device = None):
@@ -28,7 +28,7 @@ def state_matrix(H: int, device: to.device = None):
     return all_states
 
 
-class FullEM(ABC):
+class FullEM(TVOVariationalStates):
     def __init__(self, N: int, H: int, precision: to.dtype, K_init=None):
         """Full EM class.
 
@@ -43,7 +43,7 @@ class FullEM(ABC):
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.config = conf
-        self.lpj = to.empty((N, 2**H), dtype=precision, device=tvo.get_device())
+        self.lpj = to.empty((N, 2 ** H), dtype=precision, device=tvo.get_device())
         self.precision = precision
         self.K = state_matrix(H)[None, :, :].expand(N, -1, -1)
 
@@ -58,7 +58,7 @@ class FullEM(ABC):
         return 0
 
 
-class FullEMSingleCauseModels(ABC):
+class FullEMSingleCauseModels(FullEM):
     def __init__(self, N: int, H: int, precision: to.dtype):
         """Full EM class for single causes models.
 
@@ -77,11 +77,6 @@ class FullEMSingleCauseModels(ABC):
         self.K = to.eye(H, dtype=precision, device=tvo.get_device())[None, :, :].expand(N, -1, -1)
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
-        lpj_fn = model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
         assert to.any(self.K.sum(axis=1) == 1), "Multiple causes detected."
-        K = self.K
-        lpj = self.lpj
-
-        lpj[idx] = lpj_fn(batch, K[idx])
-
+        super(FullEMSingleCauseModels, self).update(idx, batch, model)
         return 0
