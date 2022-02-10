@@ -33,7 +33,7 @@ def make_var_states(
 ]:
 
     if isinstance(conf, FullEMConfig):
-        assert conf.n_states == 2 ** H, "FullEMConfig and model have different H"
+        assert conf.n_states == 2**H, "FullEMConfig and model have different H"
         return FullEM(N, H, precision)
     elif isinstance(conf, FullEMSingleCauseConfig):
         assert conf.n_states == H, "FullEMSingleCauseConfig and model have different H"

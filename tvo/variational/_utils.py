@@ -76,7 +76,7 @@ def generate_unique_states(
     """
     if device is None:
         device = tvo.get_device()
-    assert n_states <= 2 ** H, "n_states must be smaller than 2**H"
+    assert n_states <= 2**H, "n_states must be smaller than 2**H"
     n_samples = max(n_states // 2, 1)
 
     s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))}

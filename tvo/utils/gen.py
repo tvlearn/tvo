@@ -28,7 +28,7 @@ def generate_bars(
     :returns: tensor containing the bars dictionary
     """
     R = H // 2
-    D = R ** 2
+    D = R**2
 
     W = bg_amp * to.ones((R, R, H), dtype=precision, device=tvo.get_device())
     for i in range(R):
