@@ -21,8 +21,8 @@ def state_matrix(H: int, device: to.device = None):
     if device is None:
         device = tvo.get_device()
 
-    all_states = to.empty((2 ** H, H), dtype=to.uint8, device=device)
-    for state in range(2 ** H):
+    all_states = to.empty((2**H, H), dtype=to.uint8, device=device)
+    for state in range(2**H):
         bit_sequence = tuple(int(bit) for bit in f"{state:0{H}b}")
         all_states[state] = to.tensor(bit_sequence, dtype=to.uint8, device=device)
     return all_states

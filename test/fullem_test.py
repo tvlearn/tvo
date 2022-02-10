@@ -29,8 +29,8 @@ def setup(request):
 
 def test_init(setup):
     var_states = setup.var_states
-    assert var_states.K.shape == (setup.N, 2 ** setup.H, setup.H)
-    assert to.unique(var_states.K[0], dim=0).shape[0] == 2 ** setup.H
+    assert var_states.K.shape == (setup.N, 2**setup.H, setup.H)
+    assert to.unique(var_states.K[0], dim=0).shape[0] == 2**setup.H
 
 
 def test_update(setup):
