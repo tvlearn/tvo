@@ -25,7 +25,7 @@ class TVOVariationalStates(ABC):
         """
         required_keys = ("N", "H", "S", "S_new", "precision")
         for c in required_keys:
-            assert c in conf and conf[c] is not None
+            assert c in conf and conf[c] is not None, f"conf must contain {c}"
         self.config = conf
 
         N, H, S, _, precision = get(conf, *required_keys)
