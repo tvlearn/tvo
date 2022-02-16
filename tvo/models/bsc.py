@@ -22,6 +22,7 @@ if torch_minor_version >= 10:
     def lstsq(a, b):
         return to.linalg.lstsq(b, a)
 
+
 elif torch_minor_version >= 2:
     # pytorch 1.2 deprecates to.gels in favour of to.lstsq
     lstsq = to.lstsq
