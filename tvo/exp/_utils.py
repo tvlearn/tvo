@@ -8,6 +8,7 @@ from typing import Union
 from tvo.variational import (
     FullEM,
     EVOVariationalStates,
+    NeuralVariationalStates,
     FullEMSingleCauseModels,
     TVSVariationalStates,
     RandomSampledVarStates,
@@ -15,6 +16,7 @@ from tvo.variational import (
 from tvo.exp._EStepConfig import (
     FullEMConfig,
     EVOConfig,
+    NeuralEMConfig,
     EStepConfig,
     FullEMSingleCauseConfig,
     TVSConfig,
@@ -30,6 +32,7 @@ def make_var_states(
     FullEMSingleCauseModels,
     TVSVariationalStates,
     RandomSampledVarStates,
+    NeuralVariationalStates,
 ]:
 
     if isinstance(conf, FullEMConfig):
@@ -40,6 +43,15 @@ def make_var_states(
         return FullEMSingleCauseModels(N, H, precision)
     elif isinstance(conf, EVOConfig):
         return _make_EVO_var_states(conf, N, H, precision)
+    elif isinstance(conf, NeuralEMConfig):
+        return NeuralVariationalStates(
+            **conf.as_dict(),
+            N=N,
+            H=H,
+            S=conf.n_states,
+            S_new=conf.n_samples,
+            precision=precision,
+        )
     elif isinstance(conf, TVSConfig):
         return TVSVariationalStates(
             N,
@@ -75,3 +87,9 @@ def _make_EVO_var_states(conf: EVOConfig, N: int, H: int, precision: to.dtype):
         bitflip_frequency=conf.bitflip_frequency,
         K_init_file=conf.K_init_file,
     )
+
+
+#
+# TODO: remove
+# def make_neural_Var_states(conf: NeuralEMConfig, N: int, H: int, precision: to.dtype):
+#     return NeuralVariationalStates(**conf, N=N, H=H, precision=precision)
