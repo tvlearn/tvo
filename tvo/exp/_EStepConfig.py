@@ -3,7 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Sequence, List
 
 
 class EStepConfig(ABC):
@@ -79,6 +79,70 @@ class EVOConfig(EStepConfig):
         self.K_init_file = K_init_file
 
         super().__init__(n_states)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
+
+
+class NeuralEMConfig(EStepConfig):
+    """returns the appropriate config without the need to expose the individual neural configs to the outer scope"""
+
+    def __init__(
+        self,
+        encoder: str,
+        n_states: int,
+        n_samples: int,
+        input_size: int,
+        activations: Sequence,
+        output_size: int,
+        n_hidden: List[int] = None,
+        dropouts: List[bool] = None,
+        dropout_rate: float = None,
+        output_activation=None,
+        lr: float = None,
+    ):
+        """
+        :param encoder: encoder type to use. Must be one of: MLP, CNN
+        :param n_states: number of states in the K set
+        :param n_samples: number of samples to use for the E step
+        :param input_size: input size of the encoder (D)
+        :param activations: list of activations to use for the encoder
+        :param output_size: output size of the encoder (H)
+        :param n_hidden: list of hidden layer sizes for the encoder
+        :param dropouts: list of dropouts for the encoder
+        :param dropout_rate: dropout rate for the encoder
+        :param output_activation: activation for the output layer.
+        :param lr: learning rate for the optimizer of the encoder
+        """
+        super().__init__(n_states)
+        self.n_samples = n_samples
+
+        if encoder == "MLP":
+
+            self.input_size = input_size
+            self.n_hidden = n_hidden
+            self.activations = activations
+            self.dropouts = dropouts
+            self.dropout_rate = dropout_rate
+            self.output_size = output_size
+            self.output_activation = output_activation
+            self.lr = lr
+
+            self.MLP_sanity_check()
+
+        elif encoder == "CNN":
+            raise NotImplementedError  # pragma: no cover
+
+        else:
+            raise ValueError(f"Unknown encoder {encoder}")
+
+    def MLP_sanity_check(self):
+        assert self.n_hidden is not None, "n_hidden must be specified for MLP encoder"
+        assert self.dropouts is not None, "dropouts must be specified for MLP encoder"
+        assert self.dropout_rate is not None, "dropout_rate must be specified for MLP encoder"
+        assert (
+            len(self.n_hidden) == len(self.activations) == len(self.dropouts)
+        ), "hidden units, activations and dropouts must be equal."
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
