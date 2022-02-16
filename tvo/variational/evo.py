@@ -179,7 +179,7 @@ def evolve_states(
     new_states_per_gen = max_new_states // n_generations
 
     # Pre-allocations
-    # It'states probable that not all new_states will be filled with a
+    # It's probable that not all new_states will be filled with a
     # new unique state. Unfilled new_states will remain uninitialized and
     # their corresponding new_lpj will be lower than any state in states[n].
     new_states = to.empty((N, max_new_states, H), dtype=to.uint8, device=device)
