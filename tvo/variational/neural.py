@@ -84,13 +84,28 @@ class NeuralVariationalStates(TVOVariationalStates):
         super().__init__(config)
 
     def gumbel_softmax_sampling(
-        self, logits: Tensor, temperature: float = 1.0, hard: bool = False
+        self, logits: Tensor, temperature: float = 1.0, hard: bool = True
     ) -> Tensor:
         """
-        Implements Gumbel Softmax
+        Implements Gumbel Softmax on logits of a neural network.
+        :param logits: logits of a neural network
+        :param temperature: temperature of the gumbel softmax. Annealing schedule is not implemented here.
+        :param hard: If true, the returned samples are one-hot encoded.
         """
         # sample from gumbel distribution
-        return to.nn.functional.gumbel_softmax(logits, temperature, hard)
+        assert len(logits)//2 == len(logits)/2, "logits must be of even length"
+
+        # init states tensor
+        states = to.tensor([])
+
+        # split logits in two categories (for bernoulli latents)
+        category_A, category_B = logits[::2], logits[1::2]
+
+        # sample from gumbel distribution for a two-categorical distribution
+        for a, b in zip(category_A, category_B):
+            states = to.nn.functional.gumbel_softmax(to.cat(a,b), temperature, hard)
+
+        return states
 
     def init_states(K: int, N: int, H: int, S: int, precision: to.dtype):
         raise NotImplementedError  # pragma: no cover
