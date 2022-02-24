@@ -40,7 +40,10 @@ class PMM(Optimized, Sampler, Reconstructor):
                           torch.float64.
 
         """
-        assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
+        assert precision in (
+            to.float32,
+            to.float64,
+        ), "precision must be one of torch.float{32,64}"
         self._precision = precision
 
         device = tvo.get_device()
@@ -61,7 +64,11 @@ class PMM(Optimized, Sampler, Reconstructor):
         self._theta = {"pies": pies_init, "W": W_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
-            "W": [None, to.full_like(self._theta["W"], eps), to.full_like(self._theta["W"], inf)],
+            "W": [
+                None,
+                to.full_like(self._theta["W"], eps),
+                to.full_like(self._theta["W"], inf),
+            ],
             "pies": [
                 None,
                 to.full_like(self._theta["pies"], eps),
@@ -104,9 +111,13 @@ class PMM(Optimized, Sampler, Reconstructor):
         K = states.K[idx]
         batch_size, S, _ = K.shape
 
-        Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
+        Kfloat = K.to(
+            dtype=lpj.dtype
+        )  # TODO Find solution to avoid byte->float casting
 
-        batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H) mean_posterior(Kfloat, lpj)
+        batch_s_pjc = mean_posterior(
+            Kfloat, lpj
+        )  # is (batch_size,H) mean_posterior(Kfloat, lpj)
         batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
 
         self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
@@ -170,7 +181,10 @@ class PMM(Optimized, Sampler, Reconstructor):
             shape = hidden_state.shape
             if N is None:
                 N = shape[0]
-            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            assert shape == (
+                N,
+                H,
+            ), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         Wbar = to.zeros((N, D), dtype=precision, device=device)
@@ -185,7 +199,9 @@ class PMM(Optimized, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> Tensor:
+    def data_estimator(
+        self, idx: Tensor, batch: Tensor, states: TVOVariationalStates
+    ) -> Tensor:
 
         # Not yet implemented
 

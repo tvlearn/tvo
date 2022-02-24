@@ -22,10 +22,11 @@ class NeuralVariationalStates(TVOVariationalStates):
         S: int,
         S_new: int,
         precision: to.dtype,
-        K_init_file: str = None,
+        K_init=None,
         update_decoder: bool = True,
         encoder: str = "MLP",
         sampling: str = "Gumbel",
+        n_samples: int = 1,
         lr: float = 1e-3,
         **kwargs,
     ):
@@ -35,7 +36,7 @@ class NeuralVariationalStates(TVOVariationalStates):
         :param S: Number of samples in the K set
         :param S_new: Number of samples to draw for new variational states
         :param precision: floting point precision
-        :param K_init_file: File to load the initial K matrix from
+        :param K_init: File to load the initial K matrix from. to.Tensor of shape (N, S, H)
         :param update_decoder: If true, the decoder is updated during training
         :param encoder: Type of encoder to use. Either "MLP" or "CNN".
         :param sampling: Type of sampling to use. Currently only "Gumbel Softmax" is supported.
@@ -44,8 +45,11 @@ class NeuralVariationalStates(TVOVariationalStates):
         self.update_decoder = update_decoder
         self.encoder = encoder
         self.sampling = sampling
-        self.n_samples = S  # number of samples to draw from gumbel distribution per update cycle
-
+        self.n_samples = n_samples  # number of samples to draw from sampling distribution per update cycle
+        self.N = N
+        self.S = S
+        self.S_new = S_new
+        self.H = H
         # picking a model
         if encoder == "MLP":
             self.encoder = MLP(**kwargs)
@@ -75,13 +79,13 @@ class NeuralVariationalStates(TVOVariationalStates):
             precision=precision,
             encoder=encoder,
             sampling=sampling,
-            k_init_file=K_init_file,
+            K_init=K_init,
             update_decoder=update_decoder,
         )
         for k, v in kwargs.items():
             config[k] = v
 
-        super().__init__(config)
+        super().__init__(config, K_init=K_init)
 
     def gumbel_softmax_sampling(
         self, logits: Tensor, temperature: float = 1.0, hard: bool = True
@@ -93,19 +97,18 @@ class NeuralVariationalStates(TVOVariationalStates):
         :param hard: If true, the returned samples are one-hot encoded.
         """
         # sample from gumbel distribution
-        assert len(logits)//2 == len(logits)/2, "logits must be of even length"
+        assert len(logits) // 2 == len(logits) / 2, "logits must be of even length"
 
+        # reformat logits to be of shape (batch_size, model_H, 2)
+        logits_reshaped = logits.reshape(logits.shape[0], logits.shape[1] // 2, 2)
         # init states tensor
-        states = to.tensor([])
+        states = to.nn.functional.gumbel_softmax(logits_reshaped, temperature, hard)
+        # keep only the first element of the last dimension (p(x=1))
+        states = states[:, :, 0]
+        # reformat states to be of shape (batch_size, model_H)
+        states = states.reshape(logits.shape[0], logits.shape[1] // 2)
 
-        # split logits in two categories (for bernoulli latents)
-        category_A, category_B = logits[::2], logits[1::2]
-
-        # sample from gumbel distribution for a two-categorical distribution
-        for a, b in zip(category_A, category_B):
-            states = to.nn.functional.gumbel_softmax(to.cat(a,b), temperature, hard)
-
-        return states
+        return states.type(to.uint8) if hard else states
 
     def init_states(K: int, N: int, H: int, S: int, precision: to.dtype):
         raise NotImplementedError  # pragma: no cover
@@ -125,45 +128,69 @@ class NeuralVariationalStates(TVOVariationalStates):
             lpj_fn = model.log_joint
             sort_by_lpj = {}
 
+        # get number of samples to draw from the distribution
         n_samples = self.n_samples
+
+        # get the log pseudo-joints of the batch
         lpj = self.lpj
+        batch_lpj = lpj[idx]
 
+        # prepare sampling loop
         self.optimizer.zero_grad()
-        loss = 0
         q = self.encoder(batch)
+        n_subs = 0
+        loss = 0
+
+        n, k, h = self.K[idx].shape
+        new_states = to.empty((n, k, h), dtype=to.uint8, device=lpj.device)
+        new_lpj = to.empty((n, k, h), dtype=lpj.dtype, device=lpj.device)
+
+        # sample new variational states
         for i in range(n_samples):
-            # sample new variational states
-            states = self.sampling(q)
+            # get new variational states
+            new_states[:, i, :] = self.sampling(q)
 
-            # get lpj of new variational states
-            lpj_new = lpj_fn(batch, states)
-            loss -=lpj_new
+        # get lpj of new variational states
+        new_lpj = lpj_fn(batch, new_states)
 
+        # accumulate loss
+        loss = to.sum(new_lpj).requires_grad_(True)
+
+        # train the encoder
         loss.backward()
 
-        print('Average batch diff ={}'.format(lpj-loss/n_samples))
+        return update_states_for_batch(
+            new_states=new_states.to(device=self.K.device),
+            new_lpj=new_lpj.to(device=self.lpj.device),
+            idx=idx,
+            all_states=self.K,
+            all_lpj=self.lpj,
+            sort_by_lpj=sort_by_lpj,
+        )
 
-        # update K and lpj
-
-    def get_variational_states(self, q):
-        """
-        Wraps the logic of getting variational states.
-        param: q: output of encoder
-
-        """
-        if self.update_decoder:
-            return self.sampling(q)
-        else:
-            with to.no_grad():
-                warnings.warn("Sampling is used with no grad")
-                return self.sampling(q)
-
-    def update_k_lpj(self):
-        pass
+    # def update_k_lpj(self, idx: Tensor, batch: Tensor, lpj_fn, states, sort_by_lpj) -> int:
+    #     """
+    #     Update K and lpj with best samples and their lpj.
+    #     :param idx: data point indices of batch w.r.t. K
+    #     :param batch: batch of data points
+    #     :param lpj_fn: appropriate log_joint function of the model
+    #     :param states: new variational states
+    #     :param sort_by_lpj: dictionary of log_joints of the batch sorted by value
+    #     :return:
+    #     """
+    #
+    #     # get average number of variational state substitutions per datapoint
+    #     n_sub = to.sum(lpj_new > batch_lpj) / batch.shape[0]
+    #
+    #     # update lpj and K.
+    #     to.where(lpj_new > batch_lpj, states, self.K[idx]).data.copy_(states.data)
+    #     lpj[idx] = to.where(lpj_new > batch_lpj, lpj_new, batch_lpj)
+    #
+    #     return n_sub, lpj_new
 
 
 class MLP(to.nn.Module):
-    '''
+    """
     Builds an MLP.
     :param input_size: input dimensionality
     :param n_hidden: number of units per hidden layer
@@ -173,7 +200,8 @@ class MLP(to.nn.Module):
     :param dropouts: List of boolean values indicating whether to apply dropout to each layer
     :param dropout_rate: global dropout rate
     :param **kwargs: unused, for compatibility with other models
-    '''
+    """
+
     def __init__(
         self,
         input_size: int,
@@ -215,7 +243,9 @@ class MLP(to.nn.Module):
         for i in range(len(self.hidden_size)):
 
             # add  Wx + b module
-            self.add_module("layer_" + str(i), to.nn.Linear(feature_size_in, self.hidden_size[i]))
+            self.add_module(
+                "layer_" + str(i), to.nn.Linear(feature_size_in, self.hidden_size[i])
+            )
 
             # optionally apply dropout
             if self.dropouts[i]:
@@ -249,4 +279,3 @@ class CNN(to.nn.Module):
     def __init__(self, **kwargs):
         super(CNN, self).__init__()
         raise NotImplementedError  # pragma: no cover
-

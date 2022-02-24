@@ -130,7 +130,9 @@ class CyclicLR(_LRScheduler):
         self.max_lrs = self._format_param("max_lr", optimizer, max_lr)
 
         step_size_up = float(step_size_up)
-        step_size_down = float(step_size_down) if step_size_down is not None else step_size_up
+        step_size_down = (
+            float(step_size_down) if step_size_down is not None else step_size_up
+        )
         self.total_size = step_size_up + step_size_down
         self.step_ratio = step_size_up / self.total_size
 
@@ -161,12 +163,18 @@ class CyclicLR(_LRScheduler):
                     "optimizer must support momentum with `cycle_momentum` option enabled"
                 )
 
-            base_momentums = self._format_param("base_momentum", optimizer, base_momentum)
+            base_momentums = self._format_param(
+                "base_momentum", optimizer, base_momentum
+            )
             if last_epoch == -1:
                 for momentum, group in zip(base_momentums, optimizer.param_groups):
                     group["momentum"] = momentum
-            self.base_momentums = list(map(lambda group: group["momentum"], optimizer.param_groups))
-            self.max_momentums = self._format_param("max_momentum", optimizer, max_momentum)
+            self.base_momentums = list(
+                map(lambda group: group["momentum"], optimizer.param_groups)
+            )
+            self.max_momentums = self._format_param(
+                "max_momentum", optimizer, max_momentum
+            )
 
         super(CyclicLR, self).__init__(optimizer, last_epoch)
 
@@ -216,12 +224,16 @@ class CyclicLR(_LRScheduler):
 
         if self.cycle_momentum:
             momentums = []
-            for base_momentum, max_momentum in zip(self.base_momentums, self.max_momentums):
+            for base_momentum, max_momentum in zip(
+                self.base_momentums, self.max_momentums
+            ):
                 base_height = (max_momentum - base_momentum) * scale_factor
                 if self.scale_mode == "cycle":
                     momentum = max_momentum - base_height * self.scale_fn(cycle)
                 else:
-                    momentum = max_momentum - base_height * self.scale_fn(self.last_epoch)
+                    momentum = max_momentum - base_height * self.scale_fn(
+                        self.last_epoch
+                    )
                 momentums.append(momentum)
             for param_group, momentum in zip(self.optimizer.param_groups, momentums):
                 param_group["momentum"] = momentum

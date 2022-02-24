@@ -76,7 +76,8 @@ class _TrainingAndOrValidation(Experiment):
             self.test_states = self._make_states(N, H, self._precision, estep_conf)
 
         will_reconstruct = (
-            self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
+            self._conf.reco_epochs is not None
+            or self._conf.warmup_reco_epochs is not None
         )
         self.trainer = Trainer(
             self.model,
@@ -96,7 +97,10 @@ class _TrainingAndOrValidation(Experiment):
             dataset = dataset.to(dtype=self._precision)
         dataset = dataset.to(device=tvo.get_device())
         return TVODataLoader(
-            dataset, batch_size=conf.batch_size, shuffle=conf.shuffle, drop_last=conf.drop_last
+            dataset,
+            batch_size=conf.batch_size,
+            shuffle=conf.shuffle,
+            drop_last=conf.drop_last,
         )
 
     def _make_states(
@@ -128,7 +132,8 @@ class _TrainingAndOrValidation(Experiment):
             pprint("Warm-up E-steps")
         for e in range(self._conf.warmup_Esteps):
             compute_reconstruction = (
-                self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs
+                self._conf.warmup_reco_epochs is not None
+                and e in self._conf.warmup_reco_epochs
             )
             d = trainer.e_step(compute_reconstruction)
             self._log_epoch(logger, d)
@@ -188,12 +193,21 @@ class _TrainingAndOrValidation(Experiment):
 
             # log_kind is one of "train", "valid" or "test"
             # (while data_kind is one of "train" or "test")
-            log_kind = "valid" if data_kind == "test" and self.train_data is not None else data_kind
+            log_kind = (
+                "valid"
+                if data_kind == "test" and self.train_data is not None
+                else data_kind
+            )
 
             # log F and subs to stdout and file
             F, subs = get(epoch_results, f"{data_kind}_F", f"{data_kind}_subs")
-            assert not (math.isnan(F) or math.isinf(F)), f"{log_kind} free energy is invalid!"
-            F_and_subs_dict = {f"{log_kind}_F": to.tensor(F), f"{log_kind}_subs": to.tensor(subs)}
+            assert not (
+                math.isnan(F) or math.isinf(F)
+            ), f"{log_kind} free energy is invalid!"
+            F_and_subs_dict = {
+                f"{log_kind}_F": to.tensor(F),
+                f"{log_kind}_subs": to.tensor(subs),
+            }
             logger.append(**F_and_subs_dict)
 
             # log latest states and lpj to file
@@ -266,10 +280,14 @@ class Training(_TrainingAndOrValidation):
         """
         if tvo.get_run_policy() == "mpi":
             init_processes()
-        train_dataset = get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
+        train_dataset = get_h5_dataset_to_processes(
+            train_data_file, ("train_data", "data")
+        )
         val_dataset = None
         if val_data_file is not None:
-            val_dataset = get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
+            val_dataset = get_h5_dataset_to_processes(
+                val_data_file, ("val_data", "data")
+            )
 
         setattr(conf, "train_dataset", train_data_file)
         setattr(conf, "val_dataset", val_data_file)
@@ -277,7 +295,9 @@ class Training(_TrainingAndOrValidation):
 
 
 class Testing(_TrainingAndOrValidation):
-    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: Trainable, data_file: str):
+    def __init__(
+        self, conf: ExpConfig, estep_conf: EStepConfig, model: Trainable, data_file: str
+    ):
         """Test given model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.

@@ -41,7 +41,10 @@ class GMM(Optimized, Sampler, Reconstructor):
                           torch.float64.
 
         """
-        assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
+        assert precision in (
+            to.float32,
+            to.float64,
+        ), "precision must be one of torch.float{32,64}"
         self._precision = precision
 
         device = tvo.get_device()
@@ -68,7 +71,11 @@ class GMM(Optimized, Sampler, Reconstructor):
         self._theta = {"pies": pies_init, "W": W_init, "sigma2": sigma2_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
-            "W": [None, to.full_like(self._theta["W"], -inf), to.full_like(self._theta["W"], inf)],
+            "W": [
+                None,
+                to.full_like(self._theta["W"], -inf),
+                to.full_like(self._theta["W"], inf),
+            ],
             "pies": [
                 None,
                 to.full_like(self._theta["pies"], eps),
@@ -98,7 +105,8 @@ class GMM(Optimized, Sampler, Reconstructor):
             Kfloat, self.theta["W"].t()
         )  # N,C,D  # TODO Pre-allocate tensor and use `out` argument of to.matmul
         lpj = to.mul(
-            to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
+            to.sum(to.pow(Wbar - data[:, None, :], 2), dim=2),
+            -1 / 2 / self.theta["sigma2"],
         ) + to.matmul(Kfloat, to.log(self.theta["pies"]))
         return lpj.to(device=states.device)
 
@@ -114,14 +122,20 @@ class GMM(Optimized, Sampler, Reconstructor):
         K = states.K[idx]
         batch_size, S, _ = K.shape
 
-        Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
+        Kfloat = K.to(
+            dtype=lpj.dtype
+        )  # TODO Find solution to avoid byte->float casting
         Wbar = to.matmul(
             Kfloat, self.theta["W"].t()
         )  # N,S,D # TODO Find solution to re-use evaluations from E-step
 
-        batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H) mean_posterior(Kfloat, lpj)
+        batch_s_pjc = mean_posterior(
+            Kfloat, lpj
+        )  # is (batch_size,H) mean_posterior(Kfloat, lpj)
         batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
-        batch_sigma2 = mean_posterior(to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj)
+        batch_sigma2 = mean_posterior(
+            to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
+        )
 
         self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
         self.my_Wp.add_(to.sum(batch_Wp, dim=0))
@@ -192,7 +206,10 @@ class GMM(Optimized, Sampler, Reconstructor):
             shape = hidden_state.shape
             if N is None:
                 N = shape[0]
-            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            assert shape == (
+                N,
+                H,
+            ), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         Wbar = to.zeros((N, D), dtype=precision, device=device)
@@ -203,11 +220,15 @@ class GMM(Optimized, Sampler, Reconstructor):
                     Wbar[n] += self.theta["W"][:, h]
 
         # Add noise according to the model parameters
-        Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn((N, D), dtype=precision, device=device)
+        Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn(
+            (N, D), dtype=precision, device=device
+        )
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> Tensor:
+    def data_estimator(
+        self, idx: Tensor, batch: Tensor, states: TVOVariationalStates
+    ) -> Tensor:
 
         # Not yet implemented
 

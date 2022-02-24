@@ -59,7 +59,9 @@ class EVOConfig(EStepConfig):
             not crossover or n_children is None
         ), "Exactly one of n_children and crossover may be provided."
         valid_selections = ("fitness", "uniform")
-        assert parent_selection in valid_selections, f"Unknown parent selection {parent_selection}"
+        assert (
+            parent_selection in valid_selections
+        ), f"Unknown parent selection {parent_selection}"
         valid_mutations = ("sparsity", "uniform")
         assert mutation in valid_mutations, f"Unknown mutation {mutation}"
         assert (
@@ -85,7 +87,9 @@ class EVOConfig(EStepConfig):
 
 
 class NeuralEMConfig(EStepConfig):
-    """returns the appropriate config without the need to expose the individual neural configs to the outer scope"""
+    """
+    Configuration object for Neural EM E-step.
+    """
 
     def __init__(
         self,
@@ -100,6 +104,8 @@ class NeuralEMConfig(EStepConfig):
         dropout_rate: float = None,
         output_activation=None,
         lr: float = None,
+        sampling: str = "Gumbel",
+        K_init=None,
     ):
         """
         :param encoder: encoder type to use. Must be one of: MLP, CNN
@@ -113,6 +119,9 @@ class NeuralEMConfig(EStepConfig):
         :param dropout_rate: dropout rate for the encoder
         :param output_activation: activation for the output layer.
         :param lr: learning rate for the optimizer of the encoder
+        :param sampling: sampling method to use. Must be one of: Gumbel
+        :param K_init: initial K set to use. If None, a random set of states is used. To.tensor.
+
         """
         super().__init__(n_states)
         self.n_samples = n_samples
@@ -129,6 +138,7 @@ class NeuralEMConfig(EStepConfig):
             self.lr = lr
 
             self.MLP_sanity_check()
+            self.K_init = K_init
 
         elif encoder == "CNN":
             raise NotImplementedError  # pragma: no cover
@@ -136,10 +146,17 @@ class NeuralEMConfig(EStepConfig):
         else:
             raise ValueError(f"Unknown encoder {encoder}")
 
+        if sampling == "Gumbel":
+            self.output_size *= 2
+        else:
+            raise ValueError(f"Unknown sampling method {sampling}")
+
     def MLP_sanity_check(self):
         assert self.n_hidden is not None, "n_hidden must be specified for MLP encoder"
         assert self.dropouts is not None, "dropouts must be specified for MLP encoder"
-        assert self.dropout_rate is not None, "dropout_rate must be specified for MLP encoder"
+        assert (
+            self.dropout_rate is not None
+        ), "dropout_rate must be specified for MLP encoder"
         assert (
             len(self.n_hidden) == len(self.activations) == len(self.dropouts)
         ), "hidden units, activations and dropouts must be equal."
@@ -165,7 +182,9 @@ class TVSConfig(EStepConfig):
         :param K_init_file: Full path to H5 file providing initial states
         """
         assert n_states > 0, f"n_states must be positive integer ({n_states})"
-        assert n_prior_samples > 0, f"n_prior_samples must be positive integer ({n_prior_samples})"
+        assert (
+            n_prior_samples > 0
+        ), f"n_prior_samples must be positive integer ({n_prior_samples})"
         assert (
             n_marginal_samples > 0
         ), f"n_marginal_samples must be positive integer ({n_marginal_samples})"
@@ -200,7 +219,11 @@ class FullEMSingleCauseConfig(EStepConfig):
 
 class RandomSamplingConfig(EStepConfig):
     def __init__(
-        self, n_states: int, n_samples: int, sparsity: float = 0.5, K_init_file: str = None
+        self,
+        n_states: int,
+        n_samples: int,
+        sparsity: float = 0.5,
+        K_init_file: str = None,
     ):
         """Configuration object for random sampling.
 

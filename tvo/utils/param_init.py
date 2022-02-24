@@ -54,7 +54,10 @@ def init_sigma2_default(
 
 
 def init_pies_default(
-    H: int, crowdedness: float = 2.0, dtype: to.dtype = to.float64, device: to.device = None
+    H: int,
+    crowdedness: float = 2.0,
+    dtype: to.dtype = to.float64,
+    device: to.device = None,
 ):
     """Initialize pi parameter based on given crowdedness.
 

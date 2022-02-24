@@ -51,14 +51,24 @@ class Trainer:
             assert (data is not None) == (
                 states is not None
             ), "Please provide both dataset and variational states, or neither"
-        train_data = TVODataLoader(train_data) if isinstance(train_data, to.Tensor) else train_data
-        test_data = TVODataLoader(test_data) if isinstance(test_data, to.Tensor) else test_data
+        train_data = (
+            TVODataLoader(train_data)
+            if isinstance(train_data, to.Tensor)
+            else train_data
+        )
+        test_data = (
+            TVODataLoader(test_data) if isinstance(test_data, to.Tensor) else test_data
+        )
         self.can_train = train_data is not None and train_states is not None
         self.can_test = test_data is not None and test_states is not None
         if not self.can_train and not self.can_test:  # pragma: no cover
-            raise RuntimeError("Please provide at least one pair of dataset and variational states")
+            raise RuntimeError(
+                "Please provide at least one pair of dataset and variational states"
+            )
 
-        _d, _s = (train_data, train_states) if self.can_train else (test_data, test_states)
+        _d, _s = (
+            (train_data, train_states) if self.can_train else (test_data, test_states)
+        )
         assert _d is not None and _s is not None
         if isinstance(model, Optimized):
             model.init_storage(_s.config["S"], _s.config["S_new"], _d.batch_size)
@@ -83,7 +93,9 @@ class Trainer:
             if self.will_reconstruct:
                 self.test_reconstruction = test_data.dataset.tensors[1].clone()
         self._to_rollback = rollback_if_F_decreases
-        self.data_transform = data_transform if data_transform is not None else lambda x: x
+        self.data_transform = (
+            data_transform if data_transform is not None else lambda x: x
+        )
 
     @staticmethod
     def _do_e_step(
@@ -140,7 +152,9 @@ class Trainer:
 
         # Training #
         if self.can_train:
-            assert train_data is not None and train_states is not None  # to make mypy happy
+            assert (
+                train_data is not None and train_states is not None
+            )  # to make mypy happy
             ret["train_F"], ret["train_subs"], train_rec = self._do_e_step(
                 train_data,
                 train_states,
@@ -154,9 +168,16 @@ class Trainer:
 
         # Validation/Testing #
         if self.can_test:
-            assert test_data is not None and test_states is not None  # to make mypy happy
+            assert (
+                test_data is not None and test_states is not None
+            )  # to make mypy happy
             ret["test_F"], ret["test_subs"], test_rec = self._do_e_step(
-                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+                test_data,
+                test_states,
+                model,
+                self.N_test,
+                self.data_transform,
+                test_reconstruction,
             )
             if test_rec is not None:
                 ret["test_rec"] = test_rec
@@ -206,9 +227,16 @@ class Trainer:
             )
             model = self.model
 
-            assert test_data is not None and test_states is not None  # to make mypy happy
+            assert (
+                test_data is not None and test_states is not None
+            )  # to make mypy happy
             res = self._do_e_step(
-                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+                test_data,
+                test_states,
+                model,
+                self.N_test,
+                self.data_transform,
+                test_reconstruction,
             )
             ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
             if test_reconstruction is not None:
@@ -267,7 +295,9 @@ class Trainer:
         ret = {}
 
         if self.can_train:
-            assert train_data is not None and train_states is not None  # to make mypy happy
+            assert (
+                train_data is not None and train_states is not None
+            )  # to make mypy happy
             F = to.tensor(0.0)
             if isinstance(m, Optimized):
                 m.init_epoch()
@@ -282,7 +312,9 @@ class Trainer:
             ret["train_subs"] = 0
 
         if self.can_test:
-            assert test_data is not None and test_states is not None  # to make mypy happy
+            assert (
+                test_data is not None and test_states is not None
+            )  # to make mypy happy
             F = to.tensor(0.0)
             if isinstance(m, Optimized):
                 m.init_epoch()
@@ -309,17 +341,23 @@ class Trainer:
         m = self.model
         lpj_fn = m.log_pseudo_joint if isinstance(m, Optimized) else m.log_joint
 
-        assert self.train_data is not None and self.train_states is not None  # to make mypy happy
+        assert (
+            self.train_data is not None and self.train_states is not None
+        )  # to make mypy happy
         all_data = self.train_data.dataset.tensors[1]
         states = self.train_states
 
         old_params = {p: m.theta[p].clone() for p in self._to_rollback}
-        old_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        old_F = m.free_energy(
+            idx=to.arange(all_data.shape[0]), batch=all_data, states=states
+        )
         all_reduce(old_F)
         old_lpj = states.lpj.clone()
         m.update_param_epoch()
         states.lpj[:] = lpj_fn(all_data, states.K)
-        new_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        new_F = m.free_energy(
+            idx=to.arange(all_data.shape[0]), batch=all_data, states=states
+        )
         all_reduce(new_F)
         if new_F < old_F:
             for p in self._to_rollback:

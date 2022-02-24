@@ -53,7 +53,10 @@ class BSC(Optimized, Sampler, Reconstructor):
                           torch.float64.
 
         """
-        assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
+        assert precision in (
+            to.float32,
+            to.float64,
+        ), "precision must be one of torch.float{32,64}"
         self._precision = precision
 
         device = tvo.get_device()
@@ -66,7 +69,11 @@ class BSC(Optimized, Sampler, Reconstructor):
             broadcast(W_init)
 
         if pies_init is not None:
-            assert pies_init.shape == (H,) if individual_priors else pies_init.shape == (1,)
+            assert (
+                pies_init.shape == (H,)
+                if individual_priors
+                else pies_init.shape == (1,)
+            )
             pies_init = pies_init.to(dtype=precision, device=device)
         else:
             pies_init = (
@@ -84,7 +91,11 @@ class BSC(Optimized, Sampler, Reconstructor):
         self._theta = {"pies": pies_init, "W": W_init, "sigma2": sigma2_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
-            "W": [None, to.full_like(self._theta["W"], -inf), to.full_like(self._theta["W"], inf)],
+            "W": [
+                None,
+                to.full_like(self._theta["W"], -inf),
+                to.full_like(self._theta["W"], inf),
+            ],
             "pies": [
                 None,
                 to.full_like(self._theta["pies"], eps),
@@ -103,7 +114,11 @@ class BSC(Optimized, Sampler, Reconstructor):
         self.my_sigma2 = to.zeros(1, dtype=precision, device=device)
         self.my_N = to.tensor([0], dtype=to.int, device=device)
         self._config = dict(
-            H=H, D=D, individual_priors=individual_priors, precision=precision, device=device
+            H=H,
+            D=D,
+            individual_priors=individual_priors,
+            precision=precision,
+            device=device,
         )
         self._shape = self.theta["W"].shape
 
@@ -118,11 +133,13 @@ class BSC(Optimized, Sampler, Reconstructor):
         Kpriorterm = (
             to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
             if self.config["individual_priors"]
-            else to.log(self.theta["pies"] / (1 - self.theta["pies"])) * Kfloat.sum(dim=2)
+            else to.log(self.theta["pies"] / (1 - self.theta["pies"]))
+            * Kfloat.sum(dim=2)
         )
         lpj = (
             to.mul(
-                to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
+                to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2),
+                -1 / 2 / self.theta["sigma2"],
             )
             + Kpriorterm
         )
@@ -139,14 +156,22 @@ class BSC(Optimized, Sampler, Reconstructor):
             if self.config["individual_priors"]
             else H * to.log(1 - self.theta["pies"])
         )
-        return lpj + priorterm - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
+        return (
+            lpj
+            + priorterm
+            - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
+        )
 
-    def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> None:
+    def update_param_batch(
+        self, idx: Tensor, batch: Tensor, states: TVOVariationalStates
+    ) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
         batch_size, S, _ = K.shape
 
-        Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
+        Kfloat = K.to(
+            dtype=lpj.dtype
+        )  # TODO Find solution to avoid byte->float casting
         Wbar = to.matmul(
             Kfloat, self.theta["W"].t()
         )  # TODO Find solution to re-use evaluations from E-step
@@ -232,7 +257,10 @@ class BSC(Optimized, Sampler, Reconstructor):
             shape = hidden_state.shape
             if N is None:
                 N = shape[0]
-            assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+            assert shape == (
+                N,
+                H,
+            ), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         Wbar = to.zeros((N, D), dtype=precision, device=device)
@@ -244,11 +272,15 @@ class BSC(Optimized, Sampler, Reconstructor):
                     Wbar[n] += self.theta["W"][:, h]
 
         # Add noise according to the model parameters
-        Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn((N, D), dtype=precision, device=device)
+        Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn(
+            (N, D), dtype=precision, device=device
+        )
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> Tensor:
+    def data_estimator(
+        self, idx: Tensor, batch: Tensor, states: TVOVariationalStates
+    ) -> Tensor:
         """Estimator used for data reconstruction. Data reconstruction can only be supported
         by a model if it implements this method. The estimator to be implemented is defined
         as follows:""" r"""

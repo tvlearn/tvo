@@ -25,7 +25,9 @@ def fix_theta(theta: Dict[str, Tensor], policy: Dict[str, List]):
     - the values in tensors from the theta dictionary are clamped to the corresponding values
     of low_bound and up_bound.
     """
-    assert set(theta.keys()) == set(policy.keys()), "theta and policy must have same keys"
+    assert set(theta.keys()) == set(
+        policy.keys()
+    ), "theta and policy must have same keys"
 
     rank = dist.get_rank() if dist.is_initialized() else 0
 

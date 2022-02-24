@@ -148,7 +148,9 @@ class Optimized(Trainable, Protocol):
     """Additionally implements log_pseudo_joint, init_storage, init_batch, init_epoch."""
 
     @abstractmethod
-    def log_joint(self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None) -> to.Tensor:
+    def log_joint(
+        self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None
+    ) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
 
         :param data: shape is (N,D)

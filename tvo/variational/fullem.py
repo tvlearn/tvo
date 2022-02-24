@@ -48,7 +48,9 @@ class FullEM(TVOVariationalStates):
         super().__init__(conf, K_init)
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
-        lpj_fn = model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
+        lpj_fn = (
+            model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
+        )
 
         K = self.K
         lpj = self.lpj
@@ -67,11 +69,15 @@ class FullEMSingleCauseModels(FullEM):
         :param precision: The floating point precision of the lpj values.
                           Must be one of to.float32 or to.float64
         """
-        K_init = to.eye(H, dtype=precision, device=tvo.get_device())[None, :, :].expand(N, -1, -1)
+        K_init = to.eye(H, dtype=precision, device=tvo.get_device())[None, :, :].expand(
+            N, -1, -1
+        )
         super().__init__(N, H, precision, K_init=K_init)
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
-        lpj_fn = model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
+        lpj_fn = (
+            model.log_pseudo_joint if isinstance(model, Optimized) else model.log_joint
+        )
         assert to.any(self.K.sum(axis=1) == 1), "Multiple causes detected."
         K = self.K
         lpj = self.lpj

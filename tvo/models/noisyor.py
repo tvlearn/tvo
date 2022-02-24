@@ -34,7 +34,10 @@ class NoisyOR(Optimized, Sampler):
                           torch.float64.
         """
 
-        assert precision in (to.float32, to.float64), "precision must be one of torch.float{32,64}"
+        assert precision in (
+            to.float32,
+            to.float64,
+        ), "precision must be one of torch.float{32,64}"
         self._precision = precision
 
         device = tvo.get_device()
@@ -124,7 +127,9 @@ class NoisyOR(Optimized, Sampler):
         # Ws_nsdh = 1 - (W_dh * Kfloat_nsh)
         Ws = (self.theta["W"][None, None, :, :] * Kfloat[:, :, None, :]).neg_().add_(1)
         Ws_prod = to.prod(Ws, dim=3, keepdim=True)
-        B = Kfloat.unsqueeze(2) / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # (N,S,D,H)
+        B = Kfloat.unsqueeze(2) / (Ws * Ws_prod.neg().add_(1)).add_(
+            self.eps
+        )  # (N,S,D,H)
         self.Btilde.add_(
             (mean_posterior(B, lpj) * (batch.type_as(lpj) - 1).unsqueeze(2)).sum(dim=0)
         )
@@ -181,7 +186,10 @@ class NoisyOR(Optimized, Sampler):
         else:
             if N is not None:
                 shape = hidden_state.shape
-                assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
+                assert shape == (
+                    N,
+                    H,
+                ), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
         # py_nd = 1 - prod_h (1 - W_dh * s_nh)

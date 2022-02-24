@@ -64,14 +64,22 @@ def make_var_states(
         )
     elif isinstance(conf, RandomSamplingConfig):
         return RandomSampledVarStates(
-            N, H, conf.n_states, precision, conf.n_samples, conf.sparsity, conf.K_init_file
+            N,
+            H,
+            conf.n_states,
+            precision,
+            conf.n_samples,
+            conf.sparsity,
+            conf.K_init_file,
         )
     else:  # pragma: no cover
         raise NotImplementedError()
 
 
 def _make_EVO_var_states(conf: EVOConfig, N: int, H: int, precision: to.dtype):
-    selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
+    selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[
+        conf.parent_selection
+    ]
     mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
     return EVOVariationalStates(
         N=N,

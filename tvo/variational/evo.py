@@ -89,7 +89,12 @@ class EVOVariationalStates(TVOVariationalStates):
         lpj = self.lpj
 
         parent_selection, mutation, n_parents, n_children, n_generations = get(
-            self.config, "parent_selection", "mutation", "n_parents", "n_children", "n_generations"
+            self.config,
+            "parent_selection",
+            "mutation",
+            "n_parents",
+            "n_children",
+            "n_generations",
         )
 
         lpj[idx] = lpj_fn(batch, K[idx])
@@ -111,7 +116,12 @@ class EVOVariationalStates(TVOVariationalStates):
         )
 
         return update_states_for_batch(
-            new_states.to(device=K.device), new_lpj.to(device=lpj.device), idx, K, lpj, sort_by_lpj
+            new_states.to(device=K.device),
+            new_lpj.to(device=lpj.device),
+            idx,
+            K,
+            lpj,
+            sort_by_lpj,
         )
 
 
@@ -190,21 +200,25 @@ def evolve_states(
 
     for g in range(n_generations):
         # parent selection
-        gen_idx = to.arange(g * new_states_per_gen, (g + 1) * new_states_per_gen, device=device)
+        gen_idx = to.arange(
+            g * new_states_per_gen, (g + 1) * new_states_per_gen, device=device
+        )
         if g == 0:
             parents[:] = select(states, n_parents, lpj)
         else:
             old_gen_idx = gen_idx - new_states_per_gen
-            parents[:] = select(new_states[:, old_gen_idx], n_parents, new_lpj[:, old_gen_idx])
+            parents[:] = select(
+                new_states[:, old_gen_idx], n_parents, new_lpj[:, old_gen_idx]
+            )
 
         # children generation
         new_states[:, gen_idx] = mutate(parents, n_children, sparsity, p_bf)
 
         # children fitness evaluation
         # new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
-        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx].to(device=tvo.get_device())).to(
-            device="cpu"
-        )
+        new_lpj[:, gen_idx] = lpj_fn(
+            new_states[:, gen_idx].to(device=tvo.get_device())
+        ).to(device="cpu")
 
     set_redundant_lpj_to_low(new_states, new_lpj, states)
 
@@ -220,7 +234,10 @@ def get_n_new_states(mutation: str, n_parents: int, n_children: int, n_gen: int)
 
 def get_EA(parent_selection: str, mutation: str) -> Tuple:
     """Refer to the doc of `evolve_states` for the list of valid arguments"""
-    parent_sel_dict = {"batch_fitparents": batch_fitparents, "randparents": batch_randparents}
+    parent_sel_dict = {
+        "batch_fitparents": batch_fitparents,
+        "randparents": batch_randparents,
+    }
     mutation_dict = {
         "randflip": batch_randflip,
         "sparseflip": batch_sparseflip,
@@ -246,7 +263,10 @@ supported. Valid options: {list(valid_mutations)}'
 
 
 def batch_randflip(
-    parents: Tensor, n_children: int, sparsity: Optional[float] = None, p_bf: Optional[float] = None
+    parents: Tensor,
+    n_children: int,
+    sparsity: Optional[float] = None,
+    p_bf: Optional[float] = None,
 ) -> Tensor:
     """Generate n_children new states from parents by flipping one different bit per children.
 
@@ -270,10 +290,14 @@ def batch_randflip(
 
     # Each parent is "repeated" n_children times and inserted in children.
     # We then flips bits in the children states
-    children = parents.repeat(1, 1, n_children).view(N, -1, H)  # is (N, n_parents*n_children, H)
+    children = parents.repeat(1, 1, n_children).view(
+        N, -1, H
+    )  # is (N, n_parents*n_children, H)
 
     n_idx = to.arange(N)[:, None]  # broadcastable to ind_flip shape
-    s_idx = to.arange(n_parents * n_children)[None, :]  # broadcastable to ind_flip shape
+    s_idx = to.arange(n_parents * n_children)[
+        None, :
+    ]  # broadcastable to ind_flip shape
     children[n_idx, s_idx, ind_flip] = 1 - children[n_idx, s_idx, ind_flip]
 
     return children
@@ -314,18 +338,32 @@ def batch_sparseflip(
     )
     p_0 = (H * p_bf) / (H + (alpha - 1.0) * s_abs) + eps  # is (N, n_parents)
     p_1 = alpha * p_0
-    p_0 = p_0[:, :, None].expand(-1, -1, int(H)).repeat(1, 1, n_children).view(N, -1, int(H))
-    p_1 = p_1[:, :, None].expand(-1, -1, int(H)).repeat(1, 1, n_children).view(N, -1, int(H))
+    p_0 = (
+        p_0[:, :, None]
+        .expand(-1, -1, int(H))
+        .repeat(1, 1, n_children)
+        .view(N, -1, int(H))
+    )
+    p_1 = (
+        p_1[:, :, None]
+        .expand(-1, -1, int(H))
+        .repeat(1, 1, n_children)
+        .view(N, -1, int(H))
+    )
 
     # start from children equal to the parents (with each parent repeated n_children times)
     children = parents.repeat(1, 1, n_children).view(N, n_parents * n_children, int(H))
     assert children.shape == (N, n_parents * n_children, H)
-    bool_or_byte = (to.empty(0) < 0).dtype  # BoolTensor in pytorch>=1.2, ByteTensor otherwise
+    bool_or_byte = (
+        to.empty(0) < 0
+    ).dtype  # BoolTensor in pytorch>=1.2, ByteTensor otherwise
     children_idx = children.to(bool_or_byte)
     p = to.where(children_idx, p_1, p_0)
 
     # Determine bits to be flipped and do the bitflip
-    flips = to.rand((N, n_parents * n_children, int(H)), dtype=precision, device=device) < p
+    flips = (
+        to.rand((N, n_parents * n_children, int(H)), dtype=precision, device=device) < p
+    )
     children[flips] = 1 - children[flips]
 
     return children
@@ -333,7 +371,12 @@ def batch_sparseflip(
 
 # TODO probably to be made a cython helper function for performance
 def _fill_crossed_idxs_for_batch(
-    parent_pairs, crossed_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+    parent_pairs,
+    crossed_idxs,
+    parent1_starts,
+    cutting_points_1,
+    cutting_points_2,
+    parent2_ends,
 ):
     n_pairs = parent_pairs.shape[0]
     N = parent1_starts.shape[0]
@@ -372,11 +415,18 @@ def batch_cross(parents: Tensor) -> Tensor:
     cutting_points_2 = cutting_points_1 + H
     parent2_ends = parent1_starts + 2 * H
     _fill_crossed_idxs_for_batch(
-        parent_pairs, crossed_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+        parent_pairs,
+        crossed_idxs,
+        parent1_starts,
+        cutting_points_1,
+        cutting_points_2,
+        parent2_ends,
     )
     crossed_idxs = crossed_idxs.reshape(N, n_children, H)
 
-    children = parents[np.arange(N)[:, None, None], crossed_idxs, np.arange(H)[None, None, :]]
+    children = parents[
+        np.arange(N)[:, None, None], crossed_idxs, np.arange(H)[None, None, :]
+    ]
     return children
 
 
@@ -422,7 +472,9 @@ def batch_fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     cum_p_view.insert(-1, -1)
     cum_p_view = tuple(cum_p_view)  # type: ignore
 
-    chosen_idx = cum_p.shape[-1] - 1 - (x.view(x_view) < cum_p.view(cum_p_view)).sum(dim=-1)
+    chosen_idx = (
+        cum_p.shape[-1] - 1 - (x.view(x_view) < cum_p.view(cum_p_view)).sum(dim=-1)
+    )
 
     # TODO Find solution without numpy conversion
     all_idx = to.from_numpy(np.indices(tuple(chosen_idx.shape))).to(device=device)
@@ -438,7 +490,10 @@ def batch_randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) ->
     batch_size, n_candidates, H = candidates.shape
     # for each batch, choose n_parents random idxs, concatenate all idxs together
     ind_children = to.cat(
-        tuple(to.randperm(n_candidates, device=device)[:n_parents] for _ in range(batch_size))
+        tuple(
+            to.randperm(n_candidates, device=device)[:n_parents]
+            for _ in range(batch_size)
+        )
     )
     # generate indxs for the first dimention of candidates that match ind_children, e.g.
     # [0,0,1,1,2,2] for batch_size=3 and n_parents=2
@@ -466,14 +521,20 @@ def fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
     # sample (indices of) parents according to fitness
     # TODO Find solution without numpy conversion
     ind_children = np.random.choice(
-        candidates.shape[0], size=n_parents, replace=False, p=lpj_fitness.to(device="cpu").numpy()
+        candidates.shape[0],
+        size=n_parents,
+        replace=False,
+        p=lpj_fitness.to(device="cpu").numpy(),
     )
     # is (n_parents, H)
     return candidates[to.from_numpy(ind_children).to(device=device)]
 
 
 def randflip(
-    parents: Tensor, n_children: int, sparsity: Optional[float] = None, p_bf: Optional[float] = None
+    parents: Tensor,
+    n_children: int,
+    sparsity: Optional[float] = None,
+    p_bf: Optional[float] = None,
 ) -> Tensor:
     """Generate n_children new states from parents by flipping one different bit per children."""
 
@@ -502,12 +563,16 @@ def randflip(
     # position indicated by ind_flip_flat
     ind_slice_flat = to.arange(n_children * n_parents, device=parents.device)
 
-    children[ind_slice_flat, ind_flip_flat] = 1 - children[ind_slice_flat, ind_flip_flat]
+    children[ind_slice_flat, ind_flip_flat] = (
+        1 - children[ind_slice_flat, ind_flip_flat]
+    )
 
     return children
 
 
-def cross_sparseflip(parents: Tensor, n_children: int, sparsity: float, p_bf: float) -> Tensor:
+def cross_sparseflip(
+    parents: Tensor, n_children: int, sparsity: float, p_bf: float
+) -> Tensor:
     children = sparseflip(cross(parents), 1, sparsity, p_bf)
     return children
 
@@ -542,7 +607,11 @@ def cross(parents: Tensor) -> Tensor:
     cutting_points_2 = cutting_points_1 + H
     parent2_ends = parent1_starts + 2 * H
     for pp_idx, o1, o2, o3, o4 in zip(
-        parent_pair_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+        parent_pair_idxs,
+        parent1_starts,
+        cutting_points_1,
+        cutting_points_2,
+        parent2_ends,
     ):
         parent1, parent2 = parent_pairs[pp_idx]
         crossed_idxs[o1:o2] = parent1
@@ -605,7 +674,9 @@ def sparseflip(
     p[~children_idx] = p_0[~children_idx]
 
     # Determine bits to be flipped and do the bitflip
-    flips = to.rand((n_parents * n_children, int(H)), dtype=precision, device=device) < p
+    flips = (
+        to.rand((n_parents * n_children, int(H)), dtype=precision, device=device) < p
+    )
     children[flips] = 1 - children[flips]
 
     return children
