@@ -76,8 +76,13 @@ def gaussian_denoising_example():
         ovp = OVP(noisy, args.patch_height, patch_width, patch_shift=1)
         train_data = ovp.get().t()
         store_as_h5({"data": train_data}, data_file)
+    else:
+        clean = None
     isrgb = len(bcast_shape(clean, 0)) == 3
     D = args.patch_height * patch_width * (3 if isrgb else 1)
+    barrier()
+
+    pprint("Initializing model")
 
     # initialize model
     W_init = (
@@ -103,6 +108,8 @@ def gaussian_denoising_example():
     )
     assert isinstance(model, Reconstructor)
 
+    pprint("Initializing experiment")
+
     # define hyperparameters of the variational optimization
     estep_conf = EVOConfig(
         n_states=args.Ksize,
@@ -123,7 +130,6 @@ def gaussian_denoising_example():
         log_blacklist=["train_lpj", "train_states", "train_subs", "train_reconstruction"],
         log_only_latest_theta=True,
     )
-    pprint("Initializing experiment")
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, train_data_file=data_file)
     logger, trainer = exp.logger, exp.trainer
     # append the noisy image to the data logger
@@ -157,10 +163,10 @@ def gaussian_denoising_example():
         # merge reconstructed image patches and generate reconstructed image
         gather = epoch in (reco_epochs + 1)
         assert hasattr(trainer, "train_reconstruction")
-        rec_patches = gather_from_processes(trainer.train_reconstruction).t() if gather else None
+        rec_patches = gather_from_processes(trainer.train_reconstruction) if gather else None
         merge = gather and comm_rank == 0
         imgs = {
-            k: ovp.set_and_merge(rec_patches, merge_method=v) if merge else None
+            k: ovp.set_and_merge(rec_patches.t(), merge_method=v) if merge else None
             for k, v in merge_strategies.items()
         }
         barrier()
