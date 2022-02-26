@@ -114,6 +114,9 @@ def feature_learning():
             viz_every=args.viz_every if args.viz_every is not None else args.no_epochs,
             datapoints=data[np.random.permutation(data.shape[0])[:16]],
             patch_size=args.patch_size,
+            sort_acc_to_desc_priors=True,
+            ncol_gfs=16,
+            gif_framerate=args.gif_framerate,
         )
     )
     barrier()
@@ -124,14 +127,23 @@ def feature_learning():
 
         # visualize epoch
         if comm_rank == 0:
-            assert isinstance(visualizer, Visualizer)  # to make mypy happy
             visualizer.process_epoch(
-                epoch=epoch, F=summary._results["train_F"], theta=exp.trainer.model.theta
+                epoch=epoch,
+                F=summary._results["train_F"],
+                pies=model.theta["pies"],
+                gfs=model.theta["W"],
             )
+        barrier()
 
     barrier()
 
     pprint("Finished")
+
+    if comm_rank == 0:
+        assert isinstance(visualizer, Visualizer)  # to make mypy happy
+        visualizer.finalize()
+
+    barrier()
 
 
 if __name__ == "__main__":
