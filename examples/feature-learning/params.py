@@ -95,7 +95,7 @@ def get_args():
         "--no_epochs",
         type=int,
         help="Number of epochs to train",
-        default=100,
+        default=300,
     )
 
     p.add_argument(
@@ -103,6 +103,14 @@ def get_args():
         type=int,
         help="Create visualizations every Xth epoch. Set to no_epochs if not specified.",
         default=1,
+    )
+
+    p.add_argument(
+        "--gif_framerate",
+        type=str,
+        help="If specified, the training output will be additionally saved as animated gif. The "
+        "framerate is given in frames per second. If not specified, no gif will be produced.",
+        default=None,
     )
 
     return p.parse_args()
