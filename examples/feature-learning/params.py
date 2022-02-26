@@ -14,8 +14,8 @@ def get_args():
     p.add_argument(
         "--image_file",
         type=str,
-        help="Full path to image file (.png, .jpg, ...) used to extract training patches",
-        default="./data/barbara.png",
+        help="Full path to image file (.png, .jpg, .tiff, ...) used to extract training patches",
+        default="./data/image.tiff",
     )
 
     p.add_argument(
@@ -23,14 +23,14 @@ def get_args():
         type=int,
         nargs=2,
         help="Patch size, (height, width) tuple",
-        default=(8, 8),
+        default=(10, 10),
     )
 
     p.add_argument(
         "--no_patches",
         type=int,
         help="Number of image patches to extract for training",
-        default=1000,
+        default=5000,
     )
 
     p.add_argument(
@@ -45,7 +45,7 @@ def get_args():
         "-H",
         type=int,
         help="Number of generative fields to learn",
-        default=20,
+        default=128,
     )
 
     p.add_argument(
@@ -95,7 +95,7 @@ def get_args():
         "--no_epochs",
         type=int,
         help="Number of epochs to train",
-        default=40,
+        default=100,
     )
 
     p.add_argument(

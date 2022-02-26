@@ -6,12 +6,13 @@ import os
 import sys
 import time
 import datetime
+import numpy as np
 import torch as to
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
 from tvo.models import BSC
-from tvo.utils.parallel import pprint, broadcast, barrier
+from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 
 from params import get_args
@@ -56,9 +57,11 @@ def feature_learning():
         if comm_rank == 0
         else None
     )
-    broadcast(data)
-    D = data.shape[1]
+    N, D = bcast_shape(data, 0)
+    if comm_rank != 0:
+        data = to.zeros(N, D, **dtype_device_kwargs)
     barrier()
+    broadcast(data)
 
     # initialize model
     pprint("Initializing model")
@@ -109,7 +112,7 @@ def feature_learning():
         else Visualizer(  # type: ignore
             output_directory=output_directory,
             viz_every=args.viz_every if args.viz_every is not None else args.no_epochs,
-            datapoints=data[:15],
+            datapoints=data[np.random.permutation(data.shape[0])[:16]],
             patch_size=args.patch_size,
         )
     )

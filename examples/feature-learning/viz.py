@@ -20,10 +20,11 @@ class Visualizer(object):
         sort_acc_to_desc_priors=True,
         positions={
             "datapoints": [0.0, 0.0, 0.07, 0.94],
-            "W": [0.2, 0.0, 0.1, 0.94],
-            "F": [0.4, 0.6, 0.58, 0.38],
-            "pies": [0.4, 0.1, 0.58, 0.38],
+            "W": [0.08, 0.00, 0.40, 0.94],
+            "F": [0.6, 0.6, 0.38, 0.38],
+            "pies": [0.6, 0.1, 0.38, 0.38],
         },
+        global_clims=False,
     ):
         self._output_directory = output_directory
         self._viz_every = viz_every
@@ -31,6 +32,7 @@ class Visualizer(object):
         self._patch_size = patch_size
         self._sort_acc_to_desc_priors = sort_acc_to_desc_priors
         self._cmap_weights = self._cmap_datapoints = plt.cm.jet
+        self._global_clims = global_clims
         self._labelsize = 10
         self._legendfontsize = 8
 
@@ -46,17 +48,17 @@ class Visualizer(object):
         datapoints = self._datapoints
         N, D = datapoints.shape
         patch_height, patch_width = self._patch_size
-        no_channels = D / patch_height / patch_width
+        no_channels = int(D / patch_height / patch_width)
         grid, cmap, vmin, vmax, scale_suff = make_grid_with_black_boxes_and_white_background(
             images=datapoints.numpy().reshape(N, no_channels, patch_height, patch_width),
             nrow=int(math.ceil(N / 16)),
-            surrounding=4,
+            surrounding=0,
             padding=8,
             repeat=20,
-            global_clim=True,
+            global_clim=self._global_clims,
             sym_clim=True,
             cmap=self._cmap_datapoints,
-            eps=0.02,
+            eps=0.01,
         )
 
         self._handles["datapoints"] = ax.imshow(np.squeeze(grid), interpolation="none")
@@ -71,7 +73,7 @@ class Visualizer(object):
         ax = self._axes["W"]
         D, H = W.shape
         patch_height, patch_width = self._patch_size
-        no_channels = D / patch_height / patch_width
+        no_channels = int(D / patch_height / patch_width)
         W = W.numpy()[:, inds_sort] if inds_sort is not None else W.numpy().copy()
         grid, cmap, vmin, vmax, scale_suff = make_grid_with_black_boxes_and_white_background(
             images=W.T.reshape(H, no_channels, patch_height, patch_width),
@@ -79,10 +81,10 @@ class Visualizer(object):
             surrounding=4,
             padding=8,
             repeat=20,
-            global_clim=True,
+            global_clim=self._global_clims,
             sym_clim=True,
             cmap=self._cmap_weights,
-            eps=0.02,
+            eps=0.01,
         )
 
         if self._handles["W"] is None:
@@ -134,18 +136,29 @@ class Visualizer(object):
             ax.set_xlabel(r"$h$", fontsize=self._labelsize)
             ax.set_ylabel(r"$\pi_h$ @ {}".format(epoch), fontsize=self._labelsize)
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            self._handles["pies_summed"] = ax.text(
+                0.75,
+                0.85,
+                r"$\sum_h \pi_h$ = " + "{:.2f}".format(pies.sum()),
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+            )
         else:
             self._handles["pies"].set_xdata(xdata)
             self._handles["pies"].set_ydata(ydata_learned)
             ax.set_ylabel(r"$\pi_h$ @ {}".format(epoch), fontsize=self._labelsize)
             ax.relim()
             ax.autoscale_view()
+            self._handles["pies_summed"].set_text(
+                r"$\sum_h \pi_h$ = " + "{:.2f}".format(pies.sum())
+            )
 
     def _viz_epoch(self, epoch, F, theta):
         inds_sort = (
             to.argsort(theta["pies"], descending=True) if self._sort_acc_to_desc_priors else None
         )
-        self._viz_weights(epoch, theta["W"])
+        self._viz_weights(epoch, theta["W"], inds_sort=inds_sort)
         self._viz_pies(epoch, theta["pies"], inds_sort=inds_sort)
         self._viz_free_energy()
 
@@ -161,9 +174,6 @@ class Visualizer(object):
 
     def _save_epoch(self, epoch):
         output_directory = self._output_directory
-        png_file = "{}/training{}.png".format(
-            output_directory,
-            "_epoch{:04d}".format(epoch) if self._gif_framerate is not None else "",
-        )
-        plt.savefig(png_file)
+        png_file = "{}/training.png".format(output_directory)
+        self._fig.savefig(png_file)
         print("\tWrote " + png_file)
