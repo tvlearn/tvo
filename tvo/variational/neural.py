@@ -28,6 +28,7 @@ class NeuralVariationalStates(TVOVariationalStates):
         sampling: str = "Gumbel",
         n_samples: int = 1,
         lr: float = 1e-3,
+        training=True,
         **kwargs,
     ):
         """
@@ -42,35 +43,7 @@ class NeuralVariationalStates(TVOVariationalStates):
         :param sampling: Type of sampling to use. Currently only "Gumbel Softmax" is supported.
         """
 
-        self.update_decoder = update_decoder
-        self.encoder = encoder
-        self.sampling = sampling
-        self.n_samples = n_samples  # number of samples to draw from sampling distribution per update cycle
-        self.N = N
-        self.S = S
-        self.S_new = S_new
-        self.H = H
-        # picking a model
-        if encoder == "MLP":
-            self.encoder = MLP(**kwargs)
-        elif encoder == "CNN":
-            self.encoder = CNN(**kwargs)
-        else:
-            raise ValueError(f"Unknown model: {encoder}")  # pragma: no cover
-
-        # picking sampling method
-        if sampling == "Gumbel":
-            assert (
-                kwargs["output_activation"] == to.nn.Identity
-            ), "output_activation must be nn.Identity for gumbel-Softmax"
-            self.sampling = self.gumbel_softmax_sampling
-        else:
-            raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
-
-        # picking an optimizer
-        self.optimizer = to.optim.Adam(self.encoder.parameters(), lr=lr)
-
-        # building full config
+        # build full config
         config = dict(
             N=N,
             H=H,
@@ -82,10 +55,59 @@ class NeuralVariationalStates(TVOVariationalStates):
             K_init=K_init,
             update_decoder=update_decoder,
         )
+        # add any  kwargs to config
         for k, v in kwargs.items():
             config[k] = v
-
+        # init TVOariationalStates
         super().__init__(config, K_init=K_init)
+
+        # save parameters
+        self.update_decoder = update_decoder
+        self.encoder = encoder
+        self.sampling = sampling
+        self.n_samples = n_samples  # number of samples to draw from sampling distribution per update cycle
+        self.N = N
+        self.S = S
+        self.S_new = S_new
+        self.H = H
+
+        # picking a model
+        if encoder == "MLP":
+            self.encoder = MLP(**kwargs)
+        elif encoder == "CNN":
+            self.encoder = CNN(**kwargs)
+        else:
+            raise ValueError(f"Unknown model: {encoder}")  # pragma: no cover
+
+        # select sampling method
+        if sampling == "Gumbel":
+            assert (
+                kwargs["output_activation"] == to.nn.Identity
+            ), "output_activation must be nn.Identity for gumbel-Softmax"
+            self.sampling = self.gumbel_softmax_sampling
+        elif sampling == "Independent Bernoullis":
+            assert(kwargs["output_activation"] == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
+            assert(kwargs["loss_function"] == "BCE"), "loss_function must be Binary Crossentropy"
+            self.sampling = self.independent_bernoullis_sampling
+        else:
+            raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
+
+        # select a loss function
+        self.loss_name = kwargs["loss_function"]
+        assert self.loss_name in ["BCE", "LPJ"], "loss_function must be either BCE or LPJ"
+
+        if self.loss_name == "BCE":
+            self.loss_function = to.nn.BCELoss()
+        elif self.loss_name == "LPJ":
+            self.loss_function = self.lpj_loss
+        else:
+            raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
+
+        # picking an optimizer
+        self.optimizer = to.optim.Adam(self.encoder.parameters(), lr=lr)
+
+        # set training or evaluation mode
+        self.set_training(training)
 
     def gumbel_softmax_sampling(
         self, logits: Tensor, temperature: float = 1.0, hard: bool = True
@@ -110,6 +132,13 @@ class NeuralVariationalStates(TVOVariationalStates):
 
         return states.type(to.uint8) if hard else states
 
+    def independent_bernoullis_sampling(self, logits: Tensor, hard: bool = True) -> Tensor:
+        # assert that pies are in [0, 1]
+        assert to.min(logits) >= 0 and to.max(logits) <= 1, "pies must be in [0, 1]"
+        # sample from bernoullis
+        states = to.bernoulli(logits).type(to.uint8) if hard else logits
+        return states
+
     def init_states(K: int, N: int, H: int, S: int, precision: to.dtype):
         raise NotImplementedError  # pragma: no cover
 
@@ -121,6 +150,8 @@ class NeuralVariationalStates(TVOVariationalStates):
         :param model: the model being used
         :returns: average number of variational state substitutions per datapoint performed
         """
+
+        # get log (pseudo)joints of the current variational states
         if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
             sort_by_lpj = model.sorted_by_lpj
@@ -128,37 +159,44 @@ class NeuralVariationalStates(TVOVariationalStates):
             lpj_fn = model.log_joint
             sort_by_lpj = {}
 
-        # get number of samples to draw from the distribution
-        n_samples = self.n_samples
-
         # get the log pseudo-joints of the batch
-        lpj = self.lpj
-        batch_lpj = lpj[idx]
+        # lpj = self.lpj
+        # batch_lpj = lpj[idx]
 
-        # prepare sampling loop
-        self.optimizer.zero_grad()
-        q = self.encoder(batch)
-        n_subs = 0
-        loss = 0
+        # init states tensor
+        n, k, h = self.K[idx].shape # n: batch size, k: number of states, h: size of state
+        new_states = to.empty((n, self.n_samples, h), dtype=to.uint8, device=self.lpj.device)
+        # new_lpj = to.empty((n, k, h), dtype=self.lpj.dtype, device=self.lpj.device)
 
-        n, k, h = self.K[idx].shape
-        new_states = to.empty((n, k, h), dtype=to.uint8, device=lpj.device)
-        new_lpj = to.empty((n, k, h), dtype=lpj.dtype, device=lpj.device)
+        # prepare training process
+        if self.training:
+            self.optimizer.zero_grad()
+
+        # get parameters of sampling distribution
+        with self.gradients_context_manager:
+            q = self.encoder(batch)
 
         # sample new variational states
-        for i in range(n_samples):
+        for i in range(self.n_samples):
             # get new variational states
             new_states[:, i, :] = self.sampling(q)
 
         # get lpj of new variational states
         new_lpj = lpj_fn(batch, new_states)
 
-        # accumulate loss
-        loss = to.sum(new_lpj).requires_grad_(True)
+        # update encoder
+        if self.training:
+            # accumulate loss
+            if self.loss_fuction=='LPJ':
+                loss = self.loss(new_lpj)
+            elif self.loss_fuction=='BCE':
+                loss = self.loss(q, self.K[idx])
+            else:
+                raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
 
-        # train the encoder
-        loss.backward()
+            loss.backward()
 
+        # update the variational states
         return update_states_for_batch(
             new_states=new_states.to(device=self.K.device),
             new_lpj=new_lpj.to(device=self.lpj.device),
@@ -167,6 +205,20 @@ class NeuralVariationalStates(TVOVariationalStates):
             all_lpj=self.lpj,
             sort_by_lpj=sort_by_lpj,
         )
+
+    def lpj_loss(self, lpj):
+        return to.sum(lpj).requires_grad_(True)
+
+    def set_training(self, training: bool):
+        if self.training:
+            self.gradients_context_manager = NullContextManager()
+            self.encoder.train()
+            self.training = True
+        else:
+            self.gradients_context_manager = to.no_grad
+            self.encoder.eval()
+            self.training = False
+
 
     # def update_k_lpj(self, idx: Tensor, batch: Tensor, lpj_fn, states, sort_by_lpj) -> int:
     #     """
@@ -279,3 +331,11 @@ class CNN(to.nn.Module):
     def __init__(self, **kwargs):
         super(CNN, self).__init__()
         raise NotImplementedError  # pragma: no cover
+
+class NullContextManager(object):
+    def __init__(self, dummy_resource=None):
+        self.dummy_resource = dummy_resource
+    def __enter__(self):
+        return self.dummy_resource
+    def __exit__(self, *args):
+        pass
