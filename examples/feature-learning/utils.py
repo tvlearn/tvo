@@ -10,7 +10,7 @@ import tifffile
 import numpy as np
 import torch as to
 import torch.distributed as dist
-from typing import Tuple
+from typing import Tuple, Iterable, Union
 from typing import Dict
 
 from tvo import get_run_policy
@@ -66,7 +66,7 @@ def _store_as_h5(to_store_dict: Dict[str, to.Tensor], output_name: str) -> None:
 
 def prepare_training_dataset(
     image_file: str,
-    patch_size: Tuple[int, int],
+    patch_size: Union[int, Iterable[int]],
     no_patches: int,
     h5_file: str,
     perc_highest_amps: float = 0.02,
@@ -75,7 +75,7 @@ def prepare_training_dataset(
     """Read image from file, optionally rescale image size and return as to.Tensor
 
     :param image_file: Full path to image file (.png, .jpg, ...)
-    :param patch_size: Patch size as (patch_height, patch_width) tuple
+    :param patch_size: Patch size
     :param no_patches: Number of patches to extract
     :param h5_file: Full path to H5 file to write data to (directory will be created if not exists)
     :param perc_highest_amps: Percentage of highest image amplitudes to clamp
