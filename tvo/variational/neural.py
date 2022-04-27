@@ -173,7 +173,7 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.optimizer.zero_grad()
 
         # get parameters of sampling distribution
-        with self.gradients_context_manager:
+        with self.gradients_context_manager:  # compute gradients when necessary
             q = self.encoder(batch)
 
         # sample new variational states
@@ -218,27 +218,6 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.gradients_context_manager = to.no_grad
             self.encoder.eval()
             self.training = False
-
-
-    # def update_k_lpj(self, idx: Tensor, batch: Tensor, lpj_fn, states, sort_by_lpj) -> int:
-    #     """
-    #     Update K and lpj with best samples and their lpj.
-    #     :param idx: data point indices of batch w.r.t. K
-    #     :param batch: batch of data points
-    #     :param lpj_fn: appropriate log_joint function of the model
-    #     :param states: new variational states
-    #     :param sort_by_lpj: dictionary of log_joints of the batch sorted by value
-    #     :return:
-    #     """
-    #
-    #     # get average number of variational state substitutions per datapoint
-    #     n_sub = to.sum(lpj_new > batch_lpj) / batch.shape[0]
-    #
-    #     # update lpj and K.
-    #     to.where(lpj_new > batch_lpj, states, self.K[idx]).data.copy_(states.data)
-    #     lpj[idx] = to.where(lpj_new > batch_lpj, lpj_new, batch_lpj)
-    #
-    #     return n_sub, lpj_new
 
 
 class MLP(to.nn.Module):
@@ -326,16 +305,15 @@ class MLP(to.nn.Module):
             to.nn.Identity,
         ], "Only Sigmoid or Identity activations are supported"
 
-
 class CNN(to.nn.Module):
     def __init__(self, **kwargs):
         super(CNN, self).__init__()
         raise NotImplementedError  # pragma: no cover
 
 class NullContextManager(object):
-    def __init__(self, dummy_resource=None):
-        self.dummy_resource = dummy_resource
+    def __init__(self, object=None):
+        self.object = object
     def __enter__(self):
-        return self.dummy_resource
+        return self.object
     def __exit__(self, *args):
         pass
