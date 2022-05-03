@@ -1,0 +1,12 @@
+numpy
+matplotlib
+h5py
+pylama
+pytest
+mypy
+pytest-cov
+black
+munch
+cython
+scipy
+scikit-image

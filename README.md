@@ -8,13 +8,50 @@
 This repository provides a PyTorch package for Truncated Variational Optimization. For related publications, see [1-3]. Check out the [examples](/examples) to get started.
 
 
-## Installing
+## Installation
+
+### with CUDA, without MPI
 
 To install from sources:
 
 ```bash
 git@github.com:tvlearn/tvo.git # clone this repo
 python -m pip install .
+```
+
+### without CUDA, with MPI (requires installing PyTorch from sources)
+
+```bash
+# load modules hosting MPI and Anaconda installations
+$ module load gcc/9.3.0 openmpi/gcc.9/3.1.5 anaconda2/2019.10
+
+# create and active conda environment to host MPI-based installation
+$ conda create -n tvo python==3.8
+$ source activate tvo
+
+# install MPI for Python
+$ MPICC=$(which mpicc) pip install mpi4py
+
+# install PyTorch from source
+$ conda install -c conda-forge typing_extensions numpy ninja pyyaml mkl mkl-include setuptools cmake cffi future six requests dataclasses
+$ git clone --recursive https://github.com/pytorch/pytorch
+$ cd pytorch
+$ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+$ python setup.py install
+
+# install TVO including required packages
+$ cd ..
+$ git clone https://github.com/tvlearn/tvo.git
+$ cd tvo
+$ pip install -r requirements.txt
+$ python setup.py build_ext --inplace
+$ python setup.py develop  # change develop->install (optionally)
+
+# install tvutil (optionally, required to run the examples)
+$ cd ..
+$ git clone https://github.com/tvlearn/tvutil.git
+$ cd tvutil
+$ python setup.py develop  # change develop->install (optionally)
 ```
 
 
