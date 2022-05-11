@@ -346,6 +346,29 @@ class BSCVisualizer(Visualizer):
         super(BSCVisualizer, self)._viz_epoch(epoch, F, theta)
         self._viz_sigma2()
 
+#############
+
+
+class PMCAVisualizer(Visualizer):
+    def __init__(self, **kwargs):
+        super(PMCAVisualizer, self).__init__(
+            memorize=("F"),
+            positions={
+                "datapoints": [0.0, 0.0, 0.07, 0.94],
+                "W_gen": [0.08, 0.0, 0.1, 0.94],
+                "W": [0.2, 0.0, 0.1, 0.94],
+                "F": [0.4, 0.76, 0.58, 0.23],
+                "pies": [0.4, 0.1, 0.58, 0.23],
+            },
+            **kwargs
+        )
+
+    def _viz_epoch(self, epoch, F, theta):
+        super(PMCAVisualizer, self)._viz_epoch(epoch, F, theta)
+
+
+
+
 
 class SSSCVisualizer(Visualizer):
     def __init__(self, sort_acc_to_desc_priors=False, **kwargs):

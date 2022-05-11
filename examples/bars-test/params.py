@@ -73,6 +73,21 @@ bsc_parser.add_argument(
     default=None,
 )
 
+pmca_parser = argparse.ArgumentParser(add_help=False)
+pmca_parser.add_argument(
+    "--pi_gen",
+    type=float,
+    help="Sparsity used for data generation (defaults to 2/H if not specified)",
+    default=None,
+)
+
+pmca_parser.add_argument(
+    "-H",
+    type=int,
+    help="Number of generative fields to learn (set to H_gen if not specified)",
+    default=None,
+)
+
 sssc_parser = argparse.ArgumentParser(add_help=False)
 sssc_parser.add_argument(
     "--pi_gen",
@@ -200,6 +215,16 @@ def get_args():
         parents=comm_parents
         + [
             bsc_parser,
+        ],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    algo_parsers.add_parser(
+        "pmca",
+        help="Run experiment with PMCA",
+        parents=comm_parents
+        + [
+            pmca_parser,
         ],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
