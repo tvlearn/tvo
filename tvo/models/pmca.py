@@ -29,13 +29,13 @@ else:
     lstsq = to.gels
 
 
-class BSC(Optimized, Sampler, Reconstructor):
+class PMCA(Optimized, Sampler, Reconstructor):
     def __init__(
         self,
         H: int,
         D: int,
         W_init: Tensor = None,
-        sigma2_init: Tensor = None,
+        #sigma2_init: Tensor = None,
         pies_init: Tensor = None,
         individual_priors: bool = True,
         precision: to.dtype = to.float64,
@@ -74,32 +74,32 @@ class BSC(Optimized, Sampler, Reconstructor):
                 else to.tensor([1.0 / H], dtype=precision, device=device)
             )
 
-        if sigma2_init is not None:
-            assert sigma2_init.shape == (1,)
-            sigma2_init = sigma2_init.to(dtype=precision, device=device)
-        else:
-            sigma2_init = to.tensor([1.0], dtype=precision, device=device)
+        #if sigma2_init is not None:
+        #    assert sigma2_init.shape == (1,)
+        #    sigma2_init = sigma2_init.to(dtype=precision, device=device)
+        #else:
+        #    sigma2_init = to.tensor([1.0], dtype=precision, device=device)
 
-        self._theta = {"pies": pies_init, "W": W_init, "sigma2": sigma2_init}
+        self._theta = {"pies": pies_init, "W": W_init}
         eps, inf = 1.0e-5, math.inf
         self.policy = {
-            "W": [None, to.full_like(self._theta["W"], -inf), to.full_like(self._theta["W"], inf)],
+            "W": [None, to.full_like(self._theta["W"], eps), to.full_like(self._theta["W"], inf)],
             "pies": [
                 None,
                 to.full_like(self._theta["pies"], eps),
                 to.full_like(self._theta["pies"], 1.0 - eps),
             ],
-            "sigma2": [
-                None,
-                to.full_like(self._theta["sigma2"], eps),
-                to.full_like(self._theta["sigma2"], inf),
-            ],
+            #"sigma2": [
+            #    None,
+            #    to.full_like(self._theta["sigma2"], eps),
+            #    to.full_like(self._theta["sigma2"], inf),
+            #],
         }
 
         self.my_Wp = to.zeros((D, H), dtype=precision, device=device)
-        self.my_Wq = to.zeros((H, H), dtype=precision, device=device)
+        self.my_Wq = to.zeros((D, H), dtype=precision, device=device)
         self.my_pies = to.zeros(H, dtype=precision, device=device)
-        self.my_sigma2 = to.zeros(1, dtype=precision, device=device)
+        #self.my_sigma2 = to.zeros(1, dtype=precision, device=device)
         self.my_N = to.tensor([0], dtype=to.int, device=device)
         self._config = dict(
             H=H, D=D, individual_priors=individual_priors, precision=precision, device=device
@@ -111,20 +111,50 @@ class BSC(Optimized, Sampler, Reconstructor):
         Kfloat = states.to(
             dtype=self.theta["W"].dtype
         )  # TODO Find solution to avoid byte->float casting
-        Wbar = to.matmul(
-            Kfloat, self.theta["W"].t()
-        )  # TODO Pre-allocate tensor and use `out` argument of to.matmul
+        #Wbar = to.matmul(
+        #    Kfloat, self.theta["W"].t()
+        #)  # TODO Pre-allocate tensor and use `out` argument of to.matmul
+        N, no_states = Kfloat.size()[:2]
+        #breakpoint()
+        D = self.theta["W"].size()[0]
+        Wbar = to.zeros(N, no_states, D)
+        for s in range(no_states):
+            for n in range(N):
+                Wbar[n, s, :] = to.amax(self.theta["W"] * Kfloat[n, s, :], 1)
+            #Wbar[s, :] = to.amax(self.theta["W"] * Kfloat[0, s, :], 1)   # TODO: dounle-check the 0 index!!
+
+        # sanity check for avoiding zero values!
+        Wbar = to.maximum(Wbar, 1e-4 + to.zeros(N, no_states, D))
+
+
         Kpriorterm = (
             to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
             if self.config["individual_priors"]
             else to.log(self.theta["pies"] / (1 - self.theta["pies"])) * Kfloat.sum(dim=2)
         )
-        lpj = (
-            to.mul(
-                to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
-            )
-            + Kpriorterm
-        )
+
+        #fac_approx = this_y[this_x_infr]
+        #N_num = np.shape(this_y[this_x_infr])[0]
+        #breakpoint()
+        factorial_term = to.zeros(N)
+        index = to.where(data>0)
+        #factorial_term[index] = (data[index] * to.log(data[index]) - data[index]+(to.log(data[index]*(1+4*data[index]*(1+2*data[index])))/6.)+(to.log(to.tensor(math.pi))/2.))
+        #lpjpt = to.nansum(data[:, None] * to.log(Wbar.t()) - Wbar.t() - factorial_term[:, None], dim=1) # is (S,) 
+
+        #lpj = to.matmul(data, to.log(Wbar.t())) - to.nansum(Wbar, 1)[None, :] + Kpriorterm    # is (N, no_states) 
+
+        lpj = to.zeros(N, no_states)
+        for n in range(N):
+            lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) + Kpriorterm[n, :]
+
+        #breakpoint()
+        # LINEAR MODEL:
+        #lpj = (
+        #    to.mul(
+        #        to.nansum(to.pow(Wbar - data[:, None, :], 2), dim=2), -1 / 2 / self.theta["sigma2"]
+        #    )
+        #    + Kpriorterm
+        #)
         return lpj.to(device=states.device)
 
     def log_joint(self, data: Tensor, states: Tensor, lpj: Tensor = None) -> Tensor:
@@ -138,31 +168,47 @@ class BSC(Optimized, Sampler, Reconstructor):
             if self.config["individual_priors"]
             else H * to.log(1 - self.theta["pies"])
         )
-        return lpj + priorterm - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
+        return lpj + priorterm # - D.unsqueeze(1) / 2 * to.log(2 * math.pi * self.theta["sigma2"])
 
     def update_param_batch(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> None:
         lpj = states.lpj[idx]
         K = states.K[idx]
+        D, H = self.theta["W"].size()
         batch_size, S, _ = K.shape
-
         Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
-        Wbar = to.matmul(
-            Kfloat, self.theta["W"].t()
-        )  # TODO Find solution to re-use evaluations from E-step
+        #Wbar = to.matmul(
+        #    Kfloat, self.theta["W"].t()
+        #)  # TODO Find solution to re-use evaluations from E-step
+
 
         batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
-        batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
-        Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
-        batch_Wq = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
-        batch_sigma2 = mean_posterior(
-            to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
-        )  # is (batch_size,)
+        #batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
+        #Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
+        #batch_Wq = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
+        #batch_sigma2 = mean_posterior(
+        #    to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
+        #)  # is (batch_size,)
+        
+        #my_W = to.broadcast_to(self.theta["W"], (batch_size, D, H)) # is (batch_size, D, H)
+        #to.argmax(my_W * Kfloat[:, 0, :], 1)
+
+        Adh = to.zeros(batch_size, S, D, H)
+        for s in range(S):
+            for n in range(batch_size):
+                Adh_term = to.argmax(self.theta["W"] * Kfloat[n, s, :], 1)
+                for d in range(D):
+                    Adh[n, s, d, Adh_term[d]] = 1
+        
+        batch_Adh_pjc = mean_posterior(Adh, lpj) # is (batch_size, D, H)
+        batch_Wp = batch_Adh_pjc * batch[:, :, None]
 
         self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
         self.my_Wp.add_(to.sum(batch_Wp, dim=0))
-        self.my_Wq.add_(batch_Wq)
-        self.my_sigma2.add_(to.sum(batch_sigma2))
+        self.my_Wq.add_(to.sum(batch_Adh_pjc, dim=0))
+        #self.my_Wq.add_(batch_Wq)
+        #self.my_sigma2.add_(to.sum(batch_sigma2))
         self.my_N.add_(batch_size)
+        #breakpoint()
 
         return None
 
@@ -173,7 +219,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         all_reduce(self.my_Wp)
         all_reduce(self.my_Wq)
         all_reduce(self.my_pies)
-        all_reduce(self.my_sigma2)
+        #all_reduce(self.my_sigma2)
         all_reduce(self.my_N)
 
         N = self.my_N.item()
@@ -181,10 +227,16 @@ class BSC(Optimized, Sampler, Reconstructor):
 
         # Calculate updated W
         Wold_noisy = theta["W"] + 0.1 * to.randn_like(theta["W"])
+        dim1, dim2 = Wold_noisy.size()
+        Wold_noisy = to.maximum(Wold_noisy, 1e-4 + to.zeros(dim1, dim2))
         broadcast(Wold_noisy)
         theta_new = {}
+        index = to.where(self.my_Wq<1e-4)
+        my_Wq_corrected = self.my_Wq
+        my_Wq_corrected[index] = 1e-4
+
         try:
-            theta_new["W"] = lstsq(self.my_Wp.t(), self.my_Wq)[0].t()
+            theta_new["W"] = self.my_Wp / my_Wq_corrected   #lstsq(self.my_Wp.t(), self.my_Wq)[0].t()
         except RuntimeError:
             pprint("Inversion error. Will not update W but add some noise instead.")
             theta_new["W"] = Wold_noisy
@@ -197,11 +249,11 @@ class BSC(Optimized, Sampler, Reconstructor):
         )
 
         # Calculate updated sigma^2
-        theta_new["sigma2"] = self.my_sigma2 / N / D
+        #theta_new["sigma2"] = self.my_sigma2 / N / D
 
         policy["W"][0] = Wold_noisy
         policy["pies"][0] = theta["pies"]
-        policy["sigma2"][0] = theta["sigma2"]
+        #policy["sigma2"][0] = theta["sigma2"]
         fix_theta(theta_new, policy)
         for key in theta:
             theta[key][:] = theta_new[key]
@@ -209,7 +261,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         self.my_Wp[:] = 0.0
         self.my_Wq[:] = 0.0
         self.my_pies[:] = 0.0
-        self.my_sigma2[:] = 0.0
+        #self.my_sigma2[:] = 0.0
         self.my_N[:] = 0.0
 
     @property
@@ -234,16 +286,29 @@ class BSC(Optimized, Sampler, Reconstructor):
             assert shape == (N, H), f"hidden_state has shape {shape}, expected ({N},{H})"
             must_return_hidden_state = False
 
+
+        Y = to.zeros(N, D)
         Wbar = to.zeros((N, D), dtype=precision, device=device)
 
-        # Linear superposition
+        # Non-linear superposition
         for n in range(N):
             for h in range(H):
                 if hidden_state[n, h]:
-                    Wbar[n] += self.theta["W"][:, h]
+                    Wbar[n] = to.maximum(Wbar[n], self.theta["W"][:, h])  
 
-        # Add noise according to the model parameters
-        Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn((N, D), dtype=precision, device=device)
+            Wbar_ = to.maximum(Wbar[n], 1e-4 + to.zeros(D))          
+
+            # Add noise according to the model parameters   
+            Y[n] = to.poisson(Wbar_)
+
+        ## Linear superposition
+        #for n in range(N):
+        #    for h in range(H):
+        #        if hidden_state[n, h]:
+        #            Wbar[n] += self.theta["W"][:, h]
+
+        ## Add noise according to the model parameters
+        #Y = Wbar + to.sqrt(self.theta["sigma2"]) * to.randn((N, D), dtype=precision, device=device)
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
