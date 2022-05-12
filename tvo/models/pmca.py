@@ -136,8 +136,9 @@ class PMCA(Optimized, Sampler, Reconstructor):
         #fac_approx = this_y[this_x_infr]
         #N_num = np.shape(this_y[this_x_infr])[0]
         #breakpoint()
-        factorial_term = to.zeros(N)
-        index = to.where(data>0)
+        #factorial_term = to.zeros(N)
+        #index = to.where(data>0)
+        #breakpoint()
         #factorial_term[index] = (data[index] * to.log(data[index]) - data[index]+(to.log(data[index]*(1+4*data[index]*(1+2*data[index])))/6.)+(to.log(to.tensor(math.pi))/2.))
         #lpjpt = to.nansum(data[:, None] * to.log(Wbar.t()) - Wbar.t() - factorial_term[:, None], dim=1) # is (S,) 
 
@@ -145,9 +146,12 @@ class PMCA(Optimized, Sampler, Reconstructor):
 
         lpj = to.zeros(N, no_states)
         for n in range(N):
+            my_y = data[n, :]
+            index = to.where(my_y>0)
+            factorial_term = my_y[index] * to.log(my_y[index]) - my_y[index]
+            #lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) - to.nansum(factorial_term)[None] + Kpriorterm[n, :]
             lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) + Kpriorterm[n, :]
 
-        #breakpoint()
         # LINEAR MODEL:
         #lpj = (
         #    to.mul(
@@ -185,10 +189,7 @@ class PMCA(Optimized, Sampler, Reconstructor):
         #batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
         #Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
         #batch_Wq = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
-        #batch_sigma2 = mean_posterior(
-        #    to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
-        #)  # is (batch_size,)
-        
+
         #my_W = to.broadcast_to(self.theta["W"], (batch_size, D, H)) # is (batch_size, D, H)
         #to.argmax(my_W * Kfloat[:, 0, :], 1)
 
@@ -219,7 +220,6 @@ class PMCA(Optimized, Sampler, Reconstructor):
         all_reduce(self.my_Wp)
         all_reduce(self.my_Wq)
         all_reduce(self.my_pies)
-        #all_reduce(self.my_sigma2)
         all_reduce(self.my_N)
 
         N = self.my_N.item()
@@ -236,7 +236,7 @@ class PMCA(Optimized, Sampler, Reconstructor):
         my_Wq_corrected[index] = 1e-4
 
         try:
-            theta_new["W"] = self.my_Wp / my_Wq_corrected   #lstsq(self.my_Wp.t(), self.my_Wq)[0].t()
+            theta_new["W"] = self.my_Wp / my_Wq_corrected
         except RuntimeError:
             pprint("Inversion error. Will not update W but add some noise instead.")
             theta_new["W"] = Wold_noisy
@@ -248,12 +248,8 @@ class PMCA(Optimized, Sampler, Reconstructor):
             else self.my_pies.sum(dim=0, keepdim=True) / N / H
         )
 
-        # Calculate updated sigma^2
-        #theta_new["sigma2"] = self.my_sigma2 / N / D
-
         policy["W"][0] = Wold_noisy
         policy["pies"][0] = theta["pies"]
-        #policy["sigma2"][0] = theta["sigma2"]
         fix_theta(theta_new, policy)
         for key in theta:
             theta[key][:] = theta_new[key]
@@ -261,7 +257,6 @@ class PMCA(Optimized, Sampler, Reconstructor):
         self.my_Wp[:] = 0.0
         self.my_Wq[:] = 0.0
         self.my_pies[:] = 0.0
-        #self.my_sigma2[:] = 0.0
         self.my_N[:] = 0.0
 
     @property
@@ -301,7 +296,7 @@ class PMCA(Optimized, Sampler, Reconstructor):
             # Add noise according to the model parameters   
             Y[n] = to.poisson(Wbar_)
 
-        ## Linear superposition
+        ## Linear superposition 
         #for n in range(N):
         #    for h in range(H):
         #        if hidden_state[n, h]:
@@ -321,6 +316,19 @@ class PMCA(Optimized, Sampler, Reconstructor):
         K = states.K[idx]
         # TODO Find solution to avoid byte->float casting of `K`
         # TODO Pre-allocate tensor and use `out` argument of to.matmul
-        return mean_posterior(
-            to.matmul(K.to(dtype=self.precision), self.theta["W"].t()), states.lpj[idx]
-        )
+        N_, no_states_ = K.size()[:2]
+        D = self.theta["W"].size()[0]
+        Wbar = to.zeros(N_, no_states_, D)
+        for s in range(no_states_):
+            for n in range(N_):
+                Wbar[n, s, :] = to.amax(self.theta["W"] * K[n, s, :], 1)
+            #Wbar[s, :] = to.amax(self.theta["W"] * Kfloat[0, s, :], 1)   # TODO: dounle-check the 0 index!!
+
+        # sanity check for avoiding zero values!
+        Wbar = to.maximum(Wbar, 1e-4 + to.zeros(N_, no_states_, D))
+
+        return mean_posterior(Wbar, states.lpj[idx])
+        #return mean_posterior(
+        #    to.matmul(K.to(dtype=self.precision), self.theta["W"].t()), states.lpj[idx]
+        #)
+
