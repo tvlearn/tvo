@@ -107,7 +107,7 @@ class PMCA(Optimized, Sampler, Reconstructor):
         self._shape = self.theta["W"].shape
 
     def log_pseudo_joint(self, data: Tensor, states: Tensor) -> Tensor:  # type: ignore
-        """Evaluate log-pseudo-joints for BSC"""
+        """Evaluate log-pseudo-joints for PMCA"""
         Kfloat = states.to(
             dtype=self.theta["W"].dtype
         )  # TODO Find solution to avoid byte->float casting
@@ -144,13 +144,13 @@ class PMCA(Optimized, Sampler, Reconstructor):
 
         #lpj = to.matmul(data, to.log(Wbar.t())) - to.nansum(Wbar, 1)[None, :] + Kpriorterm    # is (N, no_states) 
 
-        lpj = to.zeros(N, no_states)
+        lpj = to.zeros(N, no_states, dtype=self._precision)
         for n in range(N):
             my_y = data[n, :]
             index = to.where(my_y>0)
             factorial_term = my_y[index] * to.log(my_y[index]) - my_y[index]
-            #lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) - to.nansum(factorial_term)[None] + Kpriorterm[n, :]
-            lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) + Kpriorterm[n, :]
+            lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) - to.nansum(factorial_term)[None] + Kpriorterm[n, :]
+            #lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) + Kpriorterm[n, :]
 
         # LINEAR MODEL:
         #lpj = (
