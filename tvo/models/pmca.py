@@ -118,14 +118,14 @@ class PMCA(Optimized, Sampler, Reconstructor):
         #breakpoint()
         D = self.theta["W"].size()[0]
         Wbar = to.zeros(N, no_states, D)
-        for s in range(no_states):
-            for n in range(N):
-                Wbar[n, s, :] = to.amax(self.theta["W"] * Kfloat[n, s, :], 1)
-            #Wbar[s, :] = to.amax(self.theta["W"] * Kfloat[0, s, :], 1)   # TODO: dounle-check the 0 index!!
+        #for s in range(no_states):
+        #    for n in range(N):
+        #        Wbar[n, s, :] = to.amax(self.theta["W"] * Kfloat[n, s, :], 1)
+        #    #Wbar[s, :] = to.amax(self.theta["W"] * Kfloat[0, s, :], 1)   # TODO: dounle-check the 0 index!!
 
         # sanity check for avoiding zero values!
-        Wbar = to.maximum(Wbar, 1e-4 + to.zeros(N, no_states, D))
-
+        #Wbar = to.maximum(Wbar, 1e-4 + to.zeros(N, no_states, D))
+        #breakpoint()
 
         Kpriorterm = (
             to.matmul(Kfloat, to.log(self.theta["pies"] / (1 - self.theta["pies"])))
@@ -149,6 +149,9 @@ class PMCA(Optimized, Sampler, Reconstructor):
             my_y = data[n, :]
             index = to.where(my_y>0)
             factorial_term = my_y[index] * to.log(my_y[index]) - my_y[index]
+
+            Wbar_term = to.amax(self.theta["W"][:, None, :] * Kfloat[n, :, :], 2).t()
+            Wbar[n, :, :] = to.maximum(Wbar_term, 1e-4 + to.zeros(no_states, D))
             lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) - to.nansum(factorial_term)[None] + Kpriorterm[n, :]
             #lpj[n, :] = to.matmul(data[n, :], to.log(Wbar[n, :, :].t())) - to.nansum(Wbar[n, :, :], 1) + Kpriorterm[n, :]
 
@@ -199,6 +202,11 @@ class PMCA(Optimized, Sampler, Reconstructor):
                 Adh_term = to.argmax(self.theta["W"] * Kfloat[n, s, :], 1)
                 for d in range(D):
                     Adh[n, s, d, Adh_term[d]] = 1
+
+        #for n in range(batch_size):
+        #    Adh_term = to.argmax(self.theta["W"][:, None, :] * Kfloat[n, :, :], 2)
+        #    for d in range(D):
+        #        Adh[n, :, d, Adh_term[:,d]] = 1
         
         batch_Adh_pjc = mean_posterior(Adh, lpj) # is (batch_size, D, H)
         batch_Wp = batch_Adh_pjc * batch[:, :, None]
@@ -319,10 +327,13 @@ class PMCA(Optimized, Sampler, Reconstructor):
         N_, no_states_ = K.size()[:2]
         D = self.theta["W"].size()[0]
         Wbar = to.zeros(N_, no_states_, D)
-        for s in range(no_states_):
-            for n in range(N_):
-                Wbar[n, s, :] = to.amax(self.theta["W"] * K[n, s, :], 1)
-            #Wbar[s, :] = to.amax(self.theta["W"] * Kfloat[0, s, :], 1)   # TODO: dounle-check the 0 index!!
+        #for s in range(no_states_):
+        #    for n in range(N_):
+        #        Wbar[n, s, :] = to.amax(self.theta["W"] * K[n, s, :], 1)
+        #    #Wbar[s, :] = to.amax(self.theta["W"] * Kfloat[0, s, :], 1)   # TODO: dounle-check the 0 index!!
+
+        for n in range(N_):
+            Wbar[n, :, :] = to.amax(self.theta["W"][:, None, :] * K[n, :, :], 2).t()
 
         # sanity check for avoiding zero values!
         Wbar = to.maximum(Wbar, 1e-4 + to.zeros(N_, no_states_, D))
