@@ -106,6 +106,8 @@ class NeuralEMConfig(EStepConfig):
         lr: float = None,
         sampling: str = "Gumbel",
         K_init=None,
+        loss_name: str =None,
+        **kwargs
     ):
         """
         :param encoder: encoder type to use. Must be one of: MLP, CNN
@@ -136,9 +138,11 @@ class NeuralEMConfig(EStepConfig):
             self.output_size = output_size
             self.output_activation = output_activation
             self.lr = lr
+            self.sampling = sampling
 
             self.MLP_sanity_check()
             self.K_init = K_init
+            self.loss_name = loss_name
 
         elif encoder == "CNN":
             raise NotImplementedError  # pragma: no cover
@@ -147,7 +151,9 @@ class NeuralEMConfig(EStepConfig):
             raise ValueError(f"Unknown encoder {encoder}")
 
         if sampling == "Gumbel":
-            self.output_size *= 2
+            self.output_size *= 2 # shift to bitwise categorical representation
+        elif sampling == "Independent Bernoullis":
+            pass
         else:
             raise ValueError(f"Unknown sampling method {sampling}")
 

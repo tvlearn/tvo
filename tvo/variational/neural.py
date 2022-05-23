@@ -87,19 +87,21 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.sampling = self.gumbel_softmax_sampling
         elif sampling == "Independent Bernoullis":
             assert(kwargs["output_activation"] == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
-            assert(kwargs["loss_function"] == "BCE"), "loss_function must be Binary Crossentropy"
+            assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
             self.sampling = self.independent_bernoullis_sampling
         else:
             raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
 
         # select a loss function
-        self.loss_name = kwargs["loss_function"]
-        assert self.loss_name in ["BCE", "LPJ"], "loss_function must be either BCE or LPJ"
+        self.loss_fname = kwargs["loss_name"]
+        assert self.loss_fname in ["BCE", "LPJ", 'CE'], "loss_function must be either BCE or LPJ"
 
-        if self.loss_name == "BCE":
+        if self.loss_fname == "BCE":
             self.loss_function = to.nn.BCELoss()
-        elif self.loss_name == "LPJ":
+        elif self.loss_fname == "LPJ":
             self.loss_function = self.lpj_loss
+        elif self.loss_fname == "CE":
+            self.loss_function = to.nn.CrossEntropyLoss()
         else:
             raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
 
@@ -108,6 +110,10 @@ class NeuralVariationalStates(TVOVariationalStates):
 
         # set training or evaluation mode
         self.set_training(training)
+
+        # populate train set if any
+        if getattr(self, "decoder_train_labels", None):
+            self.K = self.decoder_train_labels
 
     def gumbel_softmax_sampling(
         self, logits: Tensor, temperature: float = 1.0, hard: bool = True
@@ -173,8 +179,10 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.optimizer.zero_grad()
 
         # get parameters of sampling distribution
-        with self.gradients_context_manager:  # compute gradients when necessary
-            q = self.encoder(batch)
+        with self.gradients_context_manager:  # computes gradients when necessary
+            if self.training:
+                batch.requires_grad=True
+            q = self.encoder(batch) # n x h
 
         # sample new variational states
         for i in range(self.n_samples):
@@ -186,16 +194,28 @@ class NeuralVariationalStates(TVOVariationalStates):
 
         # update encoder
         if self.training:
-            # accumulate loss
-            if self.loss_fuction=='LPJ':
-                loss = self.loss(new_lpj)
-            elif self.loss_fuction=='BCE':
-                loss = self.loss(q, self.K[idx])
-            else:
-                raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
+            with self.gradients_context_manager:
+                # accumulate loss
+                if self.loss_fname=='LPJ':
+                    loss = self.loss_function(new_lpj)
+                elif self.loss_fname in ('BCE','CE'):
+                    p = to.mean(self.K[idx].to(to.float64), axis=1) # compute <s_h>
+                    p.requires_grad=True
+                    # q.requires_grad=True
+                    # assert p.requires_grad
+                    # assert q.requires_grad
+                    loss = self.loss_function(p,q)
 
-            loss.backward()
+                else:
+                    raise ValueError(f"Unknown loss function: {self.loss_fname}")  # pragma: no cover
 
+                # if to.rand(1) > 0.95:
+                #     print('Loss={}'.format(loss.detach().numpy()))
+
+                try:
+                    loss.backward()
+                except RuntimeError as e:
+                    raise e
         # update the variational states
         return update_states_for_batch(
             new_states=new_states.to(device=self.K.device),
@@ -210,12 +230,12 @@ class NeuralVariationalStates(TVOVariationalStates):
         return to.sum(lpj).requires_grad_(True)
 
     def set_training(self, training: bool):
-        if self.training:
-            self.gradients_context_manager = NullContextManager()
+        if training:
+            self.gradients_context_manager = to.set_grad_enabled(True) # NullContextManager()
             self.encoder.train()
             self.training = True
         else:
-            self.gradients_context_manager = to.no_grad
+            self.gradients_context_manager = to.no_grad()
             self.encoder.eval()
             self.training = False
 
@@ -242,6 +262,7 @@ class MLP(to.nn.Module):
         dropouts: Sequence[bool],
         dropout_rate: int,
         output_activation=to.nn.Identity,
+        precision: to.dtype = to.float64,
         **kwargs,
     ):
         super(MLP, self).__init__()
@@ -252,6 +273,7 @@ class MLP(to.nn.Module):
         self.output_activation = output_activation
         self.dropouts = dropouts
         self.dropout_rate = dropout_rate
+        self.precision = precision
 
         self.sanity_check()
 
@@ -275,7 +297,7 @@ class MLP(to.nn.Module):
 
             # add  Wx + b module
             self.add_module(
-                "layer_" + str(i), to.nn.Linear(feature_size_in, self.hidden_size[i])
+                "layer_" + str(i), to.nn.Linear(feature_size_in, self.hidden_size[i], dtype=self.precision, device=tvo.get_device())
             )
 
             # optionally apply dropout
@@ -289,13 +311,15 @@ class MLP(to.nn.Module):
             feature_size_in = self.hidden_size[i]
 
         # add the output layer
-        self.add_module("output_layer", to.nn.Linear(feature_size_in, self.output_size))
+        self.add_module("output_layer", to.nn.Linear(feature_size_in, self.output_size, dtype=self.precision,
+                                                     device=tvo.get_device()))
         self.output_activation = self.output_activation()
 
     def forward(self, x):
         # pass the input through the network
         for module in list(self.modules())[1:]:
             x = module(x)
+
         return x
 
     def sanity_check(self):

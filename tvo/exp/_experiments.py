@@ -46,6 +46,7 @@ class _TrainingAndOrValidation(Experiment):
         model: Trainable,
         train_dataset: to.Tensor = None,
         test_dataset: to.Tensor = None,
+        train_states: to.Tensor = None
     ):
         """Helper class to avoid code repetition between Training and Testing.
 
@@ -66,7 +67,9 @@ class _TrainingAndOrValidation(Experiment):
             # might differ between processes: last process might have smaller N and less states
             # (but TVODataLoader+ShufflingSampler make sure the number of batches is the same)
             N = train_dataset.shape[0]
-            self.train_states = self._make_states(N, H, self._precision, estep_conf)
+            self.train_states = self._make_states(N, H, self._precision, estep_conf) # init Variational States
+            if hasattr(self._conf,"train_states") and self._conf.train_states is not None:
+                self.train_states.K=self._conf.train_states.K
 
         self.test_data = None
         self.test_states = None

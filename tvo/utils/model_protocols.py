@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class Trainable(Protocol):
-    """The most basic model.
+    """The most basic decoder model.
 
     Requires implementation of log_joint, update_parameter_batch, update_parameter_epoch.
     Provides default implementation of free_energy.
@@ -142,6 +142,21 @@ class Trainable(Protocol):
             prec = dt
         return prec
 
+class Encoder(Protocol):
+    '''
+    Base Encoder protocol. It requires an inference method that produces latent space parameters, and a sampler
+    method which produces latents.
+    '''
+    _phi: Dict[str, to.Tensor]
+    _config: Dict[str, Any] = {}
+
+    @abstractmethod
+    def sample(self):
+        pass
+
+    @abstractmethod
+    def encode(self):
+        pass
 
 @runtime_checkable
 class Optimized(Trainable, Protocol):

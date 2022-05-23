@@ -24,6 +24,7 @@ class ExpConfig:
         keep_best_states: bool = False,
         eval_F_at_epoch_end: bool = False,
         data_transform: Callable[[to.Tensor], to.Tensor] = None,
+        train_states=None
     ):
         """Configuration object for Experiment classes.
 
@@ -87,6 +88,7 @@ class ExpConfig:
         self.keep_best_states = keep_best_states
         self.eval_F_at_epoch_end = eval_F_at_epoch_end
         self.data_transform = data_transform
+        self.train_states=train_states
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
