@@ -1,9 +1,9 @@
 import h5py
 import numpy as np
 import torch as to
-from tvem.utils import get
-from tvem.models import BernoulliTVAE as TVAE
-from tvem.exp import EEMConfig, ExpConfig, Training, Testing
+from tvo.utils import get
+from tvo.models import BernoulliTVAE as TVAE
+from tvo.exp import EEMConfig, ExpConfig, Training, Testing
 
 from hyperoptimization.models import FCDeConvNetSigOut as FCDeConvNet
 

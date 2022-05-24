@@ -9,7 +9,7 @@ from hyperoptimization.runs import local_sequential as run
 
 def experiment(parser):
 
-    parser.add_argument("dataset", help="HD5 file as expected in input by tvem.Training")
+    parser.add_argument("dataset", help="HD5 file as expected in input by tvo.Training")
     parser.add_argument("--Ksize", type=int, default=3, help="size of each K^n set")
     parser.add_argument("--epochs", type=int, default=40, help="number of training epochs")
     parser.add_argument(
