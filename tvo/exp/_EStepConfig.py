@@ -125,7 +125,7 @@ class NeuralEMConfig(EStepConfig):
         :param K_init: initial K set to use. If None, a random set of states is used. To.tensor.
 
         """
-        super().__init__(n_states)
+
         self.n_samples = n_samples
 
         if encoder == "MLP":
@@ -143,7 +143,7 @@ class NeuralEMConfig(EStepConfig):
             self.MLP_sanity_check()
             self.K_init = K_init
             self.loss_name = loss_name
-
+            super().__init__(n_states)
         elif encoder == "CNN":
             raise NotImplementedError  # pragma: no cover
 
