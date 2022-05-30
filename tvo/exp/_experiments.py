@@ -167,7 +167,7 @@ class _TrainingAndOrValidation(Experiment):
             os.remove(leftover_logfile)
 
         # put trainer into undefined state after the experiment is finished
-        self.trainer = None  # type: ignore
+        #self.trainer = None  # type: ignore
 
     def _log_confs(self, logger: H5Logger):
         """Dump experiment+estep configuration to screen and save it to output file."""
