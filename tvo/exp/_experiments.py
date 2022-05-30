@@ -67,9 +67,11 @@ class _TrainingAndOrValidation(Experiment):
             # might differ between processes: last process might have smaller N and less states
             # (but TVODataLoader+ShufflingSampler make sure the number of batches is the same)
             N = train_dataset.shape[0]
-            self.train_states = self._make_states(N, H, self._precision, estep_conf) # init Variational States
             if hasattr(self._conf,"train_states") and self._conf.train_states is not None:
-                self.train_states.K=self._conf.train_states.K
+                self.train_states=self._conf.train_states
+            else:
+                self.train_states = self._make_states(N, H, self._precision, estep_conf) # init Variational States
+
 
         self.test_data = None
         self.test_states = None
