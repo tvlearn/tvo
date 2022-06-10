@@ -10,7 +10,7 @@ import os
 class ValidFreeEnergy:
     """
     Extracts the free energy from an hpbandster run if the run was successful.
-    If the free energy of the loss is requested, the negative loss is returned.
+    If the free energy of the loss is requested (i.e. training), the negative loss is returned.
     """
 
     def __init__(self, key):
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         printable="validation accuracy",
         criterion="train accuracy",
         show_config=False,
-        top_n=10,
+        top_n=5,
     )
     print("\n")
     print_best(
@@ -184,7 +184,7 @@ if __name__ == "__main__":
         printable="validation accuracy",
         criterion="validation accuracy",
         show_config=True,
-        top_n=50,
+        top_n=5,
     )
     print("\n")
     print_best(
@@ -192,6 +192,6 @@ if __name__ == "__main__":
         printable="test accuracy",
         criterion="test accuracy",
         show_config=False,
-        top_n=10,
+        top_n=5,
     )
     visualize(path)
