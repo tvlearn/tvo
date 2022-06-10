@@ -13,6 +13,7 @@ import torch as to
 from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union, Callable
 from math import pi as MATH_PI
 from abc import abstractmethod
+from warnings import warn
 
 
 def _get_net_shape(net_shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
@@ -186,6 +187,21 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         """Forward application of TVAE's MLP to the specified input."""
         ...
 
+    @property
+    def theta(self):
+        return self._theta
+
+    @theta.setter
+    def theta(self, new_theta):
+        # update Ws and Bs
+        for key in self._theta.keys():
+            if hasattr(self, key):
+                setattr(self, key, new_theta[key])
+        # update the theta dict
+        self._theta = new_theta
+        if self.W is not None:
+            warn('Setting theta is supported only for usage with external_model.')
+            # TODO: extend this method to update the W and b manually.
 
 class GaussianTVAE(_TVAE):
     def __init__(
