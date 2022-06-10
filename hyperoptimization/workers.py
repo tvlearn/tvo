@@ -13,7 +13,7 @@ from hpbandster.core.worker import Worker
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class BaseWorker(Worker):
