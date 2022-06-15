@@ -6,7 +6,6 @@ import torch as to
 import torch.nn as nn
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
 
 class FCDeConvNet(to.nn.Module):
     def __init__(
@@ -111,7 +110,6 @@ class FCDeConvNet(to.nn.Module):
             len(n_filters) == n_deconv_layers == len(batch_norms)
         ), "add information for all deconv layers"
 
-
         # fc+dc sanity
         if n_filters and n_fc_layers:
             initial_deconv_dim = int(np.sqrt(W_shapes[-1] / n_filters[0]))
@@ -132,83 +130,34 @@ class FCDeConvNet(to.nn.Module):
         ), "filters need to be positive"
 
 class FCnet(to.nn.Module):
-    def __init__(self, in_features,
-                 n_deconv_layers: int,
-                 n_fc_layers: int,
+    def __init__(self,
+                 input_size,
                  W_shapes: List[int],
                  fc_activations: List,
-                 dc_activations: List,
-                 n_filters: List[int],
                  dropouts: List[bool],
-                 batch_norms: List[bool],
-                 output_shape: int,
-                 input_size,
                  dropout_rate=0.25,
-                 filters_from_fc=1,
-                 kernels=None,
-                 paddings=None,
-                 sanity_checks=False,
                  ):
-    # # transposed convolution blocks
-    # input_len = int(np.sqrt(in_features))
-    # input_shape = (input_len, input_len, filters_from_fc)
-    #
-    # if not kernels:
-    #     # calculate total increase in dimensionality
-    #     total_upsampling = int(np.sqrt(output_shape) - np.sqrt(input_shape[0] * input_shape[1]))
-    #     assert total_upsampling == np.sqrt(output_shape) - np.sqrt(
-    #         input_shape[0] * input_shape[1]
-    #     )
-    #
-    #     if total_upsampling < 0:
-    #         warn("Transposed convolution used for downsampling")
-    #
-    #     # calculate kernel sizes and paddings, such as the outputs match the
-    #     # dimensionality of the output
-    #     kernels, paddings = self.deconvolution_hypers_from_upsampling(
-    #         upsampling=total_upsampling, min_kernel=3, n_layers=n_deconv_layers
-    #     )
-    #
-    # if not paddings:
-    #     paddings = [0] * len(kernels)
-    #
-    # # print(total_upsampling, kernels, paddings)
-    #
-    # # add the transposed convolution blocks
-    # for i in range(n_deconv_layers):
-    #
-    #     self.shape.append((n_filters[i], kernels[i]))
-    #     self.deconv_stack.add_module(
-    #         "conv_transpose_{}".format(i),
-    #         nn.ConvTranspose2d(
-    #             in_channels=input_shape[-1],
-    #             out_channels=n_filters[i],
-    #             kernel_size=kernels[i],
-    #             padding=paddings[i],
-    #         ),
-    #     )
-    #
-    #     if batch_norms[i]:
-    #         self.deconv_stack.add_module(
-    #             "batch_norm_{}".format(i), nn.BatchNorm2d(n_filters[i])
-    #         )
-    #
-    #     self.deconv_stack.add_module(
-    #         "deconv_activation_{}".format(i), eval(dc_activations[i])()
-    #     )
-    #
-    #     input_shape = self.deconv_output_shape(
-    #         input_len=input_shape[0],
-    #         filters=n_filters[i],
-    #         kernel=kernels[i],
-    #         padding=paddings[i],
-    #     )
-    #
-    # assert input_shape[0] == input_shape[1]
-    # assert output_shape == np.prod(input_shape)
-    #
-    #
+                    # in_features,
+                    # n_deconv_layers: int,
+                    # n_fc_layers: int,
+                    #
+                    # dc_activations: List,
+                    # n_filters: List[int],
+                    #
+                    # batch_norms: List[bool],
+                    # output_shape: int,
+                    #
+                    # filters_from_fc=1,
+                    # kernels=None,
+                    # paddings=None,
+                    # sanity_checks=False,
+        super().__init__()
 
+        if not hasattr(self, 'shape'):
+            self.shape = [input_size]
+
+        if not hasattr(self, 'linear_stack'):
+            self.linear_stack = nn.Sequential()
         # setup fully connected blocks
         in_features = input_size
         # if not n_deconv_layers:
@@ -216,7 +165,7 @@ class FCnet(to.nn.Module):
 
         # build fc blocks
         for i, (n_hidden, activation, dropout) in enumerate(
-                zip(W_shapes, fc_activations, dropouts)
+            zip(W_shapes, fc_activations, dropouts)
         ):
             self.shape.append(n_hidden)  # store shape for TVEM
             self.linear_stack.add_module(
@@ -232,7 +181,7 @@ class FCnet(to.nn.Module):
         self.dropout = nn.Dropout(p=dropout_rate)  # set the dropout rate
 
     def forward(self, x):
-        x = x.double()
+        #x = x.double()
         # x.to('cuda')
         out = self.linear_stack(x)
         return out
