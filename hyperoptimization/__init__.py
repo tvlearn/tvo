@@ -1,4 +1,4 @@
-from .models import FCDeConvNetSigOut, FCDeConvNet
+from .neural_models import FCDeConvNetSigOut, FCDeConvNet
 from .workers import TVAEWorker
 from .explore import print_best
 from .runs import local_sequential

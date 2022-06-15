@@ -5,7 +5,7 @@ from tvo.utils import get
 from tvo.models import BernoulliTVAE as TVAE
 from tvo.exp import EVOConfig, ExpConfig, Training, Testing
 
-from hyperoptimization.models import FCDeConvNetSigOut as FCDeConvNet
+from hyperoptimization.neural_models import FCDeConvNetSigOut as FCDeConvNet
 
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
