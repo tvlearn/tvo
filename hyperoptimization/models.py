@@ -146,7 +146,7 @@ class FCDeConvNet(to.nn.Module):
             )
 
         assert input_shape[0] == input_shape[1]
-        assert output_shape == np.prod(input_shape)
+        assert output_shape == np.prod(input_shape), 'output ({}) not equal to product of input ({})'.format(output_shape,input_shape)
         self.dropout = nn.Dropout(p=dropout_rate)
 
         # todo: change self.shape functionality appropriately after the TVAE changes

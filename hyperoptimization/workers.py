@@ -3,7 +3,7 @@ import numpy as np
 import torch as to
 from tvo.utils import get
 from tvo.models import BernoulliTVAE as TVAE
-from tvo.exp import EEMConfig, ExpConfig, Training, Testing
+from tvo.exp import EVOConfig, ExpConfig, Training, Testing
 
 from hyperoptimization.models import FCDeConvNetSigOut as FCDeConvNet
 
@@ -239,7 +239,7 @@ class TVAEWorker(BaseWorker):
 
     def get_EEM_conf(self, config):
         if self.is_hyperparameter_EEM:
-            estep_conf = EEMConfig(
+            estep_conf = EVOConfig(
                 n_states=config["S"],
                 n_parents=config["n_parents"],
                 n_children=config["n_children"],
@@ -247,7 +247,7 @@ class TVAEWorker(BaseWorker):
                 crossover=False,
             )
         else:
-            estep_conf = EEMConfig(
+            estep_conf = EVOConfig(
                 n_states=self.S,
                 n_parents=min(3, self.S),
                 n_children=min(2, self.S),
