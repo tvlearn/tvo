@@ -1,6 +1,8 @@
 import h5py
 import numpy as np
 import torch as to
+
+import tvo
 from tvo.utils import get
 from tvo.models import BernoulliTVAE as TVAE
 from tvo.exp import EVOConfig, ExpConfig, Training, Testing
@@ -137,10 +139,8 @@ class TVAEWorker(BaseWorker):
         else:
             raise NotImplementedError("Currently we support only SGD with momentum and Adam")
 
-        # todo: fix in TVEM deep tvae branch
-        gpu = to.device("cuda:0")
-        model.to(gpu)
-        model.device = gpu
+        model.to(tvo.get_device())
+        model.device = tvo.get_device()
 
         # setup TVAE
         cycliclr_half_step_size = np.ceil(self.N / self.batch_size) * self.epochs_per_half_cycle
@@ -223,7 +223,7 @@ class TVAEWorker(BaseWorker):
             W_shapes=W_shapes,
             fc_activations=fc_activations,
             dc_activations=dc_activations,
-            n_filters=n_filters,
+            n_kernels=n_filters,
             batch_norms=batch_norms,
             dropouts=dropouts,
             dropout_rate=dropout_rate,
