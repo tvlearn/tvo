@@ -112,7 +112,7 @@ def true_free_energy(tvae_model, data, states):
 def test_lpj(simple_tvae):
     N = 2
     D, H1, H0 = simple_tvae.net_shape
-    S = 2 ** H0
+    S = 2**H0
     states = fullem_for(simple_tvae, N=N)
     assert (H0, H1, D) == (2, 3, 1), "test assumes this shape for tvae but shape changed"
     assert states.K.shape == (N, S, H0)

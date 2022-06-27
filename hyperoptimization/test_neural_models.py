@@ -174,7 +174,7 @@ plt.ioff()
 if args.model == "ConvDeConv":
     model = ConvDeconv(shape=(28**2, 256, 64, 256, 28**2), lr=args.lr)
 elif args.model == "AE":
-    model = AutoEncoder(shape=(28**2, 256, 64, 256, 28**2), lr=args.lr) # type: ignore
+    model = AutoEncoder(shape=(28**2, 256, 64, 256, 28**2), lr=args.lr)  # type: ignore
 # train model
 avg_train_loss = model.train(epochs=args.n_epochs)
 
