@@ -232,6 +232,7 @@ class TVAEWorker(BaseWorker):
             filters_from_fc=1,
             kernels=kernels,
         )
+
         model.H0 = model.shape[0]
         model.D = self.D
         model.double()
@@ -385,18 +386,18 @@ class TVAEWorker(BaseWorker):
         # Todo: take filter dimensionality from x for the final filter
         # TODO: remove last filter from hyperparameters
 
-        num_filters_1 = CSH.CategoricalHyperparameter("num_filters_1", [1, "1"])
+        num_filters_1 = CSH.CategoricalHyperparameter("num_filters_1", [ 1])
         num_filters_2 = CSH.UniformIntegerHyperparameter(
-            "num_filters_2", lower=1, upper=12, default_value=4, log=True
+            "num_filters_2", lower=1, upper=4, default_value=4, log=True
         )
         num_filters_3 = CSH.UniformIntegerHyperparameter(
-            "num_filters_3", lower=1, upper=12, default_value=4, log=True
+            "num_filters_3", lower=1, upper=4, default_value=4, log=True
         )
         num_filters_4 = CSH.UniformIntegerHyperparameter(
-            "num_filters_4", lower=1, upper=12, default_value=4, log=True
+            "num_filters_4", lower=1, upper=4, default_value=4, log=True
         )
         num_filters_5 = CSH.UniformIntegerHyperparameter(
-            "num_filters_5", lower=1, upper=12, default_value=4, log=True
+            "num_filters_5", lower=1, upper=4, default_value=4, log=True
         )
 
         # define existence of per-layer batch normalization
