@@ -6,9 +6,7 @@ from hyperoptimization.workers import TVAEWorker
 from hyperoptimization.utils import parse_hyperopt_args as hyperopt
 from hyperoptimization.runs import local_sequential as run
 import logging
-
-logging.setlevel("WARNING")
-
+logging.basicConfig(level=logging.WARNING)
 
 def experiment(parser):
 
