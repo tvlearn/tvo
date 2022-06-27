@@ -1,15 +1,10 @@
 import warnings
-
 import numpy as np
 from warnings import warn
 from typing import List
 import torch as to
 import torch.nn as nn
-import tvo
 
-'''
-This is a refactored version of FCDeconvnet. 
-'''
 
 class FCDeConvNet(to.nn.Module):
     def __init__(
@@ -49,18 +44,11 @@ class FCDeConvNet(to.nn.Module):
         :param output_shape: X.shape[-1]
         :param input_size: S.shape
         :param dropout_rate: global dropout rate # todo enable local dropout?
-        :param filters_from_fc: the amount of filters t        self.deconv_stack = nn.Sequential()
-o use for the hidden representation
+        :param filters_from_fc: the amount of filters to use for the hidden representation
          of the linear stack
         :param sanity_checks: BOOL, decides whether sanity checks are run at init.
         """
         super().__init__()
-
-        # # override the first filter size?
-        # if initial_filters: # yes
-        #     n_kernels[0]=initial_filters
-        # else: # no
-        #     initial_filters = n_kernels[0]
 
         if sanity_checks:
             fc_sanitize = (W_shapes, n_fc_layers, dropouts)
@@ -71,38 +59,45 @@ o use for the hidden representation
 
         self.n_deconv_layers = n_deconv_layers
 
-        if n_kernels and n_kernels[-1]!=1:
-            warnings.warn('Final number of kernels exceeds expected dimensionality. Setting manually to 1.')
-            n_kernels[-1]=1
+        if n_kernels and n_kernels[-1] != 1:
+            warnings.warn(
+                "Final number of kernels exceeds expected dimensionality. Setting manually to 1."
+            )
+            n_kernels[-1] = 1
 
         if n_fc_layers:
             if not n_deconv_layers:
-                warnings.warn('Using fully connected network, output layer set to to input shape manually')
-                W_shapes[-1]=output_shape
-            self.linear_stack = FCnet(input_size,
-                 W_shapes,
-                 fc_activations,
-                 dropouts,
-                 dropout_rate,)
+                warnings.warn(
+                    "Using fully connected network, output layer set to to input shape manually"
+                )
+                W_shapes[-1] = output_shape
+            self.linear_stack = FCnet(
+                input_size,
+                W_shapes,
+                fc_activations,
+                dropouts,
+                dropout_rate,
+            )
 
         else:
             self.linear_stack = nn.Sequential()
 
-
         if n_deconv_layers:
             if n_fc_layers:
-                input_size=W_shapes[-1]  # plug on top of fc
-            self.deconv_stack = Deconvnet(input_size,
-                 filters_from_fc,
-                 kernels,
-                 output_shape,
-                 n_deconv_layers,
-                 n_kernels,
-                 dc_activations,
-                 paddings,
+                input_size = W_shapes[-1]  # plug on top of fc
+            self.deconv_stack = Deconvnet(
+                input_size,
+                filters_from_fc,
+                kernels,
+                output_shape,
+                n_deconv_layers,
+                n_kernels,
+                dc_activations,
+                paddings,
                 batch_norms,
-                 dtype=to.double)
-            self.deconv_stack.output_shape=output_shape
+                dtype=to.double,
+            )
+            self.deconv_stack.output_shape = output_shape
 
         else:
             self.deconv_stack = nn.Sequential()
@@ -137,7 +132,7 @@ o use for the hidden representation
         # fc+dc sanity
         if n_kernels and n_fc_layers:
             initial_deconv_dim = int(np.sqrt(W_shapes[-1] / n_kernels[0]))
-            assert n_kernels[0] == W_shapes[-1] / initial_deconv_dim ** 2, (
+            assert n_kernels[0] == W_shapes[-1] / initial_deconv_dim**2, (
                 "the output of the final fully connected layer should be "
                 "a product of squares, where the product is the number "
                 "of filters and the square is the shape of the filters. "
@@ -153,26 +148,27 @@ o use for the hidden representation
             filters_from_fc == int(filters_from_fc) and filters_from_fc > 0
         ), "filters need to be positive"
 
+
 class FCnet(to.nn.Module):
-    def __init__(self,
-                 input_size,
-                 W_shapes: List[int],
-                 fc_activations: List,
-                 dropouts: List[bool],
-                 dropout_rate=0.25,
-                 ):
+    def __init__(
+        self,
+        input_size,
+        W_shapes: List[int],
+        fc_activations: List,
+        dropouts: List[bool],
+        dropout_rate=0.25,
+    ):
 
         super().__init__()
 
-        if not hasattr(self, 'shape'):
+        if not hasattr(self, "shape"):
             self.shape = [input_size]
 
-        if not hasattr(self, 'linear_stack'):
+        if not hasattr(self, "linear_stack"):
             self.linear_stack = nn.Sequential()
 
         # setup fully connected blocks
         in_features = input_size
-
 
         # build fc blocks
         for i, (n_hidden, activation, dropout) in enumerate(
@@ -195,30 +191,32 @@ class FCnet(to.nn.Module):
         out = self.linear_stack(x)
         return out
 
-class Deconvnet(to.nn.Module):
 
-    def __init__(self, in_features,
-                 filters_from_fc,
-                 kernels,
-                 output_shape,
-                 n_deconv_layers,
-                 n_kernels,
-                 dc_activations,
-                 paddings=None,
-                batch_norms = None,
-                 dtype=to.double
-                 ):
-        '''
+class Deconvnet(to.nn.Module):
+    def __init__(
+        self,
+        in_features,
+        filters_from_fc,
+        kernels,
+        output_shape,
+        n_deconv_layers,
+        n_kernels,
+        dc_activations,
+        paddings=None,
+        batch_norms=None,
+        dtype=to.double,
+    ):
+        """
         kernels: dimensionality of kernels, e.g. =[3] results in kernels of 3x3
         n_kernels: number of kernels. e.g.  =2 results in 2 3x3 kernels
-        '''
+        """
 
         super().__init__()
 
-        if not hasattr(self, 'shape'):
+        if not hasattr(self, "shape"):
             self.shape = [in_features]
 
-        if not hasattr(self, 'linear_stack'):
+        if not hasattr(self, "linear_stack"):
             self.deconv_stack = nn.Sequential()
 
         # transposed convolution blocks
@@ -245,16 +243,18 @@ class Deconvnet(to.nn.Module):
             paddings = [0] * len(kernels)
 
         if not batch_norms:
-            batch_norms = [0]*len(kernels)
+            batch_norms = [0] * len(kernels)
 
         # print(total_upsampling, kernels, paddings)
 
         # add the transposed convolution blocks
         # for i in range(n_deconv_layers):
-        hypers= zip(batch_norms, n_kernels, kernels, paddings, dc_activations)
+        hypers = zip(batch_norms, n_kernels, kernels, paddings, dc_activations)
         for i, (batch_norm, n_kernels_, kernel_size, padding, activation) in enumerate(hypers):
 
-            self.shape.append((n_kernels_*kernel_size**2)) # tuple denotes that n params is from filters
+            self.shape.append(
+                (n_kernels_ * kernel_size**2)
+            )  # tuple denotes that n params is from filters
             self.deconv_stack.add_module(
                 "conv_transpose_{}".format(i),
                 nn.ConvTranspose2d(
@@ -262,19 +262,14 @@ class Deconvnet(to.nn.Module):
                     out_channels=n_kernels_,
                     kernel_size=kernel_size,
                     padding=padding,
-                    dtype=dtype
+                    dtype=dtype,
                 ),
-
             )
 
             if batch_norm:
-                self.deconv_stack.add_module(
-                    "batch_norm_{}".format(i), nn.BatchNorm2d(n_kernels_)
-                )
+                self.deconv_stack.add_module("batch_norm_{}".format(i), nn.BatchNorm2d(n_kernels_))
 
-            self.deconv_stack.add_module(
-                "deconv_activation_{}".format(i), eval(activation)()
-            )
+            self.deconv_stack.add_module("deconv_activation_{}".format(i), eval(activation)())
 
             input_shape = self.deconv_output_shape(
                 input_len=input_shape[0],
@@ -284,8 +279,9 @@ class Deconvnet(to.nn.Module):
             )
 
         assert input_shape[0] == input_shape[1]
-        assert output_shape == np.prod(input_shape), 'output ({}) not equal to product of input ({})'.format(output_shape,input_shape)
-
+        assert output_shape == np.prod(
+            input_shape
+        ), "output ({}) not equal to product of input ({})".format(output_shape, input_shape)
 
         # todo: change self.shape functionality appropriately after the TVAE changes
         self.shape.append(output_shape)
@@ -302,7 +298,7 @@ class Deconvnet(to.nn.Module):
             try:
                 out[:, s, :] = to.reshape(h_s, (n, D))
             except Exception as e:
-                print(h_s.shape[-1]-28)
+                print(h_s.shape[-1] - 28)
                 raise e
         return out
 
@@ -404,6 +400,7 @@ class Deconvnet(to.nn.Module):
             stride * (input_len - 1) - 2 * padding + dilation * (kernel - 1) + output_padding + 1
         )
         return (out, out, filters)
+
     def conv_output_shape(self, input_len, filters, kernel, stride=1, padding=0, dilation=1):
         """
         returns the output shape of a convolutional layer
@@ -418,8 +415,9 @@ class Deconvnet(to.nn.Module):
         out = (input_len + 2 * padding - dilation * (kernel - 1) - 1) / stride + 1
         out = int(out)
         return (out, out, filters)
-# added in neural_models.py
 
+
+# added in neural_models.py
 
 
 class FCDeConvNetSigOut(FCDeConvNet):
@@ -433,7 +431,7 @@ def feature_map(w, h, d, n_kernels, kernel_size):
     h2 = h - kernel_size + 1
     d2 = n_kernels
     volume = w2, h2, d2
-    n_weights = kernel_size ** 2 * d * n_kernels
+    n_weights = kernel_size**2 * d * n_kernels
     return volume, n_weights
 
 
@@ -444,4 +442,3 @@ def deconv_2_l(n_kernels):
     v1 = volume1[0] * volume1[1] * volume1[2]
     v2 = volume2[0] * volume2[1] * volume2[2]
     return v1 + v2, n_weights2 + n_weights1
-

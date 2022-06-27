@@ -386,7 +386,7 @@ class TVAEWorker(BaseWorker):
         # Todo: take filter dimensionality from x for the final filter
         # TODO: remove last filter from hyperparameters
 
-        num_filters_1 = CSH.CategoricalHyperparameter("num_filters_1", [ 1])
+        num_filters_1 = CSH.CategoricalHyperparameter("num_filters_1", [1])
         num_filters_2 = CSH.UniformIntegerHyperparameter(
             "num_filters_2", lower=1, upper=4, default_value=4, log=True
         )
