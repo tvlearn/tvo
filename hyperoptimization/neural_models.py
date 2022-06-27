@@ -1,14 +1,16 @@
+import warnings
+
 import numpy as np
 from warnings import warn
 from typing import List
-
 import torch as to
 import torch.nn as nn
-import logging
+import tvo
 
 '''
 This is a refactored version of FCDeconvnet. 
 '''
+
 class FCDeConvNet(to.nn.Module):
     def __init__(
         self,
@@ -47,7 +49,8 @@ class FCDeConvNet(to.nn.Module):
         :param output_shape: X.shape[-1]
         :param input_size: S.shape
         :param dropout_rate: global dropout rate # todo enable local dropout?
-        :param filters_from_fc: the amount of filters to use for the hidden representation
+        :param filters_from_fc: the amount of filters t        self.deconv_stack = nn.Sequential()
+o use for the hidden representation
          of the linear stack
         :param sanity_checks: BOOL, decides whether sanity checks are run at init.
         """
@@ -66,29 +69,48 @@ class FCDeConvNet(to.nn.Module):
 
         self.shape = [input_size]
 
-
         self.n_deconv_layers = n_deconv_layers
-        self.deconv_stack = nn.Sequential()
+
+        if n_kernels and n_kernels[-1]!=1:
+            warnings.warn('Final number of kernels exceeds expected dimensionality. Setting manually to 1.')
+            n_kernels[-1]=1
+
+        if n_fc_layers:
+            if not n_deconv_layers:
+                warnings.warn('Using fully connected network, output layer set to to input shape manually')
+                W_shapes[-1]=output_shape
+            self.linear_stack = FCnet(input_size,
+                 W_shapes,
+                 fc_activations,
+                 dropouts,
+                 dropout_rate,)
+
+        else:
+            self.linear_stack = nn.Sequential()
+
+
+        if n_deconv_layers:
+            if n_fc_layers:
+                input_size=W_shapes[-1]  # plug on top of fc
+            self.deconv_stack = Deconvnet(input_size,
+                 filters_from_fc,
+                 kernels,
+                 output_shape,
+                 n_deconv_layers,
+                 n_kernels,
+                 dc_activations,
+                 paddings,
+                batch_norms,
+                 dtype=to.double)
+            self.deconv_stack.output_shape=output_shape
+
+        else:
+            self.deconv_stack = nn.Sequential()
 
     def forward(self, x):
         x = x.double()
-        # x.to('cuda')
         h = self.linear_stack(x)
-
-        n, S_k, D = x.shape[0], x.shape[1], self.D
-
-        if self.n_deconv_layers > 0:
-
-            h = h.reshape(n, S_k, int(np.sqrt(h.shape[-1])), int(np.sqrt(h.shape[-1])))
-            out = to.empty(size=(n, S_k, D), device=h.device, dtype=h.dtype)
-            for s in range(S_k):
-                h_s = self.deconv_stack(h[:, s, :, :].unsqueeze(axis=1))
-                # h_s = to.sum(h_s, dim=1)
-                # todo force last filter to match the dimensionality
-                out[:, s, :] = to.reshape(h_s, (n, D))
-        else:
-            out = h
-
+        out = self.deconv_stack(h)
         return out
 
     def number_of_parameters(self):
@@ -174,6 +196,7 @@ class FCnet(to.nn.Module):
         return out
 
 class Deconvnet(to.nn.Module):
+
     def __init__(self, in_features,
                  filters_from_fc,
                  kernels,
@@ -269,16 +292,20 @@ class Deconvnet(to.nn.Module):
 
     def forward(self, x):
         h = x.double()
-        n, S_kn, D = x.shape[0], x.shape[1], self.D
+        n, S_kn, D = x.shape[0], x.shape[1], self.output_shape
         h = h.reshape(n, S_kn, int(np.sqrt(h.shape[-1])), int(np.sqrt(h.shape[-1])))
         out = to.empty(size=(n, S_kn, D), device=h.device, dtype=h.dtype)
         for s in range(S_kn):
             h_s = self.deconv_stack(h[:, s, :, :].unsqueeze(axis=1))
             # h_s = to.sum(h_s, dim=1)
             # todo force last filter to match the dimensionality
-            out[:, s, :] = to.reshape(h_s, (n, D))
-
+            try:
+                out[:, s, :] = to.reshape(h_s, (n, D))
+            except Exception as e:
+                print(h_s.shape[-1]-28)
+                raise e
         return out
+
     @staticmethod
     def deconvolution_hypers_from_upsampling(upsampling: int, min_kernel=3, n_layers=1):
         """
@@ -315,9 +342,16 @@ class Deconvnet(to.nn.Module):
             # kernel adds -1, with kernel=1 -> upsampling=0
             kernel = min_kernel
             padding = (min_kernel - upsampling_ - 1) / 2
+
+            # padding uneven
             if padding != int(padding):
                 kernel -= 1 * np.sign(padding)
                 padding = int(padding)
+
+            # # padding uneven
+            # if padding != int(padding):
+            #     kernel += 1 * np.sign(padding)
+            #     padding = int(padding)
 
             if padding < 0:
                 kernel += 2 * abs(padding)
