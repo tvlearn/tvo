@@ -6,6 +6,9 @@ import torch as to
 import torch.nn as nn
 import logging
 
+'''
+This is a refactored version of FCDeconvnet. 
+'''
 class FCDeConvNet(to.nn.Module):
     def __init__(
         self,

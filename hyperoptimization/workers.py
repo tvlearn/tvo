@@ -97,7 +97,7 @@ class TVAEWorker(BaseWorker):
         self.is_hyperparameter_EEM = False
 
         # loads data, sets N and D
-        self.handle_data(kwargs)
+        self.handle_data()
 
         # set the config space
         self.set_configspace()
