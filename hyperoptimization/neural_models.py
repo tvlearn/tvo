@@ -291,7 +291,7 @@ class Deconvnet(to.nn.Module):
 
     def forward(self, x):
         n, S_kn, D = x.shape[0], x.shape[1], self.output_shape
-        h = x.reshape(n, S_kn, int(np.sqrt(h.shape[-1])), int(np.sqrt(h.shape[-1])))
+        h = x.reshape(n, S_kn, int(np.sqrt(x.shape[-1])), int(np.sqrt(x.shape[-1])))
         out = to.empty(size=(n, S_kn, D), device=h.device, dtype=h.dtype)
         for s in range(S_kn):
             h_s = self.deconv_stack(h[:, s, :, :].unsqueeze(axis=1))
