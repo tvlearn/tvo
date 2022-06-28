@@ -296,12 +296,10 @@ class Deconvnet(to.nn.Module):
         for s in range(S_kn):
             h_s = self.deconv_stack(h[:, s, :, :].unsqueeze(axis=1))
             # h_s = to.sum(h_s, dim=1)
-            # todo force last filter to match the dimensionality
-            try:
-                out[:, s, :] = to.reshape(h_s, (n, D))
-            except Exception as e:
-                print(h_s.shape[-1] - 28)
-                raise e
+            # todo force last filter to match the dimensionality?
+
+            out[:, s, :] = to.reshape(h_s, (n, D))
+
         return out
 
     @staticmethod
