@@ -24,6 +24,7 @@ class FCDeConvNet(to.nn.Module):
         kernels=None,
         paddings=None,
         sanity_checks=False,
+        dtype=to.double
     ):
         """
         Adjustable deconvolutional network class. It builds an optionally deconvolutional
@@ -77,6 +78,7 @@ class FCDeConvNet(to.nn.Module):
                 fc_activations,
                 dropouts,
                 dropout_rate,
+                dtype=to.double
             )
 
         else:
@@ -157,6 +159,7 @@ class FCnet(to.nn.Module):
         fc_activations: List,
         dropouts: List[bool],
         dropout_rate=0.25,
+        dtype=to.double
     ):
 
         super().__init__()
@@ -177,7 +180,7 @@ class FCnet(to.nn.Module):
             self.shape.append(n_hidden)  # store shape for TVEM
             self.linear_stack.add_module(
                 "linear_{}".format(i),
-                nn.Linear(in_features, out_features=n_hidden),
+                nn.Linear(in_features, out_features=n_hidden, dtype=dtype),
             )
             # add dropout to layer
             if dropout:
@@ -287,9 +290,8 @@ class Deconvnet(to.nn.Module):
         self.shape.append(output_shape)
 
     def forward(self, x):
-        h = x.double()
         n, S_kn, D = x.shape[0], x.shape[1], self.output_shape
-        h = h.reshape(n, S_kn, int(np.sqrt(h.shape[-1])), int(np.sqrt(h.shape[-1])))
+        h = x.reshape(n, S_kn, int(np.sqrt(h.shape[-1])), int(np.sqrt(h.shape[-1])))
         out = to.empty(size=(n, S_kn, D), device=h.device, dtype=h.dtype)
         for s in range(S_kn):
             h_s = self.deconv_stack(h[:, s, :, :].unsqueeze(axis=1))
