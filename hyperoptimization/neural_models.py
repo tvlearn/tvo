@@ -24,7 +24,7 @@ class FCDeConvNet(to.nn.Module):
         kernels=None,
         paddings=None,
         sanity_checks=False,
-        dtype=to.double
+        dtype=to.double,
     ):
         """
         Adjustable deconvolutional network class. It builds an optionally deconvolutional
@@ -72,17 +72,12 @@ class FCDeConvNet(to.nn.Module):
                     "Using fully connected network, output layer set to to input shape manually"
                 )
                 W_shapes[-1] = output_shape
-            self.linear_stack = FCnet(
-                input_size,
-                W_shapes,
-                fc_activations,
-                dropouts,
-                dropout_rate,
-                dtype=to.double
+            self.fc_stack = FCnet(
+                input_size, W_shapes, fc_activations, dropouts, dropout_rate, dtype=to.double
             )
 
         else:
-            self.linear_stack = nn.Sequential()
+            self.fc_stack = nn.Sequential()
 
         if n_deconv_layers:
             if n_fc_layers:
@@ -106,7 +101,7 @@ class FCDeConvNet(to.nn.Module):
 
     def forward(self, x):
         x = x.double()
-        h = self.linear_stack(x)
+        h = self.fc_stack(x)
         out = self.deconv_stack(h)
         return out
 
@@ -159,7 +154,7 @@ class FCnet(to.nn.Module):
         fc_activations: List,
         dropouts: List[bool],
         dropout_rate=0.25,
-        dtype=to.double
+        dtype=to.double,
     ):
 
         super().__init__()
@@ -167,8 +162,8 @@ class FCnet(to.nn.Module):
         if not hasattr(self, "shape"):
             self.shape = [input_size]
 
-        if not hasattr(self, "linear_stack"):
-            self.linear_stack = nn.Sequential()
+        if not hasattr(self, "fc_stack"):
+            self.fc_stack = nn.Sequential()
 
         # setup fully connected blocks
         in_features = input_size
@@ -178,20 +173,20 @@ class FCnet(to.nn.Module):
             zip(W_shapes, fc_activations, dropouts)
         ):
             self.shape.append(n_hidden)  # store shape for TVEM
-            self.linear_stack.add_module(
+            self.fc_stack.add_module(
                 "linear_{}".format(i),
                 nn.Linear(in_features, out_features=n_hidden, dtype=dtype),
             )
             # add dropout to layer
             if dropout:
-                self.linear_stack.add_module("dropout_layer{}".format(i), nn.Dropout(dropout_rate))
-            self.linear_stack.add_module("activation_{}".format(i), eval(activation)())
+                self.fc_stack.add_module("dropout_layer{}".format(i), nn.Dropout(dropout_rate))
+            self.fc_stack.add_module("activation_{}".format(i), eval(activation)())
             in_features = n_hidden
 
         self.dropout = nn.Dropout(p=dropout_rate)  # set the dropout rate
 
     def forward(self, x):
-        out = self.linear_stack(x)
+        out = self.fc_stack(x)
         return out
 
 
@@ -219,7 +214,7 @@ class Deconvnet(to.nn.Module):
         if not hasattr(self, "shape"):
             self.shape = [in_features]
 
-        if not hasattr(self, "linear_stack"):
+        if not hasattr(self, "fc_stack"):
             self.deconv_stack = nn.Sequential()
 
         # transposed convolution blocks
