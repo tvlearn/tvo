@@ -10,11 +10,11 @@ import torch as to
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
-from tvo.models import BSC, GaussianTVAE
-from hyperoptimization import FCDeConvNetSigOut as FCDeconv
+from tvo.models import BSC
 from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape, gather_from_processes
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 from tvo.utils.model_protocols import Reconstructor
+
 from tvutil.prepost import (
     OverlappingPatches,
     MultiDimOverlappingPatches,
@@ -98,42 +98,14 @@ def gaussian_denoising_example():
     barrier()
     broadcast(W_init)
     broadcast(sigma2_init)
-    # model = BSC(
-    #     H=args.H,
-    #     D=D,
-    #     W_init=W_init,
-    #     sigma2_init=sigma2_init,
-    #     pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
-    #     precision=PRECISION,
-    # )
-    nn = FCDeconv(
-        n_deconv_layers=2,
-        n_fc_layers=1,
-        W_shapes=[64],
-        fc_activations=["to.nn.LeakyReLU"],
-        dc_activations=["to.nn.LeakyReLU", "to.nn.LeakyReLU"],
-        n_filters=[3, 1],
-        dropouts=[False],
-        batch_norms=[False, False],
-        output_shape=100,
-        input_size=100,
-        dropout_rate=0.25,
-        filters_from_fc=1,
-        kernels=None,
-        paddings=None,
-        sanity_checks=False,
+    model = BSC(
+        H=args.H,
+        D=D,
+        W_init=W_init,
+        sigma2_init=sigma2_init,
+        pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
+        precision=PRECISION,
     )
-
-    epochs_per_half_cycle = 10
-    cycliclr_half_step_size = to.ceil(N / args.batch_size) * epochs_per_half_cycle
-    model = GaussianTVAE(
-        external_model=nn,
-        min_lr=args.min_lr,
-        max_lr=args.max_lr,
-        cycliclr_step_size_up=cycliclr_half_step_size,
-        precision=to.float32,
-    )
-
     assert isinstance(model, Reconstructor)
 
     pprint("Initializing experiment")
