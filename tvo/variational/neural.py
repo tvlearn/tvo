@@ -199,7 +199,7 @@ class NeuralVariationalStates(TVOVariationalStates):
                 if self.loss_fname=='LPJ':
                     loss = self.loss_function(new_lpj)
                 elif self.loss_fname in ('BCE','CE'):
-                    p = to.mean(self.K[idx].to(to.float64), axis=1) # compute <s_h>
+                    p = to.mean(self.K[idx].to(self.precision), axis=1) # compute <s_h>
                     p.requires_grad=True
                     # q.requires_grad=True
                     # assert p.requires_grad
