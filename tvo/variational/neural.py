@@ -262,7 +262,7 @@ class MLP(to.nn.Module):
         dropouts: Sequence[bool],
         dropout_rate: int,
         output_activation=to.nn.Identity,
-        precision: to.dtype = to.float64,
+        precision: to.dtype = to.float32,
         **kwargs,
     ):
         super(MLP, self).__init__()
