@@ -4,5 +4,4 @@ from .tvae import GaussianTVAE, BernoulliTVAE
 from .gmm import GMM
 from .pmm import PMM
 from .sssc import SSSC
-
-__all__ = ["NoisyOR", "BSC", "GaussianTVAE", "BernoulliTVAE", "GMM", "PMM", "SSSC"]
+__all__ = ["NoisyOR", "BSC", "SSSC", "GaussianTVAE", "BernoulliTVAE", "GMM", "PMM"]
