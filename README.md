@@ -5,7 +5,7 @@
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 [![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg)](https://trello.com/b/EuWTcm4w/tvem-repo)
 
-This repository provides a PyTorch package for Truncated Variational Optimization. For related publications, see [](#related-publications) below. Check out the [examples](/examples) to get started.
+This repository provides a PyTorch package for Truncated Variational Optimization. See [related publications](#related-publications) below. To get started, check out the [examples](/examples).
 
 
 ## Setup
