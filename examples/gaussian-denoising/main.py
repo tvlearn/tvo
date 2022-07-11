@@ -85,7 +85,7 @@ def gaussian_denoising_example():
     pprint("Initializing model")
 
     # initialize model
-    if args.model=='bsc':
+    if args.model == "bsc":
         W_init = (
             init_W_data_mean(data=train_data, H=args.H, dtype=PRECISION, device=DEVICE).contiguous()
             if comm_rank == 0
@@ -100,7 +100,6 @@ def gaussian_denoising_example():
         broadcast(W_init)
         broadcast(sigma2_init)
 
-
         model = BSC(
             H=args.H,
             D=D,
@@ -109,10 +108,12 @@ def gaussian_denoising_example():
             pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
             precision=PRECISION,
         )
-    elif args.model=='tvae':
-        model=GaussianTVAE(shape=args.tvae_shape,
-                           min_lr=0.0001,
-                           max_lr=0.01,)
+    elif args.model == "tvae":
+        model = GaussianTVAE(
+            shape=args.tvae_shape,
+            min_lr=0.0001,
+            max_lr=0.01,
+        )
 
     assert isinstance(model, Reconstructor)
 
@@ -200,7 +201,7 @@ def gaussian_denoising_example():
             visualizer.process_epoch(
                 epoch=epoch,
                 pies=model.theta["pies"],
-                gfs=model.theta["W"] if args.model=='bsc' else model.theta["W_0"],
+                gfs=model.theta["W"] if args.model == "bsc" else model.theta["W_0"],
                 rec=imgs["mean"] if merge else None,
             )
         barrier()
