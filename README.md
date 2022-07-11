@@ -22,7 +22,7 @@ $ conda create -n tvo python==3.8
 $ conda activate tvo
 ```
 
-For large problem sizes, we strongly recommend distributed execution of the algorithms using CPU and/or GPU parallelization. To enable MPI-based CPU parallelization, make sure to complete the steps described under [Installing PyTorch with MPI support](#installing-pytorch-with-mpi-support-(optional)) below. Execution on GPU requires the CUDA Toolkit to be installed, e.g. via `conda install -c anaconda cudatoolkit`.
+For large problem sizes, we strongly recommend distributed execution of the algorithms using CPU and/or GPU parallelization. To enable MPI-based CPU parallelization, make sure to complete the steps described under [Installing PyTorch with MPI support](#installing-pytorch-with-mpi-support-(optional\)) below. Execution on GPU requires the CUDA Toolkit to be installed, e.g. via `conda install -c anaconda cudatoolkit`.
 
 After completing the optional installations for distributed execution, run
 
