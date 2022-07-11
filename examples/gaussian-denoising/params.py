@@ -142,8 +142,9 @@ viz_parser.add_argument(
 )
 
 model_parser = argparse.ArgumentParser(add_help=False)
-model_parser.add_argument('--model', default='tvae', choices=['tvae', 'bsc'], required=False)
-model_parser.add_argument('--tvae_shape', default=[25,25,25], nargs=3, required=False)
+model_parser.add_argument("--model", default="tvae", choices=["tvae", "bsc"], required=False)
+model_parser.add_argument("--tvae_shape", default=[25, 25, 25], nargs=3, required=False)
+
 
 def get_args():
     parser = argparse.ArgumentParser(
