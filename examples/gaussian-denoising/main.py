@@ -38,7 +38,7 @@ PRECISION = to.float32
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
-def gaussian_denoising_example():
+def gaussian_denoising_example():# noqa: C901
 
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
