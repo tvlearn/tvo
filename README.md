@@ -24,7 +24,7 @@ $ conda activate tvo
 
 For large problem sizes, we recommend distributed execution of the algorithms using CPU and/or GPU parallelization. To enable MPI-based CPU parallelization, follow the steps described under [Installing PyTorch with MPI support](#installing-pytorch-with-mpi-support) below. To enable execution on GPU, make sure to have the CUDA Toolkit installed, e.g. via `conda install -c anaconda cudatoolkit`.
 
-Next, the packages specified in `requirements.txt` can be installed. If you installed PyTorch from source for MPI support, comment out `torch` and `torchvision`. Mac users can comment out `gcc_linux-64`. You can then run:
+Next, the packages specified in [`requirements.txt`](requirements.txt) can be installed. If you have installed PyTorch from source for MPI support, comment out the packages `torch` and `torchvision`. Mac users can comment out `gcc_linux-64`. You can then run:
 
 ```bash
 $ pip install -r requirements.txt
