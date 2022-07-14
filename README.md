@@ -5,34 +5,83 @@
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 [![trello board](https://img.shields.io/badge/trello%20board-private-blue.svg)](https://trello.com/b/EuWTcm4w/tvem-repo)
 
-This repository provides a PyTorch package for Truncated Variational Optimization. For related publications, see [1-3]. Check out the [examples](/examples) to get started.
+This repository provides a PyTorch package for Truncated Variational Optimization. See [related publications](#related-publications) below. To get started, check out the [examples](/examples).
 
 
-## Installing
-
-To install from sources:
+## Setup
+Clone this repository:
 
 ```bash
-git@github.com:tvlearn/tvo.git # clone this repo
-python -m pip install .
+git clone git@github.com:tvlearn/tvo.git
+```
+
+We recommend [Anaconda](https://www.anaconda.com/) to manage the installation, and to create a new environment for hosting installed packages:
+
+```bash
+$ conda create -n tvo python==3.8
+$ conda activate tvo
+```
+
+For large problem sizes, we recommend distributed execution of the algorithms using CPU and/or GPU parallelization. To enable MPI-based CPU parallelization, follow the steps described under [Installing PyTorch with MPI support](#installing-pytorch-with-mpi-support) below. To enable execution on GPU, make sure to have the CUDA Toolkit installed, e.g. via `conda install -c anaconda cudatoolkit`.
+
+Next, the packages specified in [`requirements.txt`](requirements.txt) can be installed. If you have installed PyTorch from source for MPI support, comment out the packages `torch` and `torchvision`. Mac users can comment out `gcc_linux-64`. You can then run:
+
+```bash
+$ pip install -r requirements.txt
+```
+
+Finally, TVO can be set up:
+
+```bash
+$ cd tvo
+$ python setup.py build_ext
+$ python setup.py install  # optionally replace install by develop to facilitate development
+```
+
+Running the examples additionally requires an installation of [tvutil](https://github.com/tvlearn/tvutil), e.g. via:
+
+```bash
+$ cd ..
+$ git clone git@github.com:tvlearn/tvutil.git
+$ cd tvutil
+$ python setup.py install
 ```
 
 
 ## Running tests
-
-To run the tests, first make sure `cython`, `pytest` and `setuptools` are installed in your local environment.
-Then run:
+Unit tests are implemented in [test](/test) and can be executed via:
 
 ```bash
-python setup.py build_ext --inplace # compile extension modules
-pytest test # run tests
+python setup.py build_ext --inplace  # compile extension modules
+pytest test  # run tests
 ```
 
 
-## References
+## Installing PyTorch with MPI support
+This step is optional and only relevant for large scale applications of the algorithms. 
 
-[1] Evolutionary Variational Optimization of Generative Models. Jakob Drefs, Enrico Guiraud, Jörg Lücke. _Journal of Machine Learning Research_ 23(21):1-51, 2022. [(online access)](https://www.jmlr.org/papers/v23/20-233.html)
+First, you need to install MPI (please consult the official documentation of [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html) and [MPICH](https://www.mpich.org/documentation/guides/) if you need help), e.g. via:
+```
+$ sudo apt install mpich
+$ MPICC=$(which mpicc) pip install mpi4py
+```
 
-[2] Truncated Variational Sampling for ‘Black Box’ Optimization of Generative Models. Jörg Lücke, Zhenwen Dai, Georgios Exarchakis. _International Conference on Latent Variable Analysis and Signal Separation_, Springer, Cham, 2018. [(online access)](https://link.springer.com/chapter/10.1007/978-3-319-93764-9_43)
+Once MPICH is installed, you are ready to install PyTorch from source:
+```bash
+$ conda install -c conda-forge typing_extensions numpy ninja pyyaml mkl mkl-include setuptools cmake cffi future six requests dataclasses
+$ git clone --recursive https://github.com/pytorch/pytorch
+$ cd pytorch
+$ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+$ python setup.py install
+```
 
-[3] Truncated Variational Expectation Maximization. Jörg Lücke. _arXiv preprint_ arXiv:1610.03113, 2019. [(online access)](https://arxiv.org/abs/1610.03113)
+
+## Related publications
+
+J. Drefs\*, E. Guiraud\*, F. Panagiotou, J. Lücke. Direct Evolutionary Optimization of Variational Autoencoders With Binary Latents. _Joint European Conference on Machine Learning and Knowledge Discovery in Databases_, Springer, Cham, 2022, accepted. \*Joint first authorship.
+
+Jakob Drefs, Enrico Guiraud, Jörg Lücke. Evolutionary Variational Optimization of Generative Models. _Journal of Machine Learning Research_ 23(21):1-51, 2022. [(online access)](https://www.jmlr.org/papers/v23/20-233.html)
+
+Jörg Lücke, Zhenwen Dai, Georgios Exarchakis. Truncated Variational Sampling for ‘Black Box’ Optimization of Generative Models. _International Conference on Latent Variable Analysis and Signal Separation_, Springer, Cham, 2018. [(online access)](https://link.springer.com/chapter/10.1007/978-3-319-93764-9_43)
+
+Jörg Lücke. Truncated Variational Expectation Maximization. _arXiv preprint_ arXiv:1610.03113, 2019. [(online access)](https://arxiv.org/abs/1610.03113)
