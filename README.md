@@ -78,7 +78,7 @@ $ python setup.py install
 
 ## Related publications
 
-J. Drefs\*, E. Guiraud\*, F. Panagiotou, J. Lücke. Direct Evolutionary Optimization of Variational Autoencoders With Binary Latents. _Joint European Conference on Machine Learning and Knowledge Discovery in Databases_, Springer, Cham, 2022, accepted. \*Joint first authorship.
+Jakob Drefs\*, Enrico Guiraud\*, Filippos Panagiotou, Jörg Lücke. Direct Evolutionary Optimization of Variational Autoencoders With Binary Latents. _Joint European Conference on Machine Learning and Knowledge Discovery in Databases_, Springer, Cham, 2022, accepted. \*Joint first authorship.
 
 Jakob Drefs, Enrico Guiraud, Jörg Lücke. Evolutionary Variational Optimization of Generative Models. _Journal of Machine Learning Research_ 23(21):1-51, 2022. [(online access)](https://www.jmlr.org/papers/v23/20-233.html)
 
