@@ -10,6 +10,5 @@ pytest-cov
 black
 munch
 cython
-gcc_linux-64
 scipy
 scikit-image
