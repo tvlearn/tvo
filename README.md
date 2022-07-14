@@ -22,12 +22,12 @@ $ conda create -n tvo python==3.8
 $ conda activate tvo
 ```
 
-For large problem sizes, we strongly recommend distributed execution of the algorithms using CPU and/or GPU parallelization. To enable MPI-based CPU parallelization, make sure to complete the steps described under [Installing PyTorch with MPI support](#installing-pytorch-with-mpi-support) below. Execution on GPU requires the CUDA Toolkit to be installed, e.g. via `conda install -c anaconda cudatoolkit`.
+For large problem sizes, we recommend distributed execution of the algorithms using CPU and/or GPU parallelization. To enable MPI-based CPU parallelization, follow the steps described under [Installing PyTorch with MPI support](#installing-pytorch-with-mpi-support) below. To enable execution on GPU, make sure to have the CUDA Toolkit installed, e.g. via `conda install -c anaconda cudatoolkit`.
 
-After completing the optional installations for distributed execution, run
+Next, the packages specified in `requirements.txt` can be installed. If you installed PyTorch from source for MPI support, comment out `torch` and `torchvision`. Mac users can comment out `gcc_linux-64`. You can then run:
 
 ```bash
-$ pip install -r requirements.txt  # use requirements-mpi.txt in case of MPI-usage
+$ pip install -r requirements.txt
 ```
 
 Finally, TVO can be set up:
@@ -58,7 +58,7 @@ pytest test  # run tests
 
 
 ## Installing PyTorch with MPI support
-This step is optional and might only be relevant for large scale applications of the algorithms. 
+This step is optional and only relevant for large scale applications of the algorithms. 
 
 First, you need to install MPI (please consult the official documentation of [mpi4py](https://mpi4py.readthedocs.io/en/stable/install.html) and [MPICH](https://www.mpich.org/documentation/guides/) if you need help), e.g. via:
 ```
