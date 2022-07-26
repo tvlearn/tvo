@@ -62,7 +62,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         device = tvo.get_device()
 
         if W_init is not None:
-            assert W_init.shape == (D, H)
+            assert W_init.shape == (D, H), 'Error: W_init shape is {}, but expected {}, {}'.format(W_init.shape, D,H)
             W_init = W_init.to(dtype=precision, device=device)
         else:
             W_init = to.rand((D, H), dtype=precision, device=device)
@@ -108,10 +108,10 @@ class BSC(Optimized, Sampler, Reconstructor):
             ],
         }
 
-        self.my_Wp = to.zeros((D, H), dtype=precision, device=device)
-        self.my_Wq = to.zeros((H, H), dtype=precision, device=device)
-        self.my_pies = to.zeros(H, dtype=precision, device=device)
-        self.my_sigma2 = to.zeros(1, dtype=precision, device=device)
+        self.my_Wp = to.zeros((D, H), dtype=precision, device=device, requires_grad=self._theta["W"].requires_grad)
+        self.my_Wq = to.zeros((H, H), dtype=precision, device=device, requires_grad=self._theta["W"].requires_grad)
+        self.my_pies = to.zeros(H, dtype=precision, device=device,requires_grad=self._theta["pies"].requires_grad)
+        self.my_sigma2 = to.zeros(1, dtype=precision, device=device, requires_grad=self._theta["sigma2"].requires_grad)
         self.my_N = to.tensor([0], dtype=to.int, device=device)
         self._config = dict(
             H=H,
@@ -165,30 +165,32 @@ class BSC(Optimized, Sampler, Reconstructor):
     def update_param_batch(
         self, idx: Tensor, batch: Tensor, states: TVOVariationalStates
     ) -> None:
-        lpj = states.lpj[idx]
-        K = states.K[idx]
-        batch_size, S, _ = K.shape
 
-        Kfloat = K.to(
-            dtype=lpj.dtype
-        )  # TODO Find solution to avoid byte->float casting
-        Wbar = to.matmul(
-            Kfloat, self.theta["W"].t()
-        )  # TODO Find solution to re-use evaluations from E-step
+        with to.set_grad_enabled(self.theta['W'].requires_grad):
+            lpj = states.lpj[idx]
+            K = states.K[idx]
+            batch_size, S, _ = K.shape
 
-        batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
-        batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
-        Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
-        batch_Wq = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
-        batch_sigma2 = mean_posterior(
-            to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
-        )  # is (batch_size,)
+            Kfloat = K.to(
+                dtype=lpj.dtype
+            )  # TODO Find solution to avoid byte->float casting
+            Wbar = to.matmul(
+                Kfloat, self.theta["W"].t()
+            )  # TODO Find solution to re-use evaluations from E-step
 
-        self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
-        self.my_Wp.add_(to.sum(batch_Wp, dim=0))
-        self.my_Wq.add_(batch_Wq)
-        self.my_sigma2.add_(to.sum(batch_sigma2))
-        self.my_N.add_(batch_size)
+            batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
+            batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
+            Kq = Kfloat.mul(lpj2pjc(lpj)[:, :, None])
+            batch_Wq = to.einsum("ijk,ijl->kl", Kq, Kfloat)  # is (batch_size,H,H)
+            batch_sigma2 = mean_posterior(
+                to.sum((batch[:, None, :] - Wbar) ** 2, dim=2), lpj
+            )  # is (batch_size,)
+
+            self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
+            self.my_Wp.add_(to.sum(batch_Wp, dim=0))
+            self.my_Wq.add_(batch_Wq)
+            self.my_sigma2.add_(to.sum(batch_sigma2))
+            self.my_N.add_(batch_size)
 
         return None
 
