@@ -112,7 +112,7 @@ def feature_learning():
         else Visualizer(  # type: ignore
             output_directory=output_directory,
             viz_every=args.viz_every if args.viz_every is not None else args.no_epochs,
-            datapoints=data[np.random.permutation(data.shape[0])[:16]],
+            datapoints=data[np.random.permutation(data.shape[0])[:16]].detach().cpu(),
             patch_size=args.patch_size,
             sort_acc_to_desc_priors=True,
             ncol_gfs=16,
