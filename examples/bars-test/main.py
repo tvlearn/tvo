@@ -151,8 +151,8 @@ def bars_test():
         else Visualizer(  # type: ignore
             viz_every=args.viz_every if args.viz_every is not None else args.no_epochs,
             output_directory=output_directory,
-            datapoints=data[:15],
-            theta_gen=theta_gen,
+            datapoints=data[:15].detach().cpu(),
+            theta_gen={k: v.detach().cpu() for k, v in theta_gen.items()},
             L_gen=ll_gen,
             gif_framerate=args.gif_framerate,
         )
@@ -167,7 +167,7 @@ def bars_test():
         if comm_rank == 0:
             assert isinstance(visualizer, _Visualizer)  # to make mypy happy
             visualizer.process_epoch(
-                epoch=epoch, F=summary._results["train_F"], theta=exp.trainer.model.theta
+                epoch=epoch, F=summary._results["train_F"], theta={k: v.detach().cpu() for k, v in exp.trainer.model.theta.items()}
             )
 
     barrier()
