@@ -70,7 +70,7 @@ def gaussian_denoising_example():
     if comm_rank == 0:
         clean = get_image(args.clean_image, args.rescale).to(**dtype_device_kwargs)
         isrgb = clean.dim() == 3 and clean.shape[2] == 3
-        noisy = clean + args.noise_level * to.randn(clean.shape)
+        noisy = clean + args.noise_level * to.randn(clean.shape).to(**dtype_device_kwargs)
         print("Added white Gaussian noise with σ={}".format(args.noise_level))
         OVP = MultiDimOverlappingPatches if isrgb else OverlappingPatches
         ovp = OVP(noisy, args.patch_height, patch_width, patch_shift=1)
