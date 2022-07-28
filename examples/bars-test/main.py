@@ -167,7 +167,9 @@ def bars_test():
         if comm_rank == 0:
             assert isinstance(visualizer, _Visualizer)  # to make mypy happy
             visualizer.process_epoch(
-                epoch=epoch, F=summary._results["train_F"], theta={k: v.detach().cpu() for k, v in exp.trainer.model.theta.items()}
+                epoch=epoch,
+                F=summary._results["train_F"],
+                theta={k: v.detach().cpu() for k, v in exp.trainer.model.theta.items()},
             )
 
     barrier()
