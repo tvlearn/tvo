@@ -13,6 +13,7 @@ from tvo.variational._utils import update_states_for_batch, set_redundant_lpj_to
 from tvo.utils.model_protocols import Optimized, Trainable
 import warnings
 
+from tvo.variational.evo import batch_sparseflip, batch_randflip
 
 class NeuralVariationalStates(TVOVariationalStates):
     def __init__(
@@ -26,9 +27,11 @@ class NeuralVariationalStates(TVOVariationalStates):
         update_decoder: bool = True,
         encoder: str = "MLP",
         sampling: str = "Gumbel",
+        bitflipping: str = "randflip",
         n_samples: int = 1,
         lr: float = 1e-3,
         training=True,
+        k_updating=True,
         **kwargs,
     ):
         """
@@ -92,6 +95,11 @@ class NeuralVariationalStates(TVOVariationalStates):
         else:
             raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
 
+        # select bit flipping method
+        if bitflipping ==  'randflip':
+            self.bitflipping = batch_randflip
+        elif bitflipping == 'sparseflip':
+            self.bitflipping = batch_sparseflip
         # select a loss function
         self.loss_fname = kwargs["loss_name"]
         assert self.loss_fname in ["BCE", "LPJ", 'CE'], "loss_function must be either BCE or LPJ"
@@ -109,7 +117,8 @@ class NeuralVariationalStates(TVOVariationalStates):
         self.optimizer = to.optim.Adam(self.encoder.parameters(), lr=lr)
 
         # set training or evaluation mode
-        self.set_training(training)
+        self.set_nn_training(training)
+        self.set_k_updating(k_updating)
 
         # populate train set if any
         if getattr(self, "decoder_train_labels", None):
@@ -175,12 +184,12 @@ class NeuralVariationalStates(TVOVariationalStates):
         # new_lpj = to.empty((n, k, h), dtype=self.lpj.dtype, device=self.lpj.device)
 
         # prepare training process
-        if self.training:
+        if self._training:
             self.optimizer.zero_grad()
 
         # get parameters of sampling distribution
         with self.gradients_context_manager:  # computes gradients when necessary
-            if self.training:
+            if self._training:
                 batch.requires_grad=True
             q = self.encoder(batch) # n x h
 
@@ -189,11 +198,14 @@ class NeuralVariationalStates(TVOVariationalStates):
             # get new variational states
             new_states[:, i, :] = self.sampling(q)
 
+        # flip bits for stochasticity
+        new_states = self.bitflipping(new_states, n_children=1)
+
         # get lpj of new variational states
         new_lpj = lpj_fn(batch, new_states)
 
         # update encoder
-        if self.training:
+        if self._training:
             with self.gradients_context_manager:
                 # accumulate loss
                 if self.loss_fname=='LPJ':
@@ -212,11 +224,17 @@ class NeuralVariationalStates(TVOVariationalStates):
                 # if to.rand(1) > 0.95:
                 #     print('Loss={}'.format(loss.detach().numpy()))
 
+                self.encoder.losses.append(loss.detach().numpy())
                 try:
                     loss.backward()
                 except RuntimeError as e:
                     raise e
+
         # update the variational states
+        if self.k_updating:
+            with to.no_grad():
+                set_redundant_lpj_to_low(new_states, new_lpj, old_states=self.K[idx])
+
         return update_states_for_batch(
             new_states=new_states.to(device=self.K.device),
             new_lpj=new_lpj.to(device=self.lpj.device),
@@ -229,16 +247,18 @@ class NeuralVariationalStates(TVOVariationalStates):
     def lpj_loss(self, lpj):
         return to.sum(lpj).requires_grad_(True)
 
-    def set_training(self, training: bool):
+    def set_nn_training(self, training: bool):
         if training:
             self.gradients_context_manager = to.set_grad_enabled(True) # NullContextManager()
             self.encoder.train()
-            self.training = True
+            self._training = True
         else:
             self.gradients_context_manager = to.no_grad()
             self.encoder.eval()
-            self.training = False
+            self._training = False
 
+    def set_k_updating(self, k_updating:bool):
+        self.k_updating=k_updating
 
 class MLP(to.nn.Module):
     """
@@ -279,6 +299,7 @@ class MLP(to.nn.Module):
 
         self.build_mlp()
 
+        self.losses = []
     def build_mlp(self):
 
         # define a temporary flatten class
