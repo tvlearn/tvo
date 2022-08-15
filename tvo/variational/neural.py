@@ -27,7 +27,7 @@ class NeuralVariationalStates(TVOVariationalStates):
         update_decoder: bool = True,
         encoder: str = "MLP",
         sampling: str = "Gumbel",
-        bitflipping: str = "randflip",
+        bitflipping: str = "sparseflip",
         n_samples: int = 1,
         lr: float = 1e-3,
         training=True,
@@ -100,9 +100,10 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.bitflipping = batch_randflip
         elif bitflipping == 'sparseflip':
             self.bitflipping = batch_sparseflip
+
         # select a loss function
         self.loss_fname = kwargs["loss_name"]
-        assert self.loss_fname in ["BCE", "LPJ", 'CE'], "loss_function must be either BCE or LPJ"
+        assert self.loss_fname in ["BCE", "LPJ", 'CE'], "loss_function must be either BCE,CE or LPJ"
 
         if self.loss_fname == "BCE":
             self.loss_function = to.nn.BCELoss()
@@ -125,7 +126,7 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.K = self.decoder_train_labels
 
     def gumbel_softmax_sampling(
-        self, logits: Tensor, temperature: float = 1.0, hard: bool = True
+        self, logits: Tensor, temperature: float = 0.3, hard: bool = True
     ) -> Tensor:
         """
         Implements Gumbel Softmax on logits of a neural network.
@@ -189,30 +190,31 @@ class NeuralVariationalStates(TVOVariationalStates):
 
         # get parameters of sampling distribution
         with self.gradients_context_manager:  # computes gradients when necessary
-            if self._training:
-                batch.requires_grad=True
+            # if self._training:
+            #     batch.requires_grad_(True)
             q = self.encoder(batch) # n x h
 
         # sample new variational states
         for i in range(self.n_samples):
             # get new variational states
             new_states[:, i, :] = self.sampling(q)
-
+            # new_states[:, i, :] = self.sampling(p)
         # flip bits for stochasticity
-        new_states = self.bitflipping(new_states, n_children=1)
+        new_states_bfd=self.bitflipping(new_states, n_children=8, sparsity=0.1, p_bf=0.1)
 
         # get lpj of new variational states
-        new_lpj = lpj_fn(batch, new_states)
+        new_lpj = lpj_fn(batch, new_states_bfd)
 
         # update encoder
         if self._training:
             with self.gradients_context_manager:
                 # accumulate loss
                 if self.loss_fname=='LPJ':
-                    loss = self.loss_function(new_lpj)
+                    lpj=lpj_fn(batch.requires_grad_(False), new_states).requires_grad_(True)
+                    loss = self.loss_function(lpj)
                 elif self.loss_fname in ('BCE','CE'):
                     p = to.mean(self.K[idx].to(self.precision), axis=1) # compute <s_h>
-                    p.requires_grad=True
+                    p.requires_grad_(True)
                     # q.requires_grad=True
                     # assert p.requires_grad
                     # assert q.requires_grad
@@ -226,17 +228,21 @@ class NeuralVariationalStates(TVOVariationalStates):
 
                 self.encoder.losses.append(loss.detach().numpy())
                 try:
-                    loss.backward()
+                    to.autograd.set_detect_anomaly(True)
+                    loss.backward(retain_graph=True)
                 except RuntimeError as e:
-                    raise e
+                    #raise e
+                    pass
+
+
 
         # update the variational states
         if self.k_updating:
             with to.no_grad():
-                set_redundant_lpj_to_low(new_states, new_lpj, old_states=self.K[idx])
+                set_redundant_lpj_to_low(new_states_bfd, new_lpj, old_states=self.K[idx])
 
         return update_states_for_batch(
-            new_states=new_states.to(device=self.K.device),
+            new_states=new_states_bfd.to(device=self.K.device),
             new_lpj=new_lpj.to(device=self.lpj.device),
             idx=idx,
             all_states=self.K,
