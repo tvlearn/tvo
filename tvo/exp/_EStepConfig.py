@@ -107,6 +107,8 @@ class NeuralEMConfig(EStepConfig):
         sampling: str = "Gumbel",
         K_init=None,
         loss_name: str =None,
+        n_parents=None,
+        n_children=None,
         **kwargs
     ):
         """
@@ -143,6 +145,9 @@ class NeuralEMConfig(EStepConfig):
             self.MLP_sanity_check()
             self.K_init = K_init
             self.loss_name = loss_name
+            self.n_parents= n_parents
+            self.n_children = n_children
+
             super().__init__(n_states)
         elif encoder == "CNN":
             raise NotImplementedError  # pragma: no cover
