@@ -125,10 +125,16 @@ class NeuralEMConfig(EStepConfig):
         :param lr: learning rate for the optimizer of the encoder
         :param sampling: sampling method to use. Must be one of: Gumbel
         :param K_init: initial K set to use. If None, a random set of states is used. To.tensor.
-
+        :param n_parents: number of initial states selected for permutation. See EVO for details.
+        :param n_children: number of children per initial state. See EVO for details.
         """
 
         self.n_samples = n_samples
+
+        self.K_init = K_init
+        self.loss_name = loss_name
+        self.n_parents = n_parents
+        self.n_children = n_children
 
         if encoder == "MLP":
 
@@ -143,10 +149,6 @@ class NeuralEMConfig(EStepConfig):
             self.sampling = sampling
 
             self.MLP_sanity_check()
-            self.K_init = K_init
-            self.loss_name = loss_name
-            self.n_parents= n_parents
-            self.n_children = n_children
 
             super().__init__(n_states)
         elif encoder == "CNN":
@@ -161,6 +163,8 @@ class NeuralEMConfig(EStepConfig):
             pass
         else:
             raise ValueError(f"Unknown sampling method {sampling}")
+
+
 
     def MLP_sanity_check(self):
         assert self.n_hidden is not None, "n_hidden must be specified for MLP encoder"
