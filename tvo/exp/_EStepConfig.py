@@ -259,3 +259,55 @@ class RandomSamplingConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
+
+class NeuralEvoConfig(NeuralEMConfig, EVOConfig):
+    def __init__(
+                    self,
+                    encoder: str,
+                    n_states: int,
+                    n_samples: int,
+                    input_size: int,
+                    activations: Sequence,
+                    output_size: int,
+                    n_generations,
+                    n_hidden: List[int] = None,
+                    dropouts: List[bool] = None,
+                    dropout_rate: float = None,
+                    output_activation=None,
+                    lr: float = None,
+                    sampling: str = "Gumbel",
+                    K_init=None,
+                    loss_name: str = None,
+                    n_parents=None,
+                    n_children=None,
+                    parent_selection: str = "fitness",
+                    crossover: bool = True,
+                    mutation: str = "uniform",
+                    bitflip_frequency: float = None,
+                    K_init_file: str = None,
+                    **kwargs):
+
+        super().__init__(n_states, n_parents,n_generations,
+        parent_selection,
+        crossover,
+        n_children,
+        mutation,
+        bitflip_frequency,
+        K_init_file,
+        K_init,
+        loss_name,
+        encoder,
+        sampling,
+        output_activation,
+        n_samples,
+        lr,
+        dropout_rate,
+        dropouts,
+        n_hidden,
+        output_size,
+        activations,
+        input_size,
+        **kwargs)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
