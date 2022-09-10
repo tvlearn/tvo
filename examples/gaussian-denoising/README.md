@@ -16,25 +16,21 @@ The example additionally requires `ffmpeg`, `imageio`, and `tvutil` to be instal
 
 
 ## Get started
-To start the experiment, run `python main.py`. To see possible options, run, e.g.:
+To start the experiment, run `python main.py <model>` with `<model>` being one of `bsc` or `tvae`. To see possible options, run, e.g., 
 
 ```bash
-$ python main.py -h           
-usage: main.py [-h] [--clean_image CLEAN_IMAGE] [--rescale RESCALE] [--noise_level NOISE_LEVEL]
-               [--patch_height PATCH_HEIGHT] [--patch_width PATCH_WIDTH] [--Ksize KSIZE]
-               [--selection {fitness,uniform}] [--crossover] [--no_parents NO_PARENTS]
-               [--no_children NO_CHILDREN] [--no_generations NO_GENERATIONS] [-H H] [--no_epochs NO_EPOCHS]
-               [--merge_every MERGE_EVERY] [--output_directory OUTPUT_DIRECTORY] [--viz_every VIZ_EVERY]
-               [--gif_framerate GIF_FRAMERATE]
-
-Gaussian Denoising with BSC
+$ python main.py bsc -h
+usage: Gaussian Denoising bsc [-h] [--clean_image CLEAN_IMAGE] [--rescale RESCALE] [--noise_level NOISE_LEVEL] [--patch_height PATCH_HEIGHT]
+                              [--patch_width PATCH_WIDTH] [--Ksize KSIZE] [--selection {fitness,uniform}] [--crossover] [--no_parents NO_PARENTS]
+                              [--no_children NO_CHILDREN] [--no_generations NO_GENERATIONS] [--no_epochs NO_EPOCHS] [--merge_every MERGE_EVERY]
+                              [--output_directory OUTPUT_DIRECTORY] [--viz_every VIZ_EVERY] [--gif_framerate GIF_FRAMERATE] [-H H]
 
 optional arguments:
   -h, --help            show this help message and exit
   --clean_image CLEAN_IMAGE
                         Full path to clean image (png, jpg, ... file) (default: ./img/house.png)
-  --rescale RESCALE     If specified, the size of the clean image will be rescaled by this factor (only for
-                        demonstration purposes to minimize computational effort) (default: 0.5)
+  --rescale RESCALE     If specified, the size of the clean image will be rescaled by this factor (only for demonstration purposes to minimize computational
+                        effort) (default: 0.5)
   --noise_level NOISE_LEVEL
                         Standard deviation of the additive white Gaussian noise (default: 25)
   --patch_height PATCH_HEIGHT
@@ -44,29 +40,26 @@ optional arguments:
   --Ksize KSIZE         Size of the K sets (i.e., S=|K|) (default: 50)
   --selection {fitness,uniform}
                         Selection operator (default: fitness)
-  --crossover           Whether to apply crossover. Must be False if no_children is specified (default:
-                        False)
+  --crossover           Whether to apply crossover. Must be False if no_children is specified (default: False)
   --no_parents NO_PARENTS
                         Number of parental states to select per generation (default: 20)
   --no_children NO_CHILDREN
                         Number of children to evolve per generation (default: 2)
   --no_generations NO_GENERATIONS
                         Number of generations to evolve (default: 1)
-  -H H                  Number of generative fields to learn (dictionary size) (default: 32)
   --no_epochs NO_EPOCHS
                         Number of epochs to train (default: 40)
   --merge_every MERGE_EVERY
-                        Generate reconstructed image by merging image patches every Xth epoch (will be set
-                        equal to viz_every if not specified) (default: None)
+                        Generate reconstructed image by merging image patches every Xth epoch (will be set equal to viz_every if not specified) (default:
+                        None)
   --output_directory OUTPUT_DIRECTORY
-                        Directory to write H5 training output and visualizations to (will be
-                        output/<TIMESTAMP> if not specified) (default: None)
+                        Directory to write H5 training output and visualizations to (will be output/<TIMESTAMP> if not specified) (default: None)
   --viz_every VIZ_EVERY
                         Create visualizations every Xth epoch. (default: 1)
   --gif_framerate GIF_FRAMERATE
-                        If specified, the training output will be additionally saved as animated gif. The
-                        framerate is given in frames per second. If not specified, no gif will be produced.
-                        (default: None)
+                        If specified, the training output will be additionally saved as animated gif. The framerate is given in frames per second. If not
+                        specified, no gif will be produced. (default: None)
+  -H H                  Number of generative fields to learn (dictionary size) (default: 32)
 ```
 
 
@@ -75,19 +68,22 @@ optional arguments:
 For distributed execution on multiple CPU cores (requires MPI to be installed), run with `mpirun -n <n_proc> python main.py ...`, e.g.:
 
 ```bash
-env TVO_MPI=1 mpirun -n 4 python main.py
+env TVO_MPI=1 mpirun -n 4 python main.py bsc
 ```
 
 To run on GPU (requires cudatoolkit to be installed), run, e.g.:
 
 ```bash
-env TVO_GPU=0 python main.py
+env TVO_GPU=0 python main.py bsc
 ```
 
 
 # Note
-The default hyperparameters in this examples are chosen s.t. examplary executions of the algorithm on a standard personal computer can be performed in short time. For full resolution images and improved performance, larger models and, in turn, larger compute ressources (on the order of hundreds of CPU cores) are required. For details, see [1]. 
+The default hyperparameters in this examples are chosen s.t. examplary executions of the algorithm on a standard personal computer can be performed in short time. For full resolution images and improved performance, larger models and, in turn, larger compute ressources (on the order of hundreds of CPU cores) are required. For details, see [1,2]. 
 
 
 # Reference
 [1] Evolutionary Variational Optimization of Generative Models. Jakob Drefs, Enrico Guiraud, Jörg Lücke. _Journal of Machine Learning Research_ 23(21):1-51, 2022. [(online access)](https://www.jmlr.org/papers/v23/20-233.html)
+
+[2] Direct Evolutionary Optimization of Variational Autoencoders With Binary Latents.
+Jakob Drefs*, Enrico Guiraud*, Filippos Panagiotou, Jörg Lücke. In _Joint European Conference on Machine Learning and Knowledge Discovery in Databases_, accepted, 2022. *Joint first authorship.
