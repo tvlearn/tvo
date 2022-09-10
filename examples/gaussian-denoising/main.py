@@ -30,6 +30,7 @@ from utils import (
     store_as_h5,
     get_epochs_from_every,
     eval_fn,
+    get_singleton_means,
 )
 from viz import Visualizer
 
@@ -110,7 +111,10 @@ def gaussian_denoising_example():  # noqa: C901
         )
     elif args.model == "tvae":
         model = GaussianTVAE(
-            shape=args.tvae_shape,
+            shape=[
+                D,
+            ]
+            + args.inner_net_shape,
             min_lr=0.0001,
             max_lr=0.01,
         )
@@ -157,7 +161,7 @@ def gaussian_denoising_example():  # noqa: C901
             noisy_image=noisy,
             patch_size=(args.patch_height, patch_width),
             sort_gfs=True,
-            ncol_gfs=4,
+            ncol_gfs=3,
             gif_framerate=args.gif_framerate,
         )
         if comm_rank == 0
@@ -198,10 +202,15 @@ def gaussian_denoising_example():  # noqa: C901
 
         # visualize epoch
         if comm_rank == 0:
+            if args.model == "bsc":
+                gfs = model.theta["W"]
+            elif args.model == "tvae":
+                gfs = get_singleton_means(model.theta).T
+
             visualizer.process_epoch(
                 epoch=epoch,
                 pies=model.theta["pies"],
-                gfs=model.theta["W"] if args.model == "bsc" else model.theta["W_0"],
+                gfs=gfs,
                 rec=imgs["mean"] if merge else None,
             )
         barrier()
