@@ -105,6 +105,7 @@ class NeuralEMConfig(EStepConfig):
         output_activation=None,
         lr: float = None,
         sampling: str = "Gumbel",
+        bitflipping: str = None,
         K_init=None,
         loss_name: str =None,
         n_parents=None,
@@ -123,7 +124,8 @@ class NeuralEMConfig(EStepConfig):
         :param dropout_rate: dropout rate for the encoder
         :param output_activation: activation for the output layer.
         :param lr: learning rate for the optimizer of the encoder
-        :param sampling: sampling method to use. Must be one of: Gumbel
+        :param sampling: sampling method to use. Must be one of: Gumbel, Independent Bernoullis
+        :param bitflipping: vector permutation method. See tvo/variational/evo.py for details.
         :param K_init: initial K set to use. If None, a random set of states is used. To.tensor.
         :param n_parents: number of initial states selected for permutation. See EVO for details.
         :param n_children: number of children per initial state. See EVO for details.
@@ -135,6 +137,9 @@ class NeuralEMConfig(EStepConfig):
         self.loss_name = loss_name
         self.n_parents = n_parents
         self.n_children = n_children
+
+        assert bitflipping in ['sparseflip', 'randflip']
+        self.bitflipping = bitflipping
 
         if encoder == "MLP":
 
@@ -151,9 +156,9 @@ class NeuralEMConfig(EStepConfig):
             self.MLP_sanity_check()
 
             super().__init__(n_states)
+
         elif encoder == "CNN":
             raise NotImplementedError  # pragma: no cover
-
         else:
             raise ValueError(f"Unknown encoder {encoder}")
 
@@ -198,12 +203,13 @@ class TVSConfig(EStepConfig):
         """
         assert n_states > 0, f"n_states must be positive integer ({n_states})"
         assert (
-            n_prior_samples > 0
+            n_prior_samples > -1
         ), f"n_prior_samples must be positive integer ({n_prior_samples})"
         assert (
-            n_marginal_samples > 0
+            n_marginal_samples > -1
         ), f"n_marginal_samples must be positive integer ({n_marginal_samples})"
 
+        assert n_marginal_samples + n_prior_samples > 0, 'total samples must be a natural number'
         self.n_prior_samples = n_prior_samples
         self.n_marginal_samples = n_marginal_samples
         self.K_init_file = K_init_file
