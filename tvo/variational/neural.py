@@ -21,7 +21,6 @@ class NeuralVariationalStates(TVOVariationalStates):
         N: int,
         H: int,
         S: int,
-        S_new: int,
         precision: to.dtype,
         K_init=None,
         update_decoder: bool = True,
@@ -38,7 +37,7 @@ class NeuralVariationalStates(TVOVariationalStates):
         :param N: Number of data points
         :param H: Output dimension of the encoder
         :param S: Number of samples in the K set
-        :param S_new: Number of samples to draw for new variational states
+        :param n_samples: Number of samples to draw for new variational states
         :param precision: floting point precision
         :param K_init: File to load the initial K matrix from. to.Tensor of shape (N, S, H)
         :param update_decoder: If true, the decoder is updated during training
@@ -51,7 +50,7 @@ class NeuralVariationalStates(TVOVariationalStates):
             N=N,
             H=H,
             S=S,
-            S_new=S_new,
+            n_samples=n_samples,
             precision=precision,
             encoder=encoder,
             sampling=sampling,
@@ -71,7 +70,7 @@ class NeuralVariationalStates(TVOVariationalStates):
         self.n_samples = n_samples  # number of samples to draw from sampling distribution per update cycle
         self.N = N
         self.S = S
-        self.S_new = S_new
+        self.n_samples = n_samples
         self.H = H
 
         # picking a model
@@ -88,9 +87,9 @@ class NeuralVariationalStates(TVOVariationalStates):
                 kwargs["output_activation"] == to.nn.Identity
             ), "output_activation must be nn.Identity for gumbel-Softmax"
             self.sampling = self.gumbel_softmax_sampling
-        elif sampling == "Independent Bernoullis":
+        elif sampling =="Independent Bernoullis":
             assert(kwargs["output_activation"] == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
-            assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
+            #assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
             self.sampling = self.independent_bernoullis_sampling
         else:
             raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
@@ -100,10 +99,13 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.bitflipping = batch_randflip
         elif bitflipping == 'sparseflip':
             self.bitflipping = batch_sparseflip
+        elif bitflipping == 'none':
+            self.bitflipping = None
+        print(bitflipping)
 
         # select a loss function
         self.loss_fname = kwargs["loss_name"]
-        assert self.loss_fname in ["BCE", "LPJ", 'CE'], "loss_function must be either BCE,CE or LPJ"
+        assert self.loss_fname in ["BCE", "LPJ", 'CE', 'log_bernoulli_loss'], "loss_function not listed"
 
         if self.loss_fname == "BCE":
             self.loss_function = to.nn.BCELoss()
@@ -111,6 +113,9 @@ class NeuralVariationalStates(TVOVariationalStates):
             self.loss_function = self.lpj_loss
         elif self.loss_fname == "CE":
             self.loss_function = to.nn.CrossEntropyLoss()
+        elif self.loss_fname =='log_bernoulli_loss':
+            assert sampling=='Independent Bernoullis', 'sampling is {}'.format(sampling)
+            self.loss_function = self.log_bernoulli_loss
         else:
             raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
 
@@ -158,7 +163,7 @@ class NeuralVariationalStates(TVOVariationalStates):
     def init_states(K: int, N: int, H: int, S: int, precision: to.dtype):
         raise NotImplementedError  # pragma: no cover
 
-    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
+    def neural_update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 
         :param idx: data point indices of batch w.r.t. K
@@ -175,21 +180,21 @@ class NeuralVariationalStates(TVOVariationalStates):
             lpj_fn = model.log_joint
             sort_by_lpj = {}
 
-        # get the log pseudo-joints of the batch
-        # lpj = self.lpj
-        # batch_lpj = lpj[idx]
+        K, lpj = self.K, self.lpj
+        batch_size, H = batch.shape[0], K.shape[2]
+        lpj[idx] = lpj_fn(batch, K[idx])
+
 
         # init states tensor
-        n, k, h = self.K[idx].shape # n: batch size, k: number of states, h: size of state
+        n, k, h = K[idx].shape # n: batch size, k: number of states, h: size of state
         new_states = to.empty((n, self.n_samples, h), dtype=to.uint8, device=self.lpj.device)
-        # new_lpj = to.empty((n, k, h), dtype=self.lpj.dtype, device=self.lpj.device)
 
         # prepare training process
         if self._training:
             self.optimizer.zero_grad()
 
         # get parameters of sampling distribution
-        with self.gradients_context_manager:  # computes gradients when necessary
+        with self.gradients_context_manager:
             # if self._training:
             #     batch.requires_grad_(True)
             q = self.encoder(batch) # n x h
@@ -197,29 +202,50 @@ class NeuralVariationalStates(TVOVariationalStates):
         # sample new variational states
         for i in range(self.n_samples):
             # get new variational states
-            new_states[:, i, :] = self.sampling(q)
-            # new_states[:, i, :] = self.sampling(p)
+            using_neural_marginal = True #to.rand(1) < 2
+            using_marginal = 0
+            using_prior = 0 #~ (using_marginal | using_neural_marginal)
+
+            if using_neural_marginal:
+                new_states[:, i, :] = self.sampling(q)
+            elif using_marginal:
+                p = to.mean(self.K[idx].to(self.precision), axis=1)
+                new_states[:, i, :] = self.sampling(p)
+            elif using_prior:
+                new_K_prior = (
+                        to.rand(batch.shape[0],new_states.shape[-1], device=self.K.device)
+                        < model.theta["pies"]
+                ).byte()
+                new_states[:, i, :] = new_K_prior
+
+        # tvs prior
+        # new_states = (
+        #                     to.rand(batch.shape[0],self.n_samples,new_states.shape[-1], device=self.K.device)
+        #                     < model.theta["pies"]
+        #             ).byte()
+
+
         # flip bits for stochasticity
-        new_states_bfd=self.bitflipping(new_states, n_children=8, sparsity=0.1, p_bf=0.1)
+        new_states_bfd = new_states  #
+        if self.bitflipping:
+            new_states_bfd=self.bitflipping(new_states, n_children=8, sparsity=0.1, p_bf=0.1)
 
         # get lpj of new variational states
         new_lpj = lpj_fn(batch, new_states_bfd)
+        self.K[idx]
 
         # update encoder
         if self._training:
             with self.gradients_context_manager:
                 # accumulate loss
                 if self.loss_fname=='LPJ':
-                    lpj=lpj_fn(batch.requires_grad_(False), new_states).requires_grad_(True)
-                    loss = self.loss_function(lpj)
+                    loss = self.loss_function(new_lpj,lpj[idx].clone())
                 elif self.loss_fname in ('BCE','CE'):
-                    p = to.mean(self.K[idx].to(self.precision), axis=1) # compute <s_h>
+                    p = to.mean(self.K[idx].to(self.precision), axis=1)
                     p.requires_grad_(True)
-                    # q.requires_grad=True
-                    # assert p.requires_grad
-                    # assert q.requires_grad
                     loss = self.loss_function(p,q)
-
+                elif self.loss_fname=='log_bernoulli_loss':
+                    loss = self.loss_function(q, self.accepted(old_lpj=lpj[idx], new_lpj=new_lpj))
                 else:
                     raise ValueError(f"Unknown loss function: {self.loss_fname}")  # pragma: no cover
 
@@ -229,17 +255,19 @@ class NeuralVariationalStates(TVOVariationalStates):
                 self.encoder.losses.append(loss.detach().numpy())
                 try:
                     to.autograd.set_detect_anomaly(True)
-                    loss.backward(retain_graph=True)
+                    if self.encoder.layer_0.weight.grad:
+                        loss.backward(retain_graph=True)
                 except RuntimeError as e:
-                    #raise e
-                    pass
-
-
+                    loss = self.loss_function(p, q)
+                    loss.backward()
+                    raise e
 
         # update the variational states
-        if self.k_updating:
-            with to.no_grad():
-                set_redundant_lpj_to_low(new_states_bfd, new_lpj, old_states=self.K[idx])
+        # if self.k_updating:
+        # print(new_states.shape, new_lpj.shape, self.K[idx].shape)
+        # print(new_states_bfd.max(), new_states_bfd.min(), new_states_bfd.max()/to.prod(to.tensor(new_states_bfd.shape)))
+        # print(new_lpj.min(), new_lpj.max(), new_lpj.mean(), (new_lpj-lpj.min()).max())
+        set_redundant_lpj_to_low(new_states_bfd, new_lpj, old_states=self.K[idx])
 
         return update_states_for_batch(
             new_states=new_states_bfd.to(device=self.K.device),
@@ -250,8 +278,54 @@ class NeuralVariationalStates(TVOVariationalStates):
             sort_by_lpj=sort_by_lpj,
         )
 
-    def lpj_loss(self, lpj):
-        return to.sum(lpj).requires_grad_(True)
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
+        return self.neural_update(idx, batch, model)
+
+    def tvs_update(self, idx: to.Tensor, batch: to.Tensor, model: Trainable) -> int:
+        """minimal tvs prior sampling. Used for debugging"""
+        if isinstance(model, Optimized):
+            lpj_fn = model.log_pseudo_joint
+            sort_by_lpj = model.sorted_by_lpj
+        else:
+            lpj_fn = model.log_joint
+            sort_by_lpj = {}
+
+        K, lpj = self.K, self.lpj
+        batch_size, H = batch.shape[0], K.shape[2]
+        lpj[idx] = lpj_fn(batch, K[idx])
+
+        new_K_prior = (
+            to.rand(batch_size, self.n_samples, H, device=K.device)
+            < model.theta["pies"]
+        ).byte()
+
+        new_K = new_K_prior
+
+        new_lpj = lpj_fn(batch, new_K)
+
+        set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
+
+        return update_states_for_batch(
+            new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
+        )
+
+    def lpj_loss(self, new_lpj, old_lpj):
+        s_min = old_lpj.min(dim=1)[0].clone()
+        loss=to.sum(s_min[:,None]-new_lpj)
+        return loss
+
+    def log_bernoulli_loss(self, pies, accepted):
+        '''
+        :param pies: pies of bernoulli distribution
+        :param accepted: whether associated log_joing is accepted
+        :return:
+        '''
+        log_p_phi = to.sum(to.log(pies))
+        # p_phi = to.prod(pies)
+        delta_accepted = accepted.sum(dim=1)
+        N = accepted.shape[1]
+        return to.log(1/to.tensor(N))+ log_p_phi+to.log(delta_accepted) # 1/n sum(accepted_bool * p_phi)
+
 
     def set_nn_training(self, training: bool):
         if training:
@@ -265,6 +339,10 @@ class NeuralVariationalStates(TVOVariationalStates):
 
     def set_k_updating(self, k_updating:bool):
         self.k_updating=k_updating
+
+    def accepted(self, old_lpj, new_lpj):
+        min_lpj = to.min(old_lpj, dim=1)[0]
+        return new_lpj > min_lpj[:,None]
 
 class MLP(to.nn.Module):
     """
@@ -355,6 +433,8 @@ class MLP(to.nn.Module):
             to.nn.Sigmoid,
             to.nn.Identity,
         ], "Only Sigmoid or Identity activations are supported"
+
+
 
 class CNN(to.nn.Module):
     def __init__(self, **kwargs):

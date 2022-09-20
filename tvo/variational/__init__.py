@@ -4,7 +4,7 @@ from .RandomSampledVarStates import RandomSampledVarStates
 from .evo import EVOVariationalStates
 from .tvs import TVSVariationalStates
 from .neural import NeuralVariationalStates
-
+from .neural_evo import NeuralEvoVariationalStates
 __all__ = [
     "TVOVariationalStates",
     "FullEM",
@@ -12,4 +12,5 @@ __all__ = [
     "EVOVariationalStates",
     "TVSVariationalStates",
     "FullEMSingleCauseModels",
+    "NeuralEvoVariationalStates"
 ]

@@ -146,6 +146,7 @@ def update_states_for_batch(
     sorted_idx = to.flip(
         to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1]
     )
+    
     flattened_sorted_idx = sorted_idx.flatten()
 
     idx_n = idx.repeat(S, 1).t().flatten()
@@ -159,7 +160,13 @@ def update_states_for_batch(
         idx_n_ = to.arange(batch_size).repeat(S, 1).t().flatten()
         t[idx_n_, idx_s] = t[idx_n_, flattened_sorted_idx]
 
-    return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
+
+    n_subs = (sorted_idx >= old_states.shape[1]).sum().item() 
+    
+    check = sum(new_lpj.max(dim=1)[0] > old_lpj.min(dim=1)[0])
+
+
+    return n_subs  # nsubs
 
 
 def lpj2pjc(lpj: to.Tensor):
