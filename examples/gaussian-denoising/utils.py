@@ -14,8 +14,9 @@ from PIL import Image
 from skimage.metrics import peak_signal_noise_ratio
 from typing import Dict, Union
 
-from tvo import get_run_policy
+from tvo import get_run_policy, get_device
 from tvo.utils.parallel import init_processes as _init_processes
+from tvo.models import GaussianTVAE
 
 
 def init_processes() -> Tuple[int, int]:
@@ -125,3 +126,23 @@ def eval_fn(
             data_range=data_range,
         )
     )
+
+
+def get_singleton_means(theta: Dict[str, to.Tensor]) -> to.Tensor:
+    """Initialize TVAE model with parameters `theta` and compute NN output for NN input vectors
+       corresponding to singleton states (only one active unit per unit vector).
+
+    :param theta: Dictionary with TVAE model parameters
+    :return: Decoded means
+    """
+    n_layers = len(tuple(k for k in theta.keys() if k.startswith("W_")))
+    W = tuple(theta[f"W_{ind_layer}"].clone().detach() for ind_layer in range(n_layers))
+    b = tuple(theta[f"b_{ind_layer}"].clone().detach() for ind_layer in range(n_layers))
+    sigma2 = float(theta["sigma2"])
+    H0 = W[0].shape[0]
+    m = GaussianTVAE(W_init=W, b_init=b, sigma2_init=sigma2)
+    singletons = to.eye(H0).to(get_device())
+    means = m.forward(singletons).detach().cpu()
+    D = W[-1].shape[-1]
+    assert means.shape == (H0, D)
+    return means

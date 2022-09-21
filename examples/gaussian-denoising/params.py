@@ -90,14 +90,27 @@ variational_parser.add_argument(
 )
 
 
-experiment_parser = argparse.ArgumentParser(add_help=False)
-experiment_parser.add_argument(
+bsc_parser = argparse.ArgumentParser(add_help=False)
+bsc_parser.add_argument(
     "-H",
     type=int,
     help="Number of generative fields to learn (dictionary size)",
     default=32,
 )
 
+
+tvae_parser = argparse.ArgumentParser(add_help=False)
+tvae_parser.add_argument(
+    "--inner_net_shape",
+    nargs="+",
+    type=int,
+    help="Decoder shape (...,H1,H0) excluding number of observables. "
+    "Full network shape will be (patch_height*patch_width*no_channels,...,H1,H0)",
+    default=[25, 25],
+)
+
+
+experiment_parser = argparse.ArgumentParser(add_help=False)
 experiment_parser.add_argument(
     "--no_epochs",
     type=int,
@@ -143,17 +156,35 @@ viz_parser.add_argument(
 
 
 def get_args():
-    parser = argparse.ArgumentParser(
-        description="Gaussian Denoising with BSC",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        parents=[
-            awgn_parser,
-            patch_parser,
-            variational_parser,
-            experiment_parser,
-            output_parser,
-            viz_parser,
+    parser = argparse.ArgumentParser(prog="Gaussian Denoising")
+    algo_parsers = parser.add_subparsers(help="Select model to train", dest="model", required=True)
+    comm_parents = [
+        awgn_parser,
+        patch_parser,
+        variational_parser,
+        experiment_parser,
+        output_parser,
+        viz_parser,
+    ]
+
+    algo_parsers.add_parser(
+        "bsc",
+        help="Run experiment with BSC",
+        parents=comm_parents
+        + [
+            bsc_parser,
         ],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    algo_parsers.add_parser(
+        "tvae",
+        help="Run experiment with TVAE",
+        parents=comm_parents
+        + [
+            tvae_parser,
+        ],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     return parser.parse_args()
