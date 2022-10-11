@@ -20,7 +20,11 @@ jobs:
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Create the tvo conda env
-      run: conda env create
+      run: |
+        conda create -n tvo python==3.8 gcc_linux-64
+        source $CONDA/etc/profile.d/conda.sh
+        conda activate tvo
+        pip install -r requirements.txt
     - name: Generate docs
       run: |
         source $CONDA/etc/profile.d/conda.sh
