@@ -138,7 +138,7 @@ class NeuralEMConfig(EStepConfig):
         self.n_parents = n_parents
         self.n_children = n_children
 
-        assert bitflipping in ['sparseflip', 'randflip']
+        assert bitflipping in ['sparseflip', 'randflip'], '{} is unrecognized'.format(bitflipping)
         self.bitflipping = bitflipping
 
         if encoder == "MLP":
@@ -169,7 +169,49 @@ class NeuralEMConfig(EStepConfig):
         else:
             raise ValueError(f"Unknown sampling method {sampling}")
 
+        # picking a model
+        if encoder == "MLP":
+            self.encoder = MLP(**kwargs)
+        elif encoder == "CNN":
+            self.encoder = CNN(**kwargs)
+        else:
+            raise ValueError(f"Unknown model: {encoder}")  # pragma: no cover
 
+        # select sampling method
+        if sampling == "Gumbel":
+            assert (
+                kwargs["output_activation"] == to.nn.Identity
+            ), "output_activation must be nn.Identity for gumbel-Softmax"
+            self.sampling = self.gumbel_softmax_sampling
+        elif sampling =="Independent Bernoullis":
+            assert(kwargs["output_activation"] == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
+            #assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
+            self.sampling = self.independent_bernoullis_sampling
+        else:
+            raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
+
+        # select bit flipping method
+        if bitflipping ==  'randflip':
+            self.bitflipping = batch_randflip
+        elif bitflipping == 'sparseflip':
+            self.bitflipping = batch_sparseflip
+        elif bitflipping == 'none':
+            self.bitflipping = None
+
+        # select a loss function
+        assert self.loss_name in ["BCE", "LPJ", 'CE', 'log_bernoulli_loss'], "loss_function not listed"
+
+        if self.loss_name == "BCE":
+            self.loss_function = to.nn.BCELoss()
+        elif self.loss_name == "LPJ":
+            self.loss_function = self.lpj_loss
+        elif self.loss_name == "CE":
+            self.loss_function = to.nn.CrossEntropyLoss()
+        elif self.loss_name =='log_bernoulli_loss':
+            assert sampling=='Independent Bernoullis', 'sampling is {}'.format(sampling)
+            self.loss_function = self.log_bernoulli_loss
+        else:
+            raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
 
     def MLP_sanity_check(self):
         assert self.n_hidden is not None, "n_hidden must be specified for MLP encoder"
@@ -183,6 +225,18 @@ class NeuralEMConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
+
+    def log_bernoulli_loss(self, pies, accepted):
+        '''
+        :param pies: pies of bernoulli distribution
+        :param accepted: whether associated log_joing is accepted
+        :return:
+        '''
+        log_p_phi = to.sum(to.log(pies))
+        # p_phi = to.prod(pies)
+        delta_accepted = accepted.sum(dim=1)
+        N = accepted.shape[1]
+        return to.log(1/to.tensor(N))+ log_p_phi+to.log(delta_accepted) # 1/n sum(accepted_bool * p_phi)
 
 
 class TVSConfig(EStepConfig):

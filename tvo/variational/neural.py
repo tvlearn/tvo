@@ -73,51 +73,11 @@ class NeuralVariationalStates(TVOVariationalStates):
         self.n_samples = n_samples
         self.H = H
 
-        # picking a model
-        if encoder == "MLP":
-            self.encoder = MLP(**kwargs)
-        elif encoder == "CNN":
-            self.encoder = CNN(**kwargs)
-        else:
-            raise ValueError(f"Unknown model: {encoder}")  # pragma: no cover
+        self.hacky_ignore_substitution = False
 
-        # select sampling method
-        if sampling == "Gumbel":
-            assert (
-                kwargs["output_activation"] == to.nn.Identity
-            ), "output_activation must be nn.Identity for gumbel-Softmax"
-            self.sampling = self.gumbel_softmax_sampling
-        elif sampling =="Independent Bernoullis":
-            assert(kwargs["output_activation"] == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
-            #assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
-            self.sampling = self.independent_bernoullis_sampling
-        else:
-            raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
-
-        # select bit flipping method
-        if bitflipping ==  'randflip':
-            self.bitflipping = batch_randflip
-        elif bitflipping == 'sparseflip':
-            self.bitflipping = batch_sparseflip
-        elif bitflipping == 'none':
-            self.bitflipping = None
-        print(bitflipping)
-
-        # select a loss function
-        self.loss_fname = kwargs["loss_name"]
-        assert self.loss_fname in ["BCE", "LPJ", 'CE', 'log_bernoulli_loss'], "loss_function not listed"
-
-        if self.loss_fname == "BCE":
-            self.loss_function = to.nn.BCELoss()
-        elif self.loss_fname == "LPJ":
-            self.loss_function = self.lpj_loss
-        elif self.loss_fname == "CE":
-            self.loss_function = to.nn.CrossEntropyLoss()
-        elif self.loss_fname =='log_bernoulli_loss':
-            assert sampling=='Independent Bernoullis', 'sampling is {}'.format(sampling)
-            self.loss_function = self.log_bernoulli_loss
-        else:
-            raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
+        self.encoder=config['encoder']
+        self.sampling=config['sampling']
+        self.loss_function=config['loss_function']
 
         # picking an optimizer
         self.optimizer = to.optim.Adam(self.encoder.parameters(), lr=lr)
@@ -226,12 +186,12 @@ class NeuralVariationalStates(TVOVariationalStates):
 
 
         # flip bits for stochasticity
-        new_states_bfd = new_states  #
+        self.new_states_bfd = new_states  #
         if self.bitflipping:
-            new_states_bfd=self.bitflipping(new_states, n_children=8, sparsity=0.1, p_bf=0.1)
+            self.new_states_bfd=self.bitflipping(new_states, n_children=8, sparsity=0.1, p_bf=0.1)
 
         # get lpj of new variational states
-        new_lpj = lpj_fn(batch, new_states_bfd)
+        self.new_lpj = lpj_fn(batch, self.new_states_bfd)
         self.K[idx]
 
         # update encoder
@@ -239,13 +199,13 @@ class NeuralVariationalStates(TVOVariationalStates):
             with self.gradients_context_manager:
                 # accumulate loss
                 if self.loss_fname=='LPJ':
-                    loss = self.loss_function(new_lpj,lpj[idx].clone())
+                    loss = self.loss_function(self.new_lpj,lpj[idx].clone())
                 elif self.loss_fname in ('BCE','CE'):
                     p = to.mean(self.K[idx].to(self.precision), axis=1)
                     p.requires_grad_(True)
                     loss = self.loss_function(p,q)
                 elif self.loss_fname=='log_bernoulli_loss':
-                    loss = self.loss_function(q, self.accepted(old_lpj=lpj[idx], new_lpj=new_lpj))
+                    loss = self.loss_function(q, self.accepted(old_lpj=lpj[idx], new_lpj=self.new_lpj))
                 else:
                     raise ValueError(f"Unknown loss function: {self.loss_fname}")  # pragma: no cover
 
@@ -267,15 +227,15 @@ class NeuralVariationalStates(TVOVariationalStates):
         # print(new_states.shape, new_lpj.shape, self.K[idx].shape)
         # print(new_states_bfd.max(), new_states_bfd.min(), new_states_bfd.max()/to.prod(to.tensor(new_states_bfd.shape)))
         # print(new_lpj.min(), new_lpj.max(), new_lpj.mean(), (new_lpj-lpj.min()).max())
-        set_redundant_lpj_to_low(new_states_bfd, new_lpj, old_states=self.K[idx])
+        set_redundant_lpj_to_low(self.new_states_bfd, self.new_lpj, old_states=self.K[idx])
 
         return update_states_for_batch(
-            new_states=new_states_bfd.to(device=self.K.device),
-            new_lpj=new_lpj.to(device=self.lpj.device),
+            new_states=self.new_states_bfd.to(device=self.K.device),
+            new_lpj=self.new_lpj.to(device=self.lpj.device),
             idx=idx,
             all_states=self.K,
             all_lpj=self.lpj,
-            sort_by_lpj=sort_by_lpj,
+            sort_by_lpj=sort_by_lpj
         )
 
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
@@ -313,18 +273,6 @@ class NeuralVariationalStates(TVOVariationalStates):
         s_min = old_lpj.min(dim=1)[0].clone()
         loss=to.sum(s_min[:,None]-new_lpj)
         return loss
-
-    def log_bernoulli_loss(self, pies, accepted):
-        '''
-        :param pies: pies of bernoulli distribution
-        :param accepted: whether associated log_joing is accepted
-        :return:
-        '''
-        log_p_phi = to.sum(to.log(pies))
-        # p_phi = to.prod(pies)
-        delta_accepted = accepted.sum(dim=1)
-        N = accepted.shape[1]
-        return to.log(1/to.tensor(N))+ log_p_phi+to.log(delta_accepted) # 1/n sum(accepted_bool * p_phi)
 
 
     def set_nn_training(self, training: bool):
