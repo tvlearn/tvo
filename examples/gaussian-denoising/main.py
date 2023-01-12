@@ -10,7 +10,7 @@ import torch as to
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
-from tvo.models import BSC, GaussianTVAE
+from tvo.models import BSC, SSSC, GaussianTVAE
 from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape, gather_from_processes
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 from tvo.utils.model_protocols import Reconstructor
@@ -86,7 +86,7 @@ def gaussian_denoising_example():  # noqa: C901
     pprint("Initializing model")
 
     # initialize model
-    if args.model == "bsc":
+    if args.model in ("bsc", "sssc"):
         W_init = (
             init_W_data_mean(data=train_data, H=args.H, dtype=PRECISION, device=DEVICE).contiguous()
             if comm_rank == 0
@@ -100,8 +100,20 @@ def gaussian_denoising_example():  # noqa: C901
         barrier()
         broadcast(W_init)
         broadcast(sigma2_init)
+    else:
+        W_init, sigma2_init = None, None
 
+    if args.model == "bsc":
         model = BSC(
+            H=args.H,
+            D=D,
+            W_init=W_init,
+            sigma2_init=sigma2_init,
+            pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
+            precision=PRECISION,
+        )
+    elif args.model == "sssc":
+        model = SSSC(
             H=args.H,
             D=D,
             W_init=W_init,
@@ -118,6 +130,8 @@ def gaussian_denoising_example():  # noqa: C901
             min_lr=0.0001,
             max_lr=0.01,
         )
+    else:
+        raise NotImplementedError("Generative model {} not supported".format(args.model))
 
     assert isinstance(model, Reconstructor)
 
@@ -202,7 +216,7 @@ def gaussian_denoising_example():  # noqa: C901
 
         # visualize epoch
         if comm_rank == 0:
-            if args.model == "bsc":
+            if args.model in ("bsc", "sssc"):
                 gfs = model.theta["W"]
             elif args.model == "tvae":
                 gfs = get_singleton_means(model.theta).T

@@ -90,8 +90,8 @@ variational_parser.add_argument(
 )
 
 
-bsc_parser = argparse.ArgumentParser(add_help=False)
-bsc_parser.add_argument(
+gf_parser = argparse.ArgumentParser(add_help=False)
+gf_parser.add_argument(
     "-H",
     type=int,
     help="Number of generative fields to learn (dictionary size)",
@@ -99,8 +99,8 @@ bsc_parser.add_argument(
 )
 
 
-tvae_parser = argparse.ArgumentParser(add_help=False)
-tvae_parser.add_argument(
+decoding_net_parser = argparse.ArgumentParser(add_help=False)
+decoding_net_parser.add_argument(
     "--inner_net_shape",
     nargs="+",
     type=int,
@@ -172,7 +172,17 @@ def get_args():
         help="Run experiment with BSC",
         parents=comm_parents
         + [
-            bsc_parser,
+            gf_parser,
+        ],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    algo_parsers.add_parser(
+        "sssc",
+        help="Run experiment with SSSC",
+        parents=comm_parents
+        + [
+            gf_parser,
         ],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -182,7 +192,7 @@ def get_args():
         help="Run experiment with TVAE",
         parents=comm_parents
         + [
-            tvae_parser,
+            decoding_net_parser,
         ],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
