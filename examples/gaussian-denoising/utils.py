@@ -51,7 +51,7 @@ class stdout_logger(object):
         pass
 
 
-def get_image(image_file: str, rescale: float = None) -> to.Tensor:
+def get_image(image_file: str, rescale: float) -> to.Tensor:
     """Read image from file, optionally rescale image size and return as to.Tensor
 
     :param image_file: Full path to image file (.png, .jpg, ...)
@@ -62,7 +62,7 @@ def get_image(image_file: str, rescale: float = None) -> to.Tensor:
     isrgb = np.ndim(img) == 3 and img.shape[2] == 3
     isgrey = np.ndim(img) == 2
     assert isrgb or isgrey, "Expect img image to be either RGB or grey"
-    if rescale is not None:
+    if rescale != 1.0:
         orig_shape = img.shape
         target_shape = [int(orig_shape[1] * rescale), int(orig_shape[0] * rescale)]
         img = (
