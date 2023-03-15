@@ -4,7 +4,13 @@
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Sequence, List
+from typing import Callable, Tuple, Optional, Sequence
 
+
+from torch import Tensor
+from tvo.variational.neural import MLP
+from tvo.variational.evo import batch_sparseflip, batch_randflip
+import torch as to
 
 class EStepConfig(ABC):
     def __init__(self, n_states: int):
@@ -138,7 +144,7 @@ class NeuralEMConfig(EStepConfig):
         self.n_parents = n_parents
         self.n_children = n_children
 
-        assert bitflipping in ['sparseflip', 'randflip'], '{} is unrecognized'.format(bitflipping)
+        assert bitflipping in ['sparseflip', 'randflip', None], '{} is unrecognized'.format(bitflipping)
         self.bitflipping = bitflipping
 
         if encoder == "MLP":
@@ -162,8 +168,9 @@ class NeuralEMConfig(EStepConfig):
         else:
             raise ValueError(f"Unknown encoder {encoder}")
 
-        if sampling == "Gumbel":
-            self.output_size *= 2 # shift to bitwise categorical representation
+        if sampling == "GumbelSM":
+            self.output_size *= 2
+            output_size *= 2     # shift to bitwise categorical representation
         elif sampling == "Independent Bernoullis":
             pass
         else:
@@ -171,20 +178,21 @@ class NeuralEMConfig(EStepConfig):
 
         # picking a model
         if encoder == "MLP":
-            self.encoder = MLP(**kwargs)
+            self.encoder = MLP(input_size, n_hidden, output_size, activations, dropouts, dropout_rate, output_activation)
         elif encoder == "CNN":
             self.encoder = CNN(**kwargs)
         else:
             raise ValueError(f"Unknown model: {encoder}")  # pragma: no cover
 
         # select sampling method
-        if sampling == "Gumbel":
-            assert (
-                kwargs["output_activation"] == to.nn.Identity
-            ), "output_activation must be nn.Identity for gumbel-Softmax"
+        if sampling == "GumbelSM":
+            # assert (
+            #     kwargs["output_activation"] == to.nn.Identity
+            # ), "output_activation must be nn.Identity for gumbel-Softmax"
+            assert (output_activation == to.nn.Identity), "output_activation must be nn.Identity for gumbel-Softmax"
             self.sampling = self.gumbel_softmax_sampling
         elif sampling =="Independent Bernoullis":
-            assert(kwargs["output_activation"] == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
+            assert(output_activation == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
             #assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
             self.sampling = self.independent_bernoullis_sampling
         else:
@@ -195,11 +203,13 @@ class NeuralEMConfig(EStepConfig):
             self.bitflipping = batch_randflip
         elif bitflipping == 'sparseflip':
             self.bitflipping = batch_sparseflip
-        elif bitflipping == 'none':
+        else:
+            bitflipping == 'none'
             self.bitflipping = None
 
         # select a loss function
-        assert self.loss_name in ["BCE", "LPJ", 'CE', 'log_bernoulli_loss'], "loss_function not listed"
+        assert self.loss_name in ["BCE", "LPJ", 'CE', 'log_bernoulli_loss',
+                                  'e_logjoint_under_phi','n_accepted'], "loss_function not listed"
 
         if self.loss_name == "BCE":
             self.loss_function = to.nn.BCELoss()
@@ -210,6 +220,11 @@ class NeuralEMConfig(EStepConfig):
         elif self.loss_name =='log_bernoulli_loss':
             assert sampling=='Independent Bernoullis', 'sampling is {}'.format(sampling)
             self.loss_function = self.log_bernoulli_loss
+        elif self.loss_name== 'e_logjoint_under_phi':
+            self.loss_function = self.e_logjoint_under_phi
+        elif self.loss_name== 'n_accepted':
+            assert sampling == 'GumbelSM', 'sampling is {}'.format(sampling)
+            self.loss_function= self.n_accepted
         else:
             raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
 
@@ -226,17 +241,73 @@ class NeuralEMConfig(EStepConfig):
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
 
-    def log_bernoulli_loss(self, pies, accepted):
+    def log_bernoulli_loss(self,states, pies, accepted):
         '''
-        :param pies: pies of bernoulli distribution
+        :param pies: pies of bernoulli distribution (in case of matrix input, this function assumes independence)
         :param accepted: whether associated log_joing is accepted
         :return:
         '''
-        log_p_phi = to.sum(to.log(pies))
-        # p_phi = to.prod(pies)
-        delta_accepted = accepted.sum(dim=1)
-        N = accepted.shape[1]
-        return to.log(1/to.tensor(N))+ log_p_phi+to.log(delta_accepted) # 1/n sum(accepted_bool * p_phi)
+        # inputs are : q, vector_subs, n_accepted=vector_subs.sum(axis=1).float()
+
+        Batch, M_samples, H = states.shape # BxNxH
+        pies=pies.unsqueeze(axis=1).expand(Batch, M_samples, H)
+        # sum over H
+        log_p_phi = to.sum(states*(to.log(pies)-to.log(1-pies))+to.log(1-pies), axis=-1)
+
+        delta_lpj = accepted
+        # sum over M
+        # derivative taken by calling backward, as only log_p_phi depends on phi
+        expectation=(1/to.tensor(M_samples))+to.sum(delta_lpj*log_p_phi, axis=-1)
+        loss=-expectation.sum()
+        return loss
+
+    def e_logjoint_under_phi(self, lpj, p_phi):
+        return to.dot(lpj, p_phi).sum()
+
+    def n_accepted(self, n_accepted, q):
+        # assert n_accepted.shape[0]==q.shape[0]
+        return n_accepted*q
+
+    def gumbel_softmax_sampling(
+        self, logits: Tensor, temperature: float = 0.3, hard: bool = True
+    ) -> Tensor:
+        """
+        Implements Gumbel Softmax on logits of a neural network.
+        :param logits: logits of a neural network
+        :param temperature: temperature of the gumbel softmax. Annealing schedule is not implemented here.
+        :param hard: If true, the returned samples are one-hot encoded.
+        """
+        # sample from gumbel distribution
+        assert len(logits[1]) // 2 == len(logits[1]) / 2, "logits must be of even length, but were {}. " \
+                                                    "Is sampling set as Gumbel-Softmax?".format(len(logits))
+
+        # reformat logits to be of shape (batch_size, model_H, 2)
+        logits_reshaped = logits.reshape(logits.shape[0], logits.shape[1] // 2, 2)
+        # init states tensor
+        states = to.nn.functional.gumbel_softmax(logits_reshaped, temperature, hard)
+        # keep only the first element of the last dimension (p(x=1))
+        states = states[:, :, 0]
+        # reformat states to be of shape (batch_size, model_H)
+        states = states.reshape(logits.shape[0], logits.shape[1] // 2)
+
+        return states.type(to.uint8) if hard else states
+
+    def independent_bernoullis_sampling(self, logits: Tensor, hard: bool = True) -> Tensor:
+        # assert that pies are in [0, 1]
+
+        assert to.min(logits) >= 0 and to.max(logits) <= 1, \
+            "Pies should have a min of at least 0 and a max of at most 1. Instead, they are {} and {}".format(
+                to.min(logits),
+                to.max(logits)
+            )
+        # sample from bernoullis
+        states = to.bernoulli(logits).type(to.uint8) if hard else logits
+        return states
+
+    def lpj_loss(self, new_lpj, old_lpj):
+        s_min = old_lpj.min(dim=1)[0].clone()
+        loss=to.sum(s_min[:,None]-new_lpj)
+        return loss
 
 
 class TVSConfig(EStepConfig):
