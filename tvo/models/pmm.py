@@ -186,7 +186,6 @@ class PMM(Optimized, Sampler, Reconstructor):
         return (Y, hidden_state) if must_return_hidden_state else Y
 
     def data_estimator(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> Tensor:
-
         # Not yet implemented
 
         """Estimator used for data reconstruction. Data reconstruction can only be supported
