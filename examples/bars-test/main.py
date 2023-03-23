@@ -26,7 +26,6 @@ dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
 def bars_test():
-
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
@@ -52,7 +51,6 @@ def bars_test():
     # generate data set
     D = int((args.H_gen / 2) ** 2)
     if comm_rank == 0:
-
         gfs = get_bars_gfs(no_bars=args.H_gen, bar_amp=args.bar_amp, precision=PRECISION)
         assert gfs.shape == (D, args.H_gen)
         pi_gen = args.pi_gen if args.pi_gen is not None else 2 / args.H_gen

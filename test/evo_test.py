@@ -57,7 +57,6 @@ class TestEVO(unittest.TestCase):
         self.n_runs = 30
 
     def test_randflip(self):
-
         H, n_parents, n_children = 5, 4, 2
 
         for x in range(self.n_runs):
@@ -70,7 +69,6 @@ class TestEVO(unittest.TestCase):
             self.assertTrue(to.all(flips_per_child == 1))
 
     def test_batch_randflip(self):
-
         N, H, n_parents, n_children = 3, 5, 4, 2
 
         for x in range(self.n_runs):
@@ -103,11 +101,9 @@ class TestEVO(unittest.TestCase):
         self.assertTrue(to.equal(children, children_batch[0]))
 
     def test_sparseflip(self):
-
         H, n_parents, n_children, sparsity, p_bf = 5, 4, 2, 1.0 / 5, 0.5
 
         for x in range(self.n_runs):
-
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
             children = evo.sparseflip(parents, n_children, sparsity, p_bf)
 
@@ -121,12 +117,10 @@ class TestEVO(unittest.TestCase):
             )  # TODO Find better test
 
     def test_batch_sparseflip(self):
-
         N, H, n_parents, n_children = 3, 5, 4, 2
         sparsity, p_bf = 1 / H, 0.5
 
         for x in range(self.n_runs):
-
             # parents have shape (N, n_parents, H)
             parents = generate_unique_states(n_states=n_parents, H=H)
             parents = parents.unsqueeze(0).expand((N, -1, -1))
@@ -159,11 +153,9 @@ class TestEVO(unittest.TestCase):
         self.assertTrue(to.equal(children_batch[0], children))
 
     def test_cross(self):
-
         H, n_parents = 5, 4
 
         for x in range(self.n_runs):
-
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
             children = evo.cross(parents)  # is (n_parents*n_children, H)
 
@@ -180,11 +172,9 @@ class TestEVO(unittest.TestCase):
                 child_idx += 2
 
     def test_batch_cross(self):
-
         N, H, n_parents = 3, 5, 4
 
         for x in range(self.n_runs):
-
             # parents have shape (N, n_parents, H)
             parents = generate_unique_states(n_states=n_parents, H=H)
             parents = parents.unsqueeze(0).expand((N, -1, -1))
@@ -216,11 +206,9 @@ class TestEVO(unittest.TestCase):
         self.assertTrue(to.equal(children_batch[0], children))
 
     def test_cross_randflip(self):
-
         H, n_parents = 5, 4
 
         for x in range(self.n_runs):
-
             seed = np.random.randint(10000)
 
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
@@ -236,12 +224,10 @@ class TestEVO(unittest.TestCase):
             self.assertTrue(to.all(flips_per_child == 1))
 
     def test_cross_sparseflip(self):
-
         H, n_parents, n_children_, sparsity, p_bf = 5, 4, 1, 1.0 / 5, 0.5
         seed = 7
 
         for x in range(self.n_runs):
-
             parents = generate_unique_states(n_states=n_parents, H=H)  # is (n_parents, H)
 
             to.manual_seed(seed)
@@ -271,11 +257,9 @@ class TestEVO(unittest.TestCase):
             )  # TODO Find better test
 
     def test_batch_fitparents(self):
-
         batch_size, n_candidates, H, n_parents = 2, 3, 3, 2
 
         for x in range(self.n_runs):
-
             candidates = generate_unique_states(n_states=n_candidates, H=H).repeat(
                 batch_size, 1, 1
             )  # is (batch_size, n_candidates, H)
@@ -304,7 +288,6 @@ class TestEVO(unittest.TestCase):
                 self.assertTrue(any(to.equal(p, c) for c in candidates[batch]))
 
     def test_update(self):
-
         evo_conf = {
             "precision": self.precision,
             "N": 2,
@@ -320,7 +303,6 @@ class TestEVO(unittest.TestCase):
         device = tvo.get_device()
 
         for x in range(self.n_runs):
-
             idx = to.arange(evo_conf["N"], device=device)
             data_dummy = to.empty((1,), device=device)
 

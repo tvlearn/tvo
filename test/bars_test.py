@@ -59,7 +59,6 @@ def model_and_data(request, hyperparams, estep_conf):
     precision, N, D, H, batch_size = get(hyperparams, "precision", "N", "D", "H", "batch_size")
 
     if request.param == "BSC":
-
         W_gt = generate_bars(H, bar_amp=10.0, precision=precision)
         sigma2_gt = to.ones((1,), dtype=precision, device=tvo.get_device())
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvo.get_device())
@@ -85,7 +84,6 @@ def model_and_data(request, hyperparams, estep_conf):
         model.theta["pies"] = pies_init
 
     elif request.param == "NoisyOR":
-
         W_gt = generate_bars(H, bar_amp=0.8, bg_amp=0.1, precision=precision)
         pies_gt = to.full((H,), 2.0 / H, dtype=precision, device=tvo.get_device())
 
