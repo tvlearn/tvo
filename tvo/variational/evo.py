@@ -456,7 +456,6 @@ def batch_randparents(candidates: Tensor, n_parents: int, lpj: Tensor = None) ->
 
 
 def fitparents(candidates: Tensor, n_parents: int, lpj: Tensor) -> Tensor:
-
     device = candidates.device
 
     # compute fitness (per data point)

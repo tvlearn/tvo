@@ -117,7 +117,6 @@ class CyclicLR(_LRScheduler):
         max_momentum=0.9,
         last_epoch=-1,
     ):
-
         if not isinstance(optimizer, Optimizer):
             raise TypeError("{} is not an Optimizer".format(type(optimizer).__name__))
         self.optimizer = optimizer

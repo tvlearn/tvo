@@ -25,7 +25,6 @@ dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
 def feature_learning():
-
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
