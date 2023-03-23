@@ -404,7 +404,6 @@ class SSSC(Sampler, Optimized, Reconstructor):
                         self._storage[hsh]["Lambda_s_W_s_sigma2inv"],
                     )
                 else:
-
                     (
                         W_s,
                         mus_s,
