@@ -3,9 +3,9 @@ torchvision
 numpy
 matplotlib
 h5py
-pylama
-pyflakes==2.4.0
+pylama==8.4.1
 pytest
+mypy==0.991
 mypy
 pytest-cov
 black

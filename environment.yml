@@ -10,10 +10,9 @@ dependencies:
   - cudatoolkit>=10.0
   - matplotlib
   - h5py
-  - pylama
-  - pyflakes==2.4.0
+  - pylama==8.4.1
   - pytest
-  - mypy
+  - mypy==0.991
   - pytest-cov
   - black>=21
   - munch
