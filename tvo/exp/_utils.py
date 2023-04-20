@@ -8,6 +8,7 @@ from typing import Union
 from tvo.variational import (
     FullEM,
     EVOVariationalStates,
+    PreAmortizedVariationalStates,
     NeuralVariationalStates,
     FullEMSingleCauseModels,
     TVSVariationalStates,
@@ -17,6 +18,7 @@ from tvo.exp._EStepConfig import (
     FullEMConfig,
     EVOConfig,
     NeuralEMConfig,
+    PreAmortizedConfig,
     EStepConfig,
     FullEMSingleCauseConfig,
     TVSConfig,
@@ -28,6 +30,7 @@ def make_var_states(
     conf: EStepConfig, N: int, H: int, precision: to.dtype
 ) -> Union[
     EVOVariationalStates,
+    PreAmortizedVariationalStates,
     FullEM,
     FullEMSingleCauseModels,
     TVSVariationalStates,
@@ -51,6 +54,14 @@ def make_var_states(
             S=conf.n_states,
             S_new=conf.n_samples,
             precision=precision,
+        )
+    elif isinstance(conf, PreAmortizedConfig):
+        return PreAmortizedVariationalStates(
+            N=N,
+            H=H,
+            S=conf.n_states,
+            model_path=conf.model_path,
+            nsamples=conf.nsamples,
         )
     elif isinstance(conf, TVSConfig):
         return TVSVariationalStates(
