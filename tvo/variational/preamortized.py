@@ -70,7 +70,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         # new_K = to.cat((new_K_prior, new_K_marg), dim=1)
 
-        new_K, lq = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist='posterior')
+        new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist='posterior')
 
         new_K = (new_K>0.5).transpose(0,1).byte()
         new_lpj = lpj_fn(batch, new_K)
