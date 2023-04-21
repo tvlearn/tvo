@@ -1,10 +1,8 @@
 import numpy as np
 import torch as to
-
 from itertools import combinations
 from typing import Callable, Tuple, Optional, Sequence
 from torch import Tensor
-
 import tvo
 from tvo.utils import get
 from tvo.variational.TVOVariationalStates import TVOVariationalStates
@@ -12,10 +10,9 @@ from tvo.variational._utils import update_states_for_batch, set_redundant_lpj_to
 
 from tvo.utils.model_protocols import Optimized, Trainable
 import warnings
-
 from tvo.variational.evo import batch_sparseflip, batch_randflip
-
-from rmbvae import rmbvae
+# from rmbvae import rmbvae
+from models.binarysparsecoding import RelaxedBernoulliSC
 
 class NeuralVariationalStates(TVOVariationalStates):
     def __init__(
@@ -92,14 +89,17 @@ class NeuralVariationalStates(TVOVariationalStates):
         # todo: remove rmbvae hack
 
         if self.loss_name=='n_accepted' and self.RBMVAE:
+            print('Working with Relaxed Multivariate Bernoulli')
             self.REPARAMETERIZED=True
-            self.m=rmbvae.RMBVAE(
-                n_hidden=config['n_hidden'],
-                input_dimensionality=25,
-                d=config['output_size'],
-                r=config['output_size'],
-                lambda_=0.5
-            )
+            # self.m=rmbvae.RMBVAE(
+            #     n_hidden=config['n_hidden'],
+            #     input_dimensionality=25,
+            #     d=config['output_size'],
+            #     r=config['output_size'],
+            #     lambda_=0.5
+            # )
+            assert False,'Todo: load trained RMB model'
+            self.m = to.load()
             self.encoder=self.m.encode
             self.sampling=self.m.reparameterized_rmb_sample
             self.optimizer=to.optim.Adam(list(self.m.variance_stack.parameters())+
@@ -167,7 +167,8 @@ class NeuralVariationalStates(TVOVariationalStates):
                 else:
                     try:
                         new_states[:, i, :] = self.sampling(q)
-                    except AssertionError:
+                    except AssertionError as e:
+                        raise e
                         new_states_i=False
             elif using_marginal:
                 p = to.mean(self.K[idx].to(self.precision), axis=1)
@@ -198,7 +199,6 @@ class NeuralVariationalStates(TVOVariationalStates):
             sort_by_lpj=sort_by_lpj,
             vector_subs=True
         )
-
 
 
         # update encoder
@@ -261,10 +261,6 @@ class NeuralVariationalStates(TVOVariationalStates):
 
             else:
                 raise ValueError(f"Unknown loss function: {self.loss_fname}")  # pragma: no cover
-
-
-
-
 
                 # if to.rand(1) > 0.95:
                 #     print('Loss={}'.format(loss.detach().numpy()))
