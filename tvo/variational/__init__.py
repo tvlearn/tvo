@@ -5,6 +5,7 @@ from .evo import EVOVariationalStates
 from .tvs import TVSVariationalStates
 from .neural import NeuralVariationalStates
 from .neural_evo import NeuralEvoVariationalStates
+from .preamortized import PreAmortizedVariationalStates
 __all__ = [
     "TVOVariationalStates",
     "FullEM",
@@ -12,5 +13,6 @@ __all__ = [
     "EVOVariationalStates",
     "TVSVariationalStates",
     "FullEMSingleCauseModels",
-    "NeuralEvoVariationalStates"
+    "NeuralEvoVariationalStates",
+    "PreAmortizedVariationalStates"
 ]
