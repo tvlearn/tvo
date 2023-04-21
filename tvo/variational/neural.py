@@ -12,7 +12,6 @@ from tvo.utils.model_protocols import Optimized, Trainable
 import warnings
 from tvo.variational.evo import batch_sparseflip, batch_randflip
 # from rmbvae import rmbvae
-from models.binarysparsecoding import RelaxedBernoulliSC
 
 class NeuralVariationalStates(TVOVariationalStates):
     def __init__(
