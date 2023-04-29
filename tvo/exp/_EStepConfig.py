@@ -319,7 +319,7 @@ class PreAmortizedConfig(EStepConfig):
             nsamples: int,
             K_init_file: str = None,
     ):
-        super().__init__(nsamples)
+        super().__init__(S)
 
         self.N = N
         self.H = H
