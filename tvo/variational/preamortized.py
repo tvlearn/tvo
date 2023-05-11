@@ -62,9 +62,9 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         self.lpj_call_count += len(batch)
 
         new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist=self.dist)
-        # new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist='posterior_no_corr')
 
         new_K = (new_K>0.5).transpose(0,1).byte()
+
         new_lpj = lpj_fn(batch, new_K)
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
