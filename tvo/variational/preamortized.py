@@ -3,6 +3,7 @@ from tvo.variational.TVOVariationalStates import TVOVariationalStates
 from tvo.utils.model_protocols import Trainable, Optimized
 from ._utils import update_states_for_batch, set_redundant_lpj_to_low
 from tvo import get_device
+import functools
 
 class PreAmortizedVariationalStates(TVOVariationalStates):
     def __init__(
@@ -12,6 +13,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         S: int,
         model_path: str,
         nsamples: int,
+        dist: str,
         K_init_file: str = None,
     ):
         """Truncated Variational Sampling class.
@@ -22,6 +24,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         :param precision: floating point precision to be used for log_joint values.
                           Must be one of to.float32 or to.float64.
         :param K_init_file: Full path to H5 file providing initial states
+        :param dist: either posterior or posterior_no_corr.
         """
         conf = {
             "N": N,
@@ -35,7 +38,12 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         }
         self.nsamples = nsamples
         self.sampler = torch.load(model_path).to(get_device())
+        self.dist = dist
+
+        self.lpj_call_count = 0
+
         super().__init__(conf)
+
 
     def update(self, idx: torch.Tensor, batch: torch.Tensor, model: Trainable) -> int:
         """See :func:`tvo.variational.TVOVariationalStates.update`."""
@@ -51,27 +59,10 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         lpj[idx] = lpj_fn(batch, K[idx])
 
-        # batch_size, H = batch.shape[0], K.shape[2]
+        self.lpj_call_count += len(batch)
 
-        # new_K_prior = (
-        #     torch.rand(batch_size, self.config["S_new_prior"], H, device=K.device)
-        #     < model.theta["pies"]
-        # ).byte()
-
-        # approximate_marginals = (
-        #     mean_posterior(K[idx].type_as(lpj), lpj[idx])
-        #     .unsqueeze(1)
-        #     .expand(batch_size, self.config["S_new_marg"], H)
-        # )  # approximates p(s_h=1|\yVecN, \Theta), shape is (batch_size, S_new_marg, H)
-        # new_K_marg = (
-        #     to.rand(batch_size, self.config["S_new_marg"], H, device=K.device)
-        #     < approximate_marginals
-        # ).byte()
-
-        # new_K = to.cat((new_K_prior, new_K_marg), dim=1)
-
-        new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist='posterior')
-        # new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist='full_marginal')
+        new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist=self.dist)
+        # new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist='posterior_no_corr')
 
         new_K = (new_K>0.5).transpose(0,1).byte()
         new_lpj = lpj_fn(batch, new_K)
@@ -81,3 +72,10 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         return update_states_for_batch(
             new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
         )
+
+    # def make_lpj_counter(self, lpj_fn):
+    #     @functools.wraps(lpj_fn)
+    #     def lpj_counter(*args, **kwargs):
+    #         self.lpj_call_count += 1 # criminal and heresis
+    #         return lpj_fn(*args, **kwargs)
+    #     return lpj_counter
