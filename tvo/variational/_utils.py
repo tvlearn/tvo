@@ -109,8 +109,6 @@ def update_states_for_batch(
     all_states: to.Tensor,
     all_lpj: to.Tensor,
     sort_by_lpj: Dict[str, to.Tensor] = {},
-    hacky_ignore_substitution=False,
-    vector_subs=False
 ) -> int:
     """Perform substitution of old and new states (and lpj, ...)
        according to TVO criterion.
@@ -122,7 +120,6 @@ def update_states_for_batch(
     :param all_lpj: corresponding log-pseudo-joints (N, S)
     :param sort_by_lpj: optional list of tensors with shape (n,s,...) that will be
         sorted by all_lpj, the same way all_lpj and all_states are sorted.
-    :param vector_subs: Bool, optionally returns substitutions per individual datapoint
 
     S is the number of variational states memorized for each of the N
     data-points. idx contains the ordered list of indexes for which the
@@ -145,21 +142,8 @@ def update_states_for_batch(
     conc_states = to.cat((old_states, new_states), dim=1)
     conc_lpj = to.cat((old_lpj, new_lpj), dim=1)  # (batch_size, S+newS)
 
-    if hacky_ignore_substitution:
-        raise NotImplementedError
-        # S+=newS
-        #
-        # # increase dimensionality of all states & lpj in the S dimension
-        # complementary_all_states = to.zeros(all_states.shape[0], newS, H, dtype=all_states.dtype)
-        # complementary_all_lpj = to.zeros(all_states.shape[0], newS, dtype=all_states.dtype)
-        # all_states = to.concat((all_states, complementary_all_states), dim=1)
-        # all_lpj = to.concat((all_lpj, complementary_all_lpj), dim=1)
-
     # is (batch_size, S)
-    sorted_idx = to.flip(
-        to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1]
-    )
-    
+    sorted_idx = to.flip(to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1])
     flattened_sorted_idx = sorted_idx.flatten()
 
     idx_n = idx.repeat(S, 1).t().flatten()
@@ -173,15 +157,7 @@ def update_states_for_batch(
         idx_n_ = to.arange(batch_size).repeat(S, 1).t().flatten()
         t[idx_n_, idx_s] = t[idx_n_, flattened_sorted_idx]
 
-
-    v_subs= sorted_idx >= old_states.shape[1]
-    n_subs = v_subs.sum().item()
-    
-    check = sum(new_lpj.max(dim=1)[0] > old_lpj.min(dim=1)[0])
-
-    if vector_subs:
-        return n_subs, v_subs
-    return n_subs  # nsubs
+    return (sorted_idx >= old_states.shape[1]).sum().item()  # nsubs
 
 
 def lpj2pjc(lpj: to.Tensor):
