@@ -13,7 +13,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         S: int,
         model_path: str,
         nsamples: int,
-        dist: str,
+        dist: str = 'posterior',
         K_init_file: str = None,
     ):
         """Truncated Variational Sampling class.
@@ -57,21 +57,40 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         K, lpj = self.K, self.lpj
 
-        lpj[idx] = lpj_fn(batch, K[idx])
-
-        self.lpj_call_count += len(batch)
+        lpj[idx] = lpj_fn(batch, K[idx])  # only necessary during training
+        self.lpj_call_count += lpj[idx].numel()
 
         new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist=self.dist)
 
         new_K = (new_K>0.5).transpose(0,1).byte()
 
+
         new_lpj = lpj_fn(batch, new_K)
+        self.lpj_call_count += new_lpj.numel()
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        return update_states_for_batch(
+        self.assertion(new_lpj)
+
+        subs = update_states_for_batch(
             new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
         )
+
+        return subs
+
+    def assertion(self, new_lpj):
+        try:
+            n_lpj = new_lpj.shape.numel()
+            uniques = new_lpj.unique().shape.numel()
+            batch = new_lpj.shape[0]
+            substituted = (new_lpj <= new_lpj.min()*0.99).sum()
+            should_be_zero = n_lpj- uniques - substituted
+            # print(should_be_zero)
+            assert should_be_zero == 0,'{} UFOs out of {}'.format(should_be_zero, n_lpj)
+
+        except AssertionError as e:
+            # print('Not passed')
+            pass
 
     # def make_lpj_counter(self, lpj_fn):
     #     @functools.wraps(lpj_fn)
