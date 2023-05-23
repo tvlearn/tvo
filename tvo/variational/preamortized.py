@@ -1,7 +1,7 @@
 import torch
 from tvo.variational.TVOVariationalStates import TVOVariationalStates
 from tvo.utils.model_protocols import Trainable, Optimized
-from ._utils import update_states_for_batch, set_redundant_lpj_to_low
+from ._utils import update_states_for_batch, set_redundant_lpj_to_low, _unique_ind
 from tvo import get_device
 import functools
 
@@ -64,13 +64,15 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         new_K = (new_K>0.5).transpose(0,1).byte()
 
+        new_K = self.make_unique(new_K, nbatch=len(idx))
 
         new_lpj = lpj_fn(batch, new_K)
+
         self.lpj_call_count += new_lpj.numel()
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        self.assertion(new_lpj)
+        self.debug_lpj(new_lpj)
 
         subs = update_states_for_batch(
             new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
@@ -78,19 +80,24 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         return subs
 
-    def assertion(self, new_lpj):
-        try:
-            n_lpj = new_lpj.shape.numel()
-            uniques = new_lpj.unique().shape.numel()
-            batch = new_lpj.shape[0]
-            substituted = (new_lpj <= new_lpj.min()*0.99).sum()
-            should_be_zero = n_lpj- uniques - substituted
-            # print(should_be_zero)
-            assert should_be_zero == 0,'{} UFOs out of {}'.format(should_be_zero, n_lpj)
+    def debug_lpj(self, new_lpj):
+        n_lpj = new_lpj.shape.numel()
+        uniques = new_lpj.unique().shape.numel()
+        batch = new_lpj.shape[0]
+        substituted = (new_lpj <= new_lpj.min()*0.99).sum()
+        should_be_zero = n_lpj- uniques - substituted
+        # print('{} lpj out of {} are equal to others'.format(should_be_zero, n_lpj))
 
-        except AssertionError as e:
-            # print('Not passed')
-            pass
+
+    def make_unique(self, new_K, nbatch):
+        min_len=self.nsamples
+        for n in range(nbatch):
+            keep_ind = _unique_ind(new_K[n])
+            new_K[n,0:len(keep_ind)]= new_K[n][keep_ind]
+            if min_len>len(keep_ind):
+                min_len = len(keep_ind)
+        new_k = new_K[:, :min_len]
+        return new_k
 
     # def make_lpj_counter(self, lpj_fn):
     #     @functools.wraps(lpj_fn)
