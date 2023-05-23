@@ -120,7 +120,7 @@ def gaussian_denoising_example():
         batch_size=32,
         output=training_file,
         reco_epochs=reco_epochs,
-        log_blacklist=["train_lpj", "train_states", "train_subs", "train_reconstruction"],
+        log_blacklist=[],
         log_only_latest_theta=True,
     )
     pprint("Initializing experiment")
