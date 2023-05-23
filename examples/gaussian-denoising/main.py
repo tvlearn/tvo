@@ -140,7 +140,7 @@ def gaussian_denoising_example():  # noqa: C901
         batch_size=32,
         output=training_file,
         reco_epochs=reco_epochs,
-        log_blacklist=["train_lpj", "train_states", "train_subs", "train_reconstruction"],
+        log_blacklist=[],
         log_only_latest_theta=True,
     )
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, train_data_file=data_file)
