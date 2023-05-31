@@ -57,6 +57,8 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         K, lpj = self.K, self.lpj
 
+        B, S, H = K[idx].shape
+
         lpj[idx] = lpj_fn(batch, K[idx])  # only necessary during training
         self.lpj_call_count += lpj[idx].numel()
 
@@ -64,21 +66,27 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         new_K = (new_K>0.5).transpose(0,1).byte()
 
-        new_K = self.make_unique(new_K, nbatch=len(idx))
+        new_K = self.make_unique(torch.concat((new_K,K[idx]), dim=1), nbatch=len(idx))
 
         new_lpj = lpj_fn(batch, new_K)
 
+        values, indices = new_lpj.sort()
+
         self.lpj_call_count += new_lpj.numel()
 
-        set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
+        self.lpj[idx]=values[:,-S:]
+        for n in range(B):
+            self.K[idx[n]] = new_K[n, indices[n, -S:]]
 
-        self.debug_lpj(new_lpj)
+        # set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        subs = update_states_for_batch(
-            new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
-        )
+        # self.debug_lpj(new_lpj)
 
-        return subs
+        # subs = update_states_for_batch(
+        #     new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
+        # )
+
+        return 0
 
     def debug_lpj(self, new_lpj):
         n_lpj = new_lpj.shape.numel()
@@ -97,6 +105,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
             if min_len>len(keep_ind):
                 min_len = len(keep_ind)
         new_k = new_K[:, :min_len]
+        # print('Lowest amount of unique states={}'.format(min_len))
         return new_k
 
     # def make_lpj_counter(self, lpj_fn):
