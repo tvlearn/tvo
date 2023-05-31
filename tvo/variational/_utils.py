@@ -3,6 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
+import numpy as np
 import tvo
 import numpy as np
 from typing import Dict
@@ -16,15 +17,20 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     :returns: indices of unique rows in tensor.
     """
     n = x.shape[0]
-    unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
+    unique_rows, inverse_ind = to.unique(x, sorted=True, return_inverse=True, dim=0)
+    x_numpy = x.clone().detach().cpu().numpy()
+    numpy_unique=np.unique(x_numpy, axis=0)
+    if numpy_unique.shape[0] != unique_rows.shape[0]:
+        breakpoint()
     n_unique = unique_rows.shape[0]
     perm = to.arange(n, device=inverse_ind.device)
     # make sure reverse_ind relative to old_states come last...
+
     inverse_ind, perm = inverse_ind.flip([0]), perm.flip([0])
+
     # ...so the indices that are written last in each position are the ones for old_states
     uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
     return uniq_ind
-
 
 def _set_redundant_lpj_to_low_GPU(
     new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor
@@ -52,9 +58,9 @@ def _set_redundant_lpj_to_low_GPU(
         # indexes of all non-unique states in new_states (complementary of new_uniq_idx)
         mask[new_uniq_idx.to(device=new_lpj.device)] = 0
         # set lpj of redundant states to an arbitrary low value
-        new_lpj[n][mask] = -1e20
+        new_lpj[n][mask] = to.finfo(to.float32).min
 
-
+        print('n={}, n_uniq_ind={}, n_new_uniq={}, diff={}, len_mask={}'.format(n,len(uniq_idx), len(new_uniq_idx),len(uniq_idx)-len(new_uniq_idx), mask.sum()))
 # set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
 # function that runs on numpy arrays, when running on GPU, we stick to torch tensors
 def set_redundant_lpj_to_low(
@@ -143,6 +149,7 @@ def update_states_for_batch(
     conc_lpj = to.cat((old_lpj, new_lpj), dim=1)  # (batch_size, S+newS)
 
     # is (batch_size, S)
+    # Does this correspond to the actual least logjoints?
     sorted_idx = to.flip(to.topk(conc_lpj, k=S, dim=1, largest=True, sorted=True)[1], [1])
     flattened_sorted_idx = sorted_idx.flatten()
 

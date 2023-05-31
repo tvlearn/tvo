@@ -66,27 +66,37 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         new_K = (new_K>0.5).transpose(0,1).byte()
 
-        new_K = self.make_unique(torch.concat((new_K,K[idx]), dim=1), nbatch=len(idx))
+        new_K = self.make_unique(new_K, B, S)
 
+        # new_K = self.make_unique(torch.concat((new_K,K[idx]), dim=1), nbatch=B, S=S)
+        #
         new_lpj = lpj_fn(batch, new_K)
+        #
+        # values, indices = new_lpj.sort()
+        #
+        # self.lpj_call_count += new_lpj.numel()
+        #
+        # self.lpj[idx]=values[:,-S:]
+        # for n in range(B):
+        #     self.K[idx[n]] = new_K[n, indices[n, -S:]]
 
-        values, indices = new_lpj.sort()
+        set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        self.lpj_call_count += new_lpj.numel()
+        self.check_joint_k_and_knew_are_unique(new_lpj, new_K, idx, S, B)
 
-        self.lpj[idx]=values[:,-S:]
-        for n in range(B):
-            self.K[idx[n]] = new_K[n, indices[n, -S:]]
 
-        # set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
+        assert self.make_unique(self.K[idx], nbatch=B, S=S).shape[1] == S, 'bug in state selection'
+        # torch.where(new_lpj > to.finfo(to.float32).min)
 
         # self.debug_lpj(new_lpj)
 
-        # subs = update_states_for_batch(
-        #     new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
-        # )
+        subs = update_states_for_batch(
+            new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
+        )
 
-        return 0
+        self.check_joint_k_and_knew_are_unique(new_lpj, new_K, idx, S, B)
+        assert self.make_unique(self.K[idx], nbatch=B, S=S).shape[1]==S, 'bug in state selection'
+        return subs
 
     def debug_lpj(self, new_lpj):
         n_lpj = new_lpj.shape.numel()
@@ -97,7 +107,8 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         # print('{} lpj out of {} are equal to others'.format(should_be_zero, n_lpj))
 
 
-    def make_unique(self, new_K, nbatch):
+    def make_unique(self, new_K, nbatch, S):
+        # assert new_K.shape[1] > S
         min_len=self.nsamples
         for n in range(nbatch):
             keep_ind = _unique_ind(new_K[n])
@@ -107,6 +118,26 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         new_k = new_K[:, :min_len]
         # print('Lowest amount of unique states={}'.format(min_len))
         return new_k
+
+    def make_unique(self, new_K, nbatch, S):
+        # assert new_K.shape[1] > S
+        min_len=self.nsamples
+        for n in range(nbatch):
+            keep_ind = _unique_ind(new_K[n])
+            new_K[n,0:len(keep_ind)]= new_K[n][keep_ind]
+            if min_len>len(keep_ind):
+                min_len = len(keep_ind)
+        new_k = new_K[:, :min_len]
+        # print('Lowest amount of unique states={}'.format(min_len))
+        return new_k
+
+    def check_joint_k_and_knew_are_unique(self,new_lpj, new_K, idx, S, B):
+        for b, i in enumerate(idx):
+            nui = torch.where(new_lpj[b] > torch.finfo(torch.float32).min)[0]
+            new_K_unique = new_K[b][nui]
+            maybe_unique_K = torch.cat((self.K[i], new_K_unique))
+            possibly_unique_K = self.make_unique(maybe_unique_K, B, S)
+            assert possibly_unique_K.shape[0] == (nui.shape[0] + S), 'Disparity of uniques in concat[k,knew]'
 
     # def make_lpj_counter(self, lpj_fn):
     #     @functools.wraps(lpj_fn)
