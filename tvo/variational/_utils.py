@@ -18,9 +18,7 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     """
     n = x.shape[0]
     unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
-
     n_unique = unique_rows.shape[0]
-
     uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
 
     # CPU code
@@ -37,6 +35,7 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
 
     # uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
     # return uniq_ind
+
 
 def _set_redundant_lpj_to_low_GPU(
     new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor
