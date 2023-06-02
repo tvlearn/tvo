@@ -19,12 +19,30 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     n = x.shape[0]
     unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
     n_unique = unique_rows.shape[0]
-    perm = to.arange(n, device=inverse_ind.device)
-    # make sure reverse_ind relative to old_states come last...
-    #inverse_ind, perm = inverse_ind.flip([0]), perm.flip([0])
-    # ...so the indices that are written last in each position are the ones for old_states
-    uniq_ind = inverse_ind.new_empty(n_unique).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
-    return uniq_ind
+
+    # Find unique indices such that the uniqueness is credited to states in the Kset if they exist
+    mask = to.eq(inverse_ind.unique().unsqueeze(1),inversex_ind.repeat(len(inverse_ind.unique()),1))
+    return mask.to(to.float).argmax(1)
+
+    # This code is faster, but is 1. unstable and 2.non-deterministic as of July 2023 and pytorch=2.0.0. When the
+    # pytorch version increases, check if the docs for Tensor_scatter_reduce_ still have the relevant notes & warnings
+    # about the function. Until then, the deterministic function above should be used instead. (If you checked, please
+    # increment the pytorch version in this comment and push).
+
+    # Authored by Sebastian Salwig:
+    # uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
+    # perm = to.arange(n, device=inverse_ind.device)
+    # uniq_ind = inverse_ind.new_empty(n_unique).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
+    # return uniq_ind
+
+    # The slow CPU code below can be used to verify:
+    # CPU code
+    # for i in range(n_unique):
+    #     for j, n in enumerate(inverse_ind):
+    #         if n == i:
+    #             uniq_ind[i] = int(j)
+    #             uniq_ind.long()
+    #             break
 
 def _set_redundant_lpj_to_low_GPU(
     new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor
