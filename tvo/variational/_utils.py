@@ -20,9 +20,9 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     n_unique = unique_rows.shape[0]
     perm = to.arange(n, device=inverse_ind.device)
     # make sure reverse_ind relative to old_states come last...
-    inverse_ind, perm = inverse_ind.flip([0]), perm.flip([0])
+    #inverse_ind, perm = inverse_ind.flip([0]), perm.flip([0])
     # ...so the indices that are written last in each position are the ones for old_states
-    uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
+    uniq_ind = inverse_ind.new_empty(n_unique).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
     return uniq_ind
 
 
