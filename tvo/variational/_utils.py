@@ -20,7 +20,7 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     n_unique = unique_rows.shape[0]
 
     # Find unique indices such that the uniqueness is credited to states in the Kset if they exist
-    mask = to.eq(inverse_ind.unique().unsqueeze(1),inversex_ind.repeat(len(inverse_ind.unique()),1))
+    mask = to.eq(inverse_ind.unique().unsqueeze(1),inverse_ind.repeat(len(inverse_ind.unique()),1))
     return mask.to(to.float).argmax(1)
 
     # This code is faster, but is 1. unstable and 2.non-deterministic as of July 2023 and pytorch=2.0.0. When the
