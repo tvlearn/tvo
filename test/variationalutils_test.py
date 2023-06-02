@@ -31,7 +31,6 @@ class TestTVO(unittest.TestCase):
         self.precision = to.float64
 
     def test_unique_ind(self):
-
         states = to.tensor([[0, 1, 1], [0, 1, 1], [0, 0, 0], [0, 0, 0], [1, 0, 0]], dtype=to.uint8)
 
         states_unique_ind = _unique_ind(states)
@@ -40,7 +39,6 @@ class TestTVO(unittest.TestCase):
         self.assertEqual((states_unique_ind.sort()[0] == to.tensor([0, 2, 4])).sum().item(), 3)
 
     def test_generate_unique_states(self):
-
         n_states, H = 5, 8
 
         device = tvo.get_device()
@@ -51,7 +49,6 @@ class TestTVO(unittest.TestCase):
         self.assertTrue(to.equal(reverse_ind.sort()[0], to.arange(n_states, device=device)))
 
     def test_update_states_for_batch(self):
-
         precision = self.precision
 
         idx = to.arange(2)
@@ -76,7 +73,6 @@ class TestTVO(unittest.TestCase):
         self.assertEqual(n_subs, 4)
 
     def test_set_redundant_lpj_to_low(self):
-
         precision = self.precision
 
         device = tvo.get_device()

@@ -42,7 +42,6 @@ class Visualizer(object):
         labelsize: int = 10,
         gif_framerate: Optional[str] = None,
     ):
-
         self._viz_every = viz_every
         self._output_directory = output_directory
         self._gif_framerate = gif_framerate

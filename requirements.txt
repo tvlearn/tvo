@@ -1,9 +1,10 @@
-torch
+torch>=1.8.1
 torchvision
 numpy
 matplotlib
 h5py
 pylama
+pyflakes==2.4.0
 pytest
 mypy
 pytest-cov
