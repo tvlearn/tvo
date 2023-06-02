@@ -18,21 +18,11 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     """
     n = x.shape[0]
     unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
-
     n_unique = unique_rows.shape[0]
-
-    uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
-
-    # CPU code
-    # for i in range(n_unique):
-    #     for j, n in enumerate(inverse_ind):
-    #         if n == i:
-    #             uniq_ind[i] = int(j)
-    #             uniq_ind.long()
-    #             break
-
-    # where inverse_ind is unique, each index represented by row
-
+    perm = to.arange(n, device=inverse_ind.device)
+    # make sure reverse_ind relative to old_states come last...
+    inverse_ind, perm = inverse_ind.flip([0]), perm.flip([0])
+    # ...so the indices that are written last in each position are the ones for old_states
     uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
     return uniq_ind
 
