@@ -15,25 +15,30 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     :param x: torch tensor
     :returns: indices of unique rows in tensor.
     """
-    n = x.shape[0]
+    # Get unique rows and inverse indices
     unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
-    n_unique = unique_rows.shape[0]
 
-    # Find unique indices such that the uniqueness is credited to states in the Kset if they exist
+    # Assign original tensors in the Kset if possible
     mask = to.eq(
         inverse_ind.unique().unsqueeze(1), inverse_ind.repeat(len(inverse_ind.unique()), 1)
     )
     return mask.to(to.float).argmax(1)
 
-    # This code is faster, but is 1. unstable and 2.non-deterministic as of July 2023 and pytorch=2.0.0. When the
-    # pytorch version increases, check if the docs for Tensor_scatter_reduce_ still have the relevant notes & warnings
-    # about the function. Until then, the deterministic function above should be used instead. (If you checked, please
-    # increment the pytorch version in this comment and push).
+    # This code is faster, but is 1. unstable and 2.non-deterministic as of July 2023 and
+    # pytorch=2.0.0. When the pytorch version increases, check if the docs for
+    # Tensor_scatter_reduce_ still have the relevant notes & warnings about the function.
+    # Until then, the deterministic function above should be used instead. (Ifyou checked,
+    # please increment the pytorch version in this comment and push).
 
     # Authored by Sebastian Salwig:
+    # n = x.shape[0]
+    # unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
+    # n_unique = unique_rows.shape[0]
     # uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
     # perm = to.arange(n, device=inverse_ind.device)
-    # uniq_ind = inverse_ind.new_empty(n_unique).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
+    # uniq_ind = inverse_ind.new_empty(
+    #   n_unique
+    #   ).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
     # return uniq_ind
 
     # The slow CPU code below can be used to verify:
