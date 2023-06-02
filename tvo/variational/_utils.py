@@ -17,18 +17,22 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     :returns: indices of unique rows in tensor.
     """
     n = x.shape[0]
-    unique_rows, inverse_ind = to.unique(x, sorted=True, return_inverse=True, dim=0)
-    x_numpy = x.clone().detach().cpu().numpy()
-    numpy_unique=np.unique(x_numpy, axis=0)
-    if numpy_unique.shape[0] != unique_rows.shape[0]:
-        breakpoint()
+    unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
+
     n_unique = unique_rows.shape[0]
-    perm = to.arange(n, device=inverse_ind.device)
-    # make sure reverse_ind relative to old_states come last...
 
-    inverse_ind, perm = inverse_ind.flip([0]), perm.flip([0])
+    uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
 
-    # ...so the indices that are written last in each position are the ones for old_states
+    # CPU code
+    # for i in range(n_unique):
+    #     for j, n in enumerate(inverse_ind):
+    #         if n == i:
+    #             uniq_ind[i] = int(j)
+    #             uniq_ind.long()
+    #             break
+
+    # where inverse_ind is unique, each index represented by row
+
     uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
     return uniq_ind
 
@@ -60,7 +64,7 @@ def _set_redundant_lpj_to_low_GPU(
         # set lpj of redundant states to an arbitrary low value
         new_lpj[n][mask] = to.finfo(to.float32).min
 
-        print('n={}, n_uniq_ind={}, n_new_uniq={}, diff={}, len_mask={}'.format(n,len(uniq_idx), len(new_uniq_idx),len(uniq_idx)-len(new_uniq_idx), mask.sum()))
+        # print('n={}, n_uniq_ind={}, n_new_uniq={}, diff={}, len_mask={}'.format(n,len(uniq_idx), len(new_uniq_idx),len(uniq_idx)-len(new_uniq_idx), mask.sum()))
 # set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
 # function that runs on numpy arrays, when running on GPU, we stick to torch tensors
 def set_redundant_lpj_to_low(

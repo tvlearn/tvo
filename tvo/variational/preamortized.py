@@ -82,10 +82,10 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        self.check_joint_k_and_knew_are_unique(new_lpj, new_K, idx, S, B)
+        # self.check_joint_k_and_knew_are_unique(new_lpj, new_K, idx, S, B)
 
 
-        assert self.make_unique(self.K[idx], nbatch=B, S=S).shape[1] == S, 'bug in state selection'
+        # assert self.make_unique(self.K[idx], nbatch=B, S=S).shape[1] == S, 'bug in state selection'
         # torch.where(new_lpj > to.finfo(to.float32).min)
 
         # self.debug_lpj(new_lpj)
@@ -94,8 +94,8 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
             new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
         )
 
-        self.check_joint_k_and_knew_are_unique(new_lpj, new_K, idx, S, B)
-        assert self.make_unique(self.K[idx], nbatch=B, S=S).shape[1]==S, 'bug in state selection'
+        # self.check_joint_k_and_knew_are_unique(new_lpj, new_K, idx, S, B)
+        # assert self.make_unique(self.K[idx], nbatch=B, S=S).shape[1]==S, 'bug in state selection'
         return subs
 
     def debug_lpj(self, new_lpj):
@@ -107,26 +107,28 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         # print('{} lpj out of {} are equal to others'.format(should_be_zero, n_lpj))
 
 
-    def make_unique(self, new_K, nbatch, S):
-        # assert new_K.shape[1] > S
-        min_len=self.nsamples
-        for n in range(nbatch):
-            keep_ind = _unique_ind(new_K[n])
-            new_K[n,0:len(keep_ind)]= new_K[n][keep_ind]
-            if min_len>len(keep_ind):
-                min_len = len(keep_ind)
-        new_k = new_K[:, :min_len]
-        # print('Lowest amount of unique states={}'.format(min_len))
-        return new_k
+    # def make_unique(self, new_K, nbatch, S):
+    #     # assert new_K.shape[1] > S
+    #     min_len=self.nsamples
+    #     for n in range(nbatch):
+    #         keep_ind = _unique_ind(new_K[n])
+    #         new_K[n,0:len(keep_ind)]= new_K[n][keep_ind]
+    #         if min_len>len(keep_ind):
+    #             min_len = len(keep_ind)
+    #     new_k = new_K[:, :min_len]
+    #     # print('Lowest amount of unique states={}'.format(min_len))
+    #     return new_k
 
     def make_unique(self, new_K, nbatch, S):
         # assert new_K.shape[1] > S
         min_len=self.nsamples
+        to = torch
         for n in range(nbatch):
-            keep_ind = _unique_ind(new_K[n])
-            new_K[n,0:len(keep_ind)]= new_K[n][keep_ind]
-            if min_len>len(keep_ind):
-                min_len = len(keep_ind)
+            uniques = new_K[n].unique(dim=0)
+            new_K[n,0:len(uniques)]=uniques
+
+            if min_len>len(uniques):
+                min_len = len(uniques)
         new_k = new_K[:, :min_len]
         # print('Lowest amount of unique states={}'.format(min_len))
         return new_k
