@@ -32,9 +32,11 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     #             break
 
     # where inverse_ind is unique, each index represented by row
+    mask = to.eq(inverse_ind.unique().unsqueeze(1),inverse_ind.repeat(len(inverse_ind.unique()),1))
+    return mask.to(to.float).argmax(1)
 
-    uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
-    return uniq_ind
+    # uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
+    # return uniq_ind
 
 def _set_redundant_lpj_to_low_GPU(
     new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor
