@@ -17,6 +17,8 @@ from tvo.variational._utils import mean_posterior
 from tvo.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvo.utils.sanity import fix_theta
 
+# pytorch 1.2 deprecates to.gels in favour of to.lstsq
+lstsq = to.lstsq
 
 class GMM(Optimized, Sampler, Reconstructor):
     def __init__(
