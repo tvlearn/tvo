@@ -26,8 +26,8 @@ if torch_minor_version >= 10:
 elif torch_minor_version >= 2:
     # pytorch 1.2 deprecates to.gels in favour of to.lstsq
     lstsq = to.lstsq
-else:
-    lstsq = to.gels
+# else:
+#     lstsq = to.gels
 
 
 class BSC(Optimized, Sampler, Reconstructor):

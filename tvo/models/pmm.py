@@ -18,7 +18,7 @@ from tvo.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvo.utils.sanity import fix_theta
 
 # pytorch 1.2 deprecates to.gels in favour of to.lstsq
-lstsq = to.lstsq if int(to.__version__.split(".")[1]) >= 2 else to.gels
+lstsq = to.lstsq #if int(to.__version__.split(".")[1]) >= 2 else to.gels
 
 
 class PMM(Optimized, Sampler, Reconstructor):
