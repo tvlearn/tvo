@@ -22,13 +22,12 @@ if torch_minor_version >= 10:
     def lstsq(a, b):
         return to.linalg.lstsq(b, a)
 
+elif torch_minor_version >= 2:
+    # pytorch 1.2 deprecates to.gels in favour of to.lstsq
+    lstsq = to.lstsq
 
-# elif torch_minor_version >= 2:
-#     # pytorch 1.2 deprecates to.gels in favour of to.lstsq
-#     lstsq = to.lstsq
-# else:
-#     lstsq = to.gels
-
+else:
+    raise ValueError('Pytorch versions below 1.2 are unsupported')
 
 class BSC(Optimized, Sampler, Reconstructor):
     def __init__(
