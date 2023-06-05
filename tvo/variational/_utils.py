@@ -10,7 +10,7 @@ from tvo.variational._set_redundant_lpj_to_low_CPU import set_redundant_lpj_to_l
 
 
 def _unique_ind(x: to.Tensor) -> to.Tensor:
-    """Find indices of unique rows in tensor.
+    """Find indices of unique rows in tensor. Prioritizes the first instance.
 
     :param x: torch tensor
     :returns: indices of unique rows in tensor.
@@ -18,16 +18,21 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     # Get unique rows and inverse indices
     unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
 
-    # Assign original tensors in the Kset if possible
-    mask = to.eq(
-        inverse_ind.unique().unsqueeze(1), inverse_ind.repeat(len(inverse_ind.unique()), 1)
-    )
-    return mask.to(to.float).argmax(1)
+    # get unique inverse indices
+    uii = inverse_ind.unique()
 
-    # This code is faster, but is 1. unstable and 2.non-deterministic as of July 2023 and
+    # find where unique index in inverse index (uii x ii matrix)
+    where_unique = to.eq(uii.unsqueeze(1), inverse_ind.repeat(len(uii), 1))
+
+    # get index of first instance
+    unique_indices = where_unique.to(to.float).argmax(1)
+
+    return unique_indices
+
+    # The code below is a bit faster, but is 1. unstable and 2.non-deterministic as of July 2023 and
     # pytorch=2.0.0. When the pytorch version increases, check if the docs for
-    # Tensor_scatter_reduce_ still have the relevant notes & warnings about the function.
-    # Until then, the deterministic function above should be used instead. (Ifyou checked,
+    # Tensor.scatter_reduce_ still have the respective warnings & notes about the function.
+    # Until then, the deterministic function above should be used instead. (If you checked,
     # please increment the pytorch version in this comment and push).
 
     # Authored by Sebastian Salwig:
