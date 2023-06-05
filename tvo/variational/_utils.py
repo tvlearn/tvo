@@ -11,16 +11,43 @@ from tvo.variational._set_redundant_lpj_to_low_CPU import set_redundant_lpj_to_l
 
 
 def _unique_ind(x: to.Tensor) -> to.Tensor:
-    """Find indices of unique rows in tensor.
+    """Find indices of unique rows in tensor. Prioritizes the first instance.
 
     :param x: torch tensor
     :returns: indices of unique rows in tensor.
     """
-    n = x.shape[0]
+    # Get unique rows and inverse indices
     unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
-    n_unique = unique_rows.shape[0]
-    uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
 
+    # get unique inverse indices
+    uii = inverse_ind.unique()
+
+    # find where unique index in inverse index (uii x ii matrix)
+    where_unique = to.eq(uii.unsqueeze(1), inverse_ind.repeat(len(uii), 1))
+
+    # get index of first instance
+    unique_indices = where_unique.to(to.float).argmax(1)
+
+    return unique_indices
+
+    # The code below is a bit faster, but is 1. unstable and 2.non-deterministic as of July 2023 and
+    # pytorch=2.0.0. When the pytorch version increases, check if the docs for
+    # Tensor.scatter_reduce_ still have the respective warnings & notes about the function.
+    # Until then, the deterministic function above should be used instead. (If you checked,
+    # please increment the pytorch version in this comment and push).
+
+    # Authored by Sebastian Salwig:
+    # n = x.shape[0]
+    # unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
+    # n_unique = unique_rows.shape[0]
+    # uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
+    # perm = to.arange(n, device=inverse_ind.device)
+    # uniq_ind = inverse_ind.new_empty(
+    #   n_unique
+    #   ).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
+    # return uniq_ind
+
+    # The slow CPU code below can be used to verify:
     # CPU code
     # for i in range(n_unique):
     #     for j, n in enumerate(inverse_ind):
@@ -29,12 +56,6 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     #             uniq_ind.long()
     #             break
 
-    # where inverse_ind is unique, each index represented by row
-    mask = to.eq(inverse_ind.unique().unsqueeze(1),inverse_ind.repeat(len(inverse_ind.unique()),1))
-    return mask.to(to.float).argmax(1)
-
-    # uniq_ind = inverse_ind.new_empty(n_unique).scatter_(0, inverse_ind, perm)
-    # return uniq_ind
 
 
 def _set_redundant_lpj_to_low_GPU(
