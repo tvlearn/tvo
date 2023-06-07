@@ -317,6 +317,7 @@ class PreAmortizedConfig(EStepConfig):
             S: int,
             model_path: str,
             nsamples: int,
+            use_corr: bool,
             K_init_file: str = None,
     ):
         super().__init__(S)
@@ -326,43 +327,11 @@ class PreAmortizedConfig(EStepConfig):
         self.S = S
         self.model_path = model_path
         self.nsamples = nsamples
+        self.use_corr = use_corr
         self.K_init_file = K_init_file
-
-
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
-
-# class PreAmortizedConfig(EStepConfig):
-#     def __init__(
-#         self,
-#         n_states: int,
-#         model_path: str,
-#         nsamples: int = 10,
-#         K_init_file: str = None,
-#     ):
-#         """Configuration object for TVS E-step.
-#
-#         :param n_states: Number of variational states per datapoint to keep in memory.
-#         :param n_prior_samples: Number of new variational states to be sampled from prior.
-#         :param n_marginal_samples: Number of new variational states to be sampled from\
-#                                    approximated marginal p(s_h=1|vec{y}^{(n)}, Theta).
-#         :param K_init_file: Full path to H5 file providing initial states
-#         """
-#         model_path = os.path.expanduser(model_path)
-#         assert n_states > 0, f"n_states must be positive integer ({n_states})"
-#         assert(
-#             nsamples > -1
-#         ), f"nsamples must be positive integer ({nsamples})"
-#
-#         self.nsamples = nsamples
-#         self.model_path = model_path
-#         self.K_init_file = K_init_file
-#
-#         super().__init__(n_states)
-#
-#     def as_dict(self) -> Dict[str, Any]:
-#         return vars(self)
 
 class TVSConfig(EStepConfig):
     def __init__(
