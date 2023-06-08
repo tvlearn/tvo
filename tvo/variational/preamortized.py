@@ -85,19 +85,19 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
     #     should_be_zero = n_lpj- uniques - substituted
     #     # print('{} lpj out of {} are equal to others'.format(should_be_zero, n_lpj))
     #
-    # def make_unique(self, new_K, nbatch, S):
-    #     # assert new_K.shape[1] > S
-    #     min_len=self.nsamples
-    #     to = torch
-    #     for n in range(nbatch):
-    #         uniques = new_K[n].unique(dim=0)
-    #         new_K[n,0:len(uniques)]=uniques
-    #
-    #         if min_len>len(uniques):
-    #             min_len = len(uniques)
-    #     new_k = new_K[:, :min_len]
-    #     # print('Lowest amount of unique states={}'.format(min_len))
-    #     return new_k
+    def make_unique(self, new_K, nbatch, S):
+        # assert new_K.shape[1] > S
+        min_len=self.nsamples
+        to = torch
+        for n in range(nbatch):
+            uniques = new_K[n].unique(dim=0)
+            new_K[n,0:len(uniques)]=uniques
+
+            if min_len>len(uniques):
+                min_len = len(uniques)
+        new_k = new_K[:, :min_len]
+        # print('Lowest amount of unique states={}'.format(min_len))
+        return new_k
     #
     # def check_joint_k_and_knew_are_unique(self,new_lpj, new_K, idx, S, B):
     #     for b, i in enumerate(idx):
