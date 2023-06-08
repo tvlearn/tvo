@@ -18,7 +18,7 @@ git clone git@github.com:tvlearn/tvo.git
 We recommend [Anaconda](https://www.anaconda.com/) to manage the installation, and to create a new environment for hosting installed packages:
 
 ```bash
-$ conda create -n tvo python==3.8 gcc_linux-64
+$ conda create -n tvo python==3.8.10 gcc_linux-64
 $ conda activate tvo
 ```
 
