@@ -62,6 +62,7 @@ def make_var_states(
             S=conf.n_states,
             model_path=conf.model_path,
             nsamples=conf.nsamples,
+            use_corr=conf.use_corr,
         )
     elif isinstance(conf, TVSConfig):
         return TVSVariationalStates(
