@@ -20,6 +20,7 @@ from tvo.utils.sanity import fix_theta
 # pytorch 1.2 deprecates to.gels in favour of to.lstsq
 lstsq = to.lstsq
 
+
 class GMM(Optimized, Sampler, Reconstructor):
     def __init__(
         self,

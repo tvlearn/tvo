@@ -29,6 +29,7 @@ elif torch_minor_version >= 2:
 else:
     raise ValueError("Pytorch versions below 1.2 are unsupported")
 
+
 class BSC(Optimized, Sampler, Reconstructor):
     def __init__(
         self,
