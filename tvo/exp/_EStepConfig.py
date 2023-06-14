@@ -10,6 +10,7 @@ from tvo.variational.neural import MLP
 from tvo.variational.evo import batch_sparseflip, batch_randflip
 import torch as to
 
+
 class EStepConfig(ABC):
     def __init__(self, n_states: int):
         """Abstract base configuration object for experiments' E-steps.
@@ -63,9 +64,7 @@ class EVOConfig(EStepConfig):
             not crossover or n_children is None
         ), "Exactly one of n_children and crossover may be provided."
         valid_selections = ("fitness", "uniform")
-        assert (
-            parent_selection in valid_selections
-        ), f"Unknown parent selection {parent_selection}"
+        assert parent_selection in valid_selections, f"Unknown parent selection {parent_selection}"
         valid_mutations = ("sparsity", "uniform")
         assert mutation in valid_mutations, f"Unknown mutation {mutation}"
         assert (
@@ -111,10 +110,10 @@ class NeuralEMConfig(EStepConfig):
         sampling: str = "Gumbel",
         bitflipping: str = None,
         K_init=None,
-        loss_name: str =None,
+        loss_name: str = None,
         n_parents=None,
         n_children=None,
-        **kwargs
+        **kwargs,
     ):
         """
         :param encoder: encoder type to use. Must be one of: MLP, CNN
@@ -142,7 +141,9 @@ class NeuralEMConfig(EStepConfig):
         self.n_parents = n_parents
         self.n_children = n_children
 
-        assert bitflipping in ['sparseflip', 'randflip', None], '{} is unrecognized'.format(bitflipping)
+        assert bitflipping in ["sparseflip", "randflip", None], "{} is unrecognized".format(
+            bitflipping
+        )
         self.bitflipping = bitflipping
 
         if encoder == "MLP":
@@ -168,7 +169,7 @@ class NeuralEMConfig(EStepConfig):
 
         if sampling == "GumbelSM":
             self.output_size *= 2
-            output_size *= 2     # shift to bitwise categorical representation
+            output_size *= 2  # shift to bitwise categorical representation
         elif sampling == "Independent Bernoullis":
             pass
         else:
@@ -176,7 +177,15 @@ class NeuralEMConfig(EStepConfig):
 
         # picking a model
         if encoder == "MLP":
-            self.encoder = MLP(input_size, n_hidden, output_size, activations, dropouts, dropout_rate, output_activation)
+            self.encoder = MLP(
+                input_size,
+                n_hidden,
+                output_size,
+                activations,
+                dropouts,
+                dropout_rate,
+                output_activation,
+            )
         elif encoder == "CNN":
             self.encoder = CNN(**kwargs)
         else:
@@ -187,27 +196,37 @@ class NeuralEMConfig(EStepConfig):
             # assert (
             #     kwargs["output_activation"] == to.nn.Identity
             # ), "output_activation must be nn.Identity for gumbel-Softmax"
-            assert (output_activation == to.nn.Identity), "output_activation must be nn.Identity for gumbel-Softmax"
+            assert (
+                output_activation == to.nn.Identity
+            ), "output_activation must be nn.Identity for gumbel-Softmax"
             self.sampling = self.gumbel_softmax_sampling
-        elif sampling =="Independent Bernoullis":
-            assert(output_activation == to.nn.Sigmoid), "output_activation must be nn.Sigmoid for Independent Bernoullis"
-            #assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
+        elif sampling == "Independent Bernoullis":
+            assert (
+                output_activation == to.nn.Sigmoid
+            ), "output_activation must be nn.Sigmoid for Independent Bernoullis"
+            # assert(kwargs["loss_name"] in ["BCE", "CE"]), "loss_function must be Binary Crossentropy"
             self.sampling = self.independent_bernoullis_sampling
         else:
             raise ValueError(f"Unknown sampling method: {sampling}")  # pragma: no cover
 
         # select bit flipping method
-        if bitflipping ==  'randflip':
+        if bitflipping == "randflip":
             self.bitflipping = batch_randflip
-        elif bitflipping == 'sparseflip':
+        elif bitflipping == "sparseflip":
             self.bitflipping = batch_sparseflip
         else:
-            bitflipping == 'none'
+            bitflipping == "none"
             self.bitflipping = None
 
         # select a loss function
-        assert self.loss_name in ["BCE", "LPJ", 'CE', 'log_bernoulli_loss',
-                                  'e_logjoint_under_phi','n_accepted'], "loss_function not listed"
+        assert self.loss_name in [
+            "BCE",
+            "LPJ",
+            "CE",
+            "log_bernoulli_loss",
+            "e_logjoint_under_phi",
+            "n_accepted",
+        ], "loss_function not listed"
 
         if self.loss_name == "BCE":
             self.loss_function = to.nn.BCELoss()
@@ -215,23 +234,21 @@ class NeuralEMConfig(EStepConfig):
             self.loss_function = self.lpj_loss
         elif self.loss_name == "CE":
             self.loss_function = to.nn.CrossEntropyLoss()
-        elif self.loss_name =='log_bernoulli_loss':
-            assert sampling=='Independent Bernoullis', 'sampling is {}'.format(sampling)
+        elif self.loss_name == "log_bernoulli_loss":
+            assert sampling == "Independent Bernoullis", "sampling is {}".format(sampling)
             self.loss_function = self.log_bernoulli_loss
-        elif self.loss_name== 'e_logjoint_under_phi':
+        elif self.loss_name == "e_logjoint_under_phi":
             self.loss_function = self.e_logjoint_under_phi
-        elif self.loss_name== 'n_accepted':
-            assert sampling == 'GumbelSM', 'sampling is {}'.format(sampling)
-            self.loss_function= self.n_accepted
+        elif self.loss_name == "n_accepted":
+            assert sampling == "GumbelSM", "sampling is {}".format(sampling)
+            self.loss_function = self.n_accepted
         else:
             raise ValueError(f"Unknown loss function: {self.loss_name}")  # pragma: no cover
 
     def MLP_sanity_check(self):
         assert self.n_hidden is not None, "n_hidden must be specified for MLP encoder"
         assert self.dropouts is not None, "dropouts must be specified for MLP encoder"
-        assert (
-            self.dropout_rate is not None
-        ), "dropout_rate must be specified for MLP encoder"
+        assert self.dropout_rate is not None, "dropout_rate must be specified for MLP encoder"
         assert (
             len(self.n_hidden) == len(self.activations) == len(self.dropouts)
         ), "hidden units, activations and dropouts must be equal."
@@ -239,24 +256,24 @@ class NeuralEMConfig(EStepConfig):
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
 
-    def log_bernoulli_loss(self,states, pies, accepted):
-        '''
+    def log_bernoulli_loss(self, states, pies, accepted):
+        """
         :param pies: pies of bernoulli distribution (in case of matrix input, this function assumes independence)
         :param accepted: whether associated log_joing is accepted
         :return:
-        '''
+        """
         # inputs are : q, vector_subs, n_accepted=vector_subs.sum(axis=1).float()
 
-        Batch, M_samples, H = states.shape # BxNxH
-        pies=pies.unsqueeze(axis=1).expand(Batch, M_samples, H)
+        Batch, M_samples, H = states.shape  # BxNxH
+        pies = pies.unsqueeze(axis=1).expand(Batch, M_samples, H)
         # sum over H
-        log_p_phi = to.sum(states*(to.log(pies)-to.log(1-pies))+to.log(1-pies), axis=-1)
+        log_p_phi = to.sum(states * (to.log(pies) - to.log(1 - pies)) + to.log(1 - pies), axis=-1)
 
         delta_lpj = accepted
         # sum over M
         # derivative taken by calling backward, as only log_p_phi depends on phi
-        expectation=(1/to.tensor(M_samples))+to.sum(delta_lpj*log_p_phi, axis=-1)
-        loss=-expectation.sum()
+        expectation = (1 / to.tensor(M_samples)) + to.sum(delta_lpj * log_p_phi, axis=-1)
+        loss = -expectation.sum()
         return loss
 
     def e_logjoint_under_phi(self, lpj, p_phi):
@@ -264,7 +281,7 @@ class NeuralEMConfig(EStepConfig):
 
     def n_accepted(self, n_accepted, q):
         # assert n_accepted.shape[0]==q.shape[0]
-        return n_accepted*q
+        return n_accepted * q
 
     def gumbel_softmax_sampling(
         self, logits: Tensor, temperature: float = 0.3, hard: bool = True
@@ -276,8 +293,10 @@ class NeuralEMConfig(EStepConfig):
         :param hard: If true, the returned samples are one-hot encoded.
         """
         # sample from gumbel distribution
-        assert len(logits[1]) // 2 == len(logits[1]) / 2, "logits must be of even length, but were {}. " \
-                                                    "Is sampling set as Gumbel-Softmax?".format(len(logits))
+        assert len(logits[1]) // 2 == len(logits[1]) / 2, (
+            "logits must be of even length, but were {}. "
+            "Is sampling set as Gumbel-Softmax?".format(len(logits))
+        )
 
         # reformat logits to be of shape (batch_size, model_H, 2)
         logits_reshaped = logits.reshape(logits.shape[0], logits.shape[1] // 2, 2)
@@ -293,32 +312,31 @@ class NeuralEMConfig(EStepConfig):
     def independent_bernoullis_sampling(self, logits: Tensor, hard: bool = True) -> Tensor:
         # assert that pies are in [0, 1]
 
-        assert to.min(logits) >= 0 and to.max(logits) <= 1, \
-            "Pies should have a min of at least 0 and a max of at most 1. Instead, they are {} and {}".format(
-                to.min(logits),
-                to.max(logits)
-            )
+        assert (
+            to.min(logits) >= 0 and to.max(logits) <= 1
+        ), "Pies should have a min of at least 0 and a max of at most 1. Instead, they are {} and {}".format(
+            to.min(logits), to.max(logits)
+        )
         # sample from bernoullis
         states = to.bernoulli(logits).type(to.uint8) if hard else logits
         return states
 
     def lpj_loss(self, new_lpj, old_lpj):
         s_min = old_lpj.min(dim=1)[0].clone()
-        loss=to.sum(s_min[:,None]-new_lpj)
+        loss = to.sum(s_min[:, None] - new_lpj)
         return loss
 
 
 class PreAmortizedConfig(EStepConfig):
-
     def __init__(
-            self,
-            N: int,
-            H: int,
-            S: int,
-            model_path: str,
-            nsamples: int,
-            use_corr: bool,
-            K_init_file: str = None,
+        self,
+        N: int,
+        H: int,
+        S: int,
+        model_path: str,
+        nsamples: int,
+        use_corr: bool,
+        K_init_file: str = None,
     ):
         super().__init__(S)
 
@@ -332,6 +350,7 @@ class PreAmortizedConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
+
 
 class TVSConfig(EStepConfig):
     def __init__(
@@ -350,14 +369,12 @@ class TVSConfig(EStepConfig):
         :param K_init_file: Full path to H5 file providing initial states
         """
         assert n_states > 0, f"n_states must be positive integer ({n_states})"
-        assert (
-            n_prior_samples > -1
-        ), f"n_prior_samples must be positive integer ({n_prior_samples})"
+        assert n_prior_samples > -1, f"n_prior_samples must be positive integer ({n_prior_samples})"
         assert (
             n_marginal_samples > -1
         ), f"n_marginal_samples must be positive integer ({n_marginal_samples})"
 
-        assert n_marginal_samples + n_prior_samples > 0, 'total samples must be a natural number'
+        assert n_marginal_samples + n_prior_samples > 0, "total samples must be a natural number"
         self.n_prior_samples = n_prior_samples
         self.n_marginal_samples = n_marginal_samples
         self.K_init_file = K_init_file
@@ -371,7 +388,7 @@ class TVSConfig(EStepConfig):
 class FullEMConfig(EStepConfig):
     def __init__(self, n_latents: int):
         """Full EM configuration."""
-        super().__init__(2 ** n_latents)
+        super().__init__(2**n_latents)
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
@@ -414,54 +431,60 @@ class RandomSamplingConfig(EStepConfig):
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
 
+
 class NeuralEvoConfig(NeuralEMConfig, EVOConfig):
     def __init__(
-                    self,
-                    encoder: str,
-                    n_states: int,
-                    n_samples: int,
-                    input_size: int,
-                    activations: Sequence,
-                    output_size: int,
-                    n_generations,
-                    n_hidden: List[int] = None,
-                    dropouts: List[bool] = None,
-                    dropout_rate: float = None,
-                    output_activation=None,
-                    lr: float = None,
-                    sampling: str = "Gumbel",
-                    K_init=None,
-                    loss_name: str = None,
-                    n_parents=None,
-                    n_children=None,
-                    parent_selection: str = "fitness",
-                    crossover: bool = True,
-                    mutation: str = "uniform",
-                    bitflip_frequency: float = None,
-                    K_init_file: str = None,
-                    **kwargs):
+        self,
+        encoder: str,
+        n_states: int,
+        n_samples: int,
+        input_size: int,
+        activations: Sequence,
+        output_size: int,
+        n_generations,
+        n_hidden: List[int] = None,
+        dropouts: List[bool] = None,
+        dropout_rate: float = None,
+        output_activation=None,
+        lr: float = None,
+        sampling: str = "Gumbel",
+        K_init=None,
+        loss_name: str = None,
+        n_parents=None,
+        n_children=None,
+        parent_selection: str = "fitness",
+        crossover: bool = True,
+        mutation: str = "uniform",
+        bitflip_frequency: float = None,
+        K_init_file: str = None,
+        **kwargs,
+    ):
 
-        super().__init__(n_states, n_parents,n_generations,
-        parent_selection,
-        crossover,
-        n_children,
-        mutation,
-        bitflip_frequency,
-        K_init_file,
-        K_init,
-        loss_name,
-        encoder,
-        sampling,
-        output_activation,
-        n_samples,
-        lr,
-        dropout_rate,
-        dropouts,
-        n_hidden,
-        output_size,
-        activations,
-        input_size,
-        **kwargs)
+        super().__init__(
+            n_states,
+            n_parents,
+            n_generations,
+            parent_selection,
+            crossover,
+            n_children,
+            mutation,
+            bitflip_frequency,
+            K_init_file,
+            K_init,
+            loss_name,
+            encoder,
+            sampling,
+            output_activation,
+            n_samples,
+            lr,
+            dropout_rate,
+            dropouts,
+            n_hidden,
+            output_size,
+            activations,
+            input_size,
+            **kwargs,
+        )
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)

@@ -46,7 +46,7 @@ class _TrainingAndOrValidation(Experiment):
         model: Trainable,
         train_dataset: to.Tensor = None,
         test_dataset: to.Tensor = None,
-        train_states: to.Tensor = None
+        train_states: to.Tensor = None,
     ):
         """Helper class to avoid code repetition between Training and Testing.
 
@@ -67,11 +67,12 @@ class _TrainingAndOrValidation(Experiment):
             # might differ between processes: last process might have smaller N and less states
             # (but TVODataLoader+ShufflingSampler make sure the number of batches is the same)
             N = train_dataset.shape[0]
-            if hasattr(self._conf,"train_states") and self._conf.train_states is not None:
-                self.train_states=self._conf.train_states
+            if hasattr(self._conf, "train_states") and self._conf.train_states is not None:
+                self.train_states = self._conf.train_states
             else:
-                self.train_states = self._make_states(N, H, self._precision, estep_conf) # init Variational States
-
+                self.train_states = self._make_states(
+                    N, H, self._precision, estep_conf
+                )  # init Variational States
 
         self.test_data = None
         self.test_states = None
@@ -81,8 +82,7 @@ class _TrainingAndOrValidation(Experiment):
             self.test_states = self._make_states(N, H, self._precision, estep_conf)
 
         will_reconstruct = (
-            self._conf.reco_epochs is not None
-            or self._conf.warmup_reco_epochs is not None
+            self._conf.reco_epochs is not None or self._conf.warmup_reco_epochs is not None
         )
         self.trainer = Trainer(
             self.model,
@@ -137,8 +137,7 @@ class _TrainingAndOrValidation(Experiment):
             pprint("Warm-up E-steps")
         for e in range(self._conf.warmup_Esteps):
             compute_reconstruction = (
-                self._conf.warmup_reco_epochs is not None
-                and e in self._conf.warmup_reco_epochs
+                self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs
             )
             d = trainer.e_step(compute_reconstruction)
             self._log_epoch(logger, d)
@@ -167,7 +166,7 @@ class _TrainingAndOrValidation(Experiment):
             os.remove(leftover_logfile)
 
         # put trainer into undefined state after the experiment is finished
-        #self.trainer = None  # type: ignore
+        # self.trainer = None  # type: ignore
 
     def _log_confs(self, logger: H5Logger):
         """Dump experiment+estep configuration to screen and save it to output file."""
@@ -198,17 +197,11 @@ class _TrainingAndOrValidation(Experiment):
 
             # log_kind is one of "train", "valid" or "test"
             # (while data_kind is one of "train" or "test")
-            log_kind = (
-                "valid"
-                if data_kind == "test" and self.train_data is not None
-                else data_kind
-            )
+            log_kind = "valid" if data_kind == "test" and self.train_data is not None else data_kind
 
             # log F and subs to stdout and file
             F, subs = get(epoch_results, f"{data_kind}_F", f"{data_kind}_subs")
-            assert not (
-                math.isnan(F) or math.isinf(F)
-            ), f"{log_kind} free energy is invalid!"
+            assert not (math.isnan(F) or math.isinf(F)), f"{log_kind} free energy is invalid!"
             F_and_subs_dict = {
                 f"{log_kind}_F": to.tensor(F),
                 f"{log_kind}_subs": to.tensor(subs),
@@ -285,14 +278,10 @@ class Training(_TrainingAndOrValidation):
         """
         if tvo.get_run_policy() == "mpi":
             init_processes()
-        train_dataset = get_h5_dataset_to_processes(
-            train_data_file, ("train_data", "data")
-        )
+        train_dataset = get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
         val_dataset = None
         if val_data_file is not None:
-            val_dataset = get_h5_dataset_to_processes(
-                val_data_file, ("val_data", "data")
-            )
+            val_dataset = get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))
 
         setattr(conf, "train_dataset", train_data_file)
         setattr(conf, "val_dataset", val_data_file)
@@ -300,9 +289,7 @@ class Training(_TrainingAndOrValidation):
 
 
 class Testing(_TrainingAndOrValidation):
-    def __init__(
-        self, conf: ExpConfig, estep_conf: EStepConfig, model: Trainable, data_file: str
-    ):
+    def __init__(self, conf: ExpConfig, estep_conf: EStepConfig, model: Trainable, data_file: str):
         """Test given model on given dataset for the given number of epochs.
 
         :param conf: Experiment configuration.

@@ -39,7 +39,7 @@ def make_var_states(
 ]:
 
     if isinstance(conf, FullEMConfig):
-        assert conf.n_states == 2 ** H, "FullEMConfig and model have different H"
+        assert conf.n_states == 2**H, "FullEMConfig and model have different H"
         return FullEM(N, H, precision)
     elif isinstance(conf, FullEMSingleCauseConfig):
         assert conf.n_states == H, "FullEMSingleCauseConfig and model have different H"
@@ -89,9 +89,7 @@ def make_var_states(
 
 
 def _make_EVO_var_states(conf: EVOConfig, N: int, H: int, precision: to.dtype):
-    selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[
-        conf.parent_selection
-    ]
+    selection = {"fitness": "batch_fitparents", "uniform": "randparents"}[conf.parent_selection]
     mutation = {"sparsity": "sparseflip", "uniform": "randflip"}[conf.mutation]
     return EVOVariationalStates(
         N=N,

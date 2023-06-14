@@ -33,7 +33,7 @@ class DummyModel(Trainable):
 
         s_ids = to.empty((H,), dtype=to.int64, device=states.device)
         for h in range(H):
-            s_ids[h] = 2 ** h
+            s_ids[h] = 2**h
 
         return (
             to.mul(states.to(dtype=to.int64), s_ids[None, None, :].expand(N, S, -1))

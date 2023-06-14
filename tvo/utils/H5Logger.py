@@ -19,9 +19,7 @@ def _append_to_dict(d: Dict[str, to.Tensor], k: str, t: to.Tensor):
 
 
 class H5Logger:
-    def __init__(
-        self, output: str, blacklist: Iterable[str] = [], verbose: bool = False
-    ):
+    def __init__(self, output: str, blacklist: Iterable[str] = [], verbose: bool = False):
         """Utility class to iteratively write to HD5 files.
 
         :param output: Output filename or file path. Overwritten if it already exists.
@@ -81,9 +79,7 @@ class H5Logger:
             if k in self._blacklist:
                 continue
 
-            if not isinstance(v, to.Tensor) and not isinstance(
-                v, dict
-            ):  # pragma: no cover
+            if not isinstance(v, to.Tensor) and not isinstance(v, dict):  # pragma: no cover
                 msg = (
                     "Arguments must be torch.Tensors or dictionaries thereof "
                     f"but '{k}' is {type(v)}."

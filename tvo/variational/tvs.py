@@ -78,6 +78,4 @@ class TVSVariationalStates(TVOVariationalStates):
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        return update_states_for_batch(
-            new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
-        )
+        return update_states_for_batch(new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj)

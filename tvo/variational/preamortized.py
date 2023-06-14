@@ -14,7 +14,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         model_path: str,
         nsamples: int,
         K_init_file: str = None,
-        use_corr: bool = True
+        use_corr: bool = True,
     ):
         """Truncated Variational Sampling class.
 
@@ -35,15 +35,14 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
             "S_new": nsamples,
             "K_init_file": K_init_file,
             "precision": torch.float32,
-            "use_corr":use_corr
+            "use_corr": use_corr,
         }
         self.nsamples = nsamples
         self.sampler = torch.load(model_path).to(get_device())
-        self.dist =  'posterior' if use_corr else 'posterior_no_corr'
+        self.dist = "posterior" if use_corr else "posterior_no_corr"
         self.lpj_call_count = 0
 
         super().__init__(conf)
-
 
     def update(self, idx: torch.Tensor, batch: torch.Tensor, model: Trainable) -> int:
 
@@ -63,7 +62,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist=self.dist)
 
-        new_K = (new_K>0.5).transpose(0,1).byte()
+        new_K = (new_K > 0.5).transpose(0, 1).byte()
 
         new_K = self.make_unique(new_K, B, S)
 
@@ -71,9 +70,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
 
-        subs = update_states_for_batch(
-            new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj
-        )
+        subs = update_states_for_batch(new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj)
 
         return subs
 
@@ -87,17 +84,18 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
     #
     def make_unique(self, new_K, nbatch, S):
         # assert new_K.shape[1] > S
-        min_len=self.nsamples
+        min_len = self.nsamples
         to = torch
         for n in range(nbatch):
             uniques = new_K[n].unique(dim=0)
-            new_K[n,0:len(uniques)]=uniques
+            new_K[n, 0 : len(uniques)] = uniques
 
-            if min_len>len(uniques):
+            if min_len > len(uniques):
                 min_len = len(uniques)
         new_k = new_K[:, :min_len]
         # print('Lowest amount of unique states={}'.format(min_len))
         return new_k
+
     #
     # def check_joint_k_and_knew_are_unique(self,new_lpj, new_K, idx, S, B):
     #     for b, i in enumerate(idx):

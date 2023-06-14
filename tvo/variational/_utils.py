@@ -57,10 +57,7 @@ def _unique_ind(x: to.Tensor) -> to.Tensor:
     #             break
 
 
-
-def _set_redundant_lpj_to_low_GPU(
-    new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor
-):
+def _set_redundant_lpj_to_low_GPU(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
     """Find redundant states in new_states w.r.t. old_states and set
        corresponding lpg to low.
 
@@ -87,15 +84,13 @@ def _set_redundant_lpj_to_low_GPU(
         new_lpj[n][mask] = to.finfo(to.float32).min
 
         # print('n={}, n_uniq_ind={}, n_new_uniq={}, diff={}, len_mask={}'.format(n,len(uniq_idx), len(new_uniq_idx),len(uniq_idx)-len(new_uniq_idx), mask.sum()))
+
+
 # set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
 # function that runs on numpy arrays, when running on GPU, we stick to torch tensors
-def set_redundant_lpj_to_low(
-    new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor
-):
+def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
     if tvo.get_device().type == "cpu":
-        set_redundant_lpj_to_low_CPU(
-            new_states.numpy(), new_lpj.numpy(), old_states.numpy()
-        )
+        set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
     else:
         _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
 
@@ -114,18 +109,13 @@ def generate_unique_states(
     """
     if device is None:
         device = tvo.get_device()
-    assert n_states <= 2 ** H, "n_states must be smaller than 2**H"
+    assert n_states <= 2**H, "n_states must be smaller than 2**H"
     n_samples = max(n_states // 2, 1)
 
-    s_set = {
-        tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))
-    }
+    s_set = {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))}
     while len(s_set) < n_states:
         s_set.update(
-            {
-                tuple(s)
-                for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))
-            }
+            {tuple(s) for s in np.random.binomial(1, p=crowdedness / H, size=(n_samples, H))}
         )
     while len(s_set) > n_states:
         s_set.pop()

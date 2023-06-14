@@ -138,9 +138,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
 
             this_dtype = bcast_dtype(data, src)
             is_bool = this_dtype == torch.bool
-            if (
-                is_bool
-            ):  # workaround to avoid `IndexError: map::at` when scattering to.bool tensor
+            if is_bool:  # workaround to avoid `IndexError: map::at` when scattering to.bool tensor
                 this_dtype = torch.uint8
             this_device = tvo.get_device()
 
@@ -155,9 +153,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
             local_length_ceiled = math.ceil(total_length / comm_size)
             total_length_ceiled = local_length_ceiled * comm_size
             no_dummy = total_length_ceiled - total_length
-            local_length = (
-                local_length_ceiled - 1 if comm_rank < no_dummy else local_length_ceiled
-            )
+            local_length = local_length_ceiled - 1 if comm_rank < no_dummy else local_length_ceiled
 
             # split into chunks and scatter
             chunks = []  # type: ignore
@@ -169,12 +165,9 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
                 )
                 local_start = 0
                 for r in range(comm_size):
-                    local_length_ = (
-                        local_length_ceiled - 1 if r < no_dummy else local_length_ceiled
-                    )
+                    local_length_ = local_length_ceiled - 1 if r < no_dummy else local_length_ceiled
                     to_cut_into_chunks[
-                        r * local_length_ceiled : r * local_length_ceiled
-                        + local_length_
+                        r * local_length_ceiled : r * local_length_ceiled + local_length_
                     ] = data[range(local_start, local_start + local_length_)]
                     local_start += local_length_
                 chunks = list(torch.chunk(to_cut_into_chunks, comm_size, dim=0))
@@ -201,9 +194,7 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
     return my_tensors[0] if len(my_tensors) == 1 else my_tensors
 
 
-def gather_from_processes(
-    *my_tensors: Tensor, dst: int = 0
-) -> Union[Tensor, Iterable[Tensor]]:
+def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Union[Tensor, Iterable[Tensor]]:
     """Gather tensors from process group.
 
     :param my_tensors: List of tensors to be gathered from local process on process dst.
@@ -306,9 +297,7 @@ def mpi_average_grads(theta: Dict[str, torch.Tensor]) -> None:
             p.grad /= n_procs
 
 
-def get_h5_dataset_to_processes(
-    fname: str, possible_keys: Tuple[str, ...]
-) -> torch.Tensor:
+def get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> torch.Tensor:
     """Return dataset with the first of `possible_keys` that is found in hdf5 file `fname`."""
     rank = dist.get_rank() if dist.is_initialized() else 0
 

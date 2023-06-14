@@ -20,6 +20,7 @@ from tvo.utils.sanity import fix_theta
 # pytorch 1.2 deprecates to.gels in favour of to.lstsq
 lstsq = to.lstsq
 
+
 class PMM(Optimized, Sampler, Reconstructor):
     def __init__(
         self,
@@ -110,13 +111,9 @@ class PMM(Optimized, Sampler, Reconstructor):
         K = states.K[idx]
         batch_size, S, _ = K.shape
 
-        Kfloat = K.to(
-            dtype=lpj.dtype
-        )  # TODO Find solution to avoid byte->float casting
+        Kfloat = K.to(dtype=lpj.dtype)  # TODO Find solution to avoid byte->float casting
 
-        batch_s_pjc = mean_posterior(
-            Kfloat, lpj
-        )  # is (batch_size,H) mean_posterior(Kfloat, lpj)
+        batch_s_pjc = mean_posterior(Kfloat, lpj)  # is (batch_size,H) mean_posterior(Kfloat, lpj)
         batch_Wp = batch.unsqueeze(2) * batch_s_pjc.unsqueeze(1)  # is (batch_size,D,H)
 
         self.my_pies.add_(to.sum(batch_s_pjc, dim=0))
@@ -198,9 +195,7 @@ class PMM(Optimized, Sampler, Reconstructor):
 
         return (Y, hidden_state) if must_return_hidden_state else Y
 
-    def data_estimator(
-        self, idx: Tensor, batch: Tensor, states: TVOVariationalStates
-    ) -> Tensor:
+    def data_estimator(self, idx: Tensor, batch: Tensor, states: TVOVariationalStates) -> Tensor:
 
         # Not yet implemented
 

@@ -127,9 +127,7 @@ class NoisyOR(Optimized, Sampler):
         # Ws_nsdh = 1 - (W_dh * Kfloat_nsh)
         Ws = (self.theta["W"][None, None, :, :] * Kfloat[:, :, None, :]).neg_().add_(1)
         Ws_prod = to.prod(Ws, dim=3, keepdim=True)
-        B = Kfloat.unsqueeze(2) / (Ws * Ws_prod.neg().add_(1)).add_(
-            self.eps
-        )  # (N,S,D,H)
+        B = Kfloat.unsqueeze(2) / (Ws * Ws_prod.neg().add_(1)).add_(self.eps)  # (N,S,D,H)
         self.Btilde.add_(
             (mean_posterior(B, lpj) * (batch.type_as(lpj) - 1).unsqueeze(2)).sum(dim=0)
         )

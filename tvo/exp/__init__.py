@@ -23,5 +23,4 @@ __all__ = [
     "RandomSamplingConfig",
     "ExpConfig",
     "EpochLog",
-
 ]

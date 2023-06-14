@@ -7,7 +7,8 @@ from tvo.variational.neural import NeuralVariationalStates
 
 
 class NeuralEvoVariationalStates(TVOVariationalStates):
-    def __init__(        self,
+    def __init__(
+        self,
         N: int,
         H: int,
         S: int,
@@ -31,44 +32,46 @@ class NeuralEvoVariationalStates(TVOVariationalStates):
         k_updating=True,
         scheduler: list = None,
         **kwargs,
-):
-        '''
-            Sampling method that combines the neural and evo approaches
-            todo: comment further
-        '''
+    ):
+        """
+        Sampling method that combines the neural and evo approaches
+        todo: comment further
+        """
         # init evo
         self.evo = EVOVariationalStates(
-        N,
-        H,
-        S,
-        precision,
-        parent_selection,
-        mutation,
-        n_parents,
-        n_generations,
-        n_children = n_children,
-        crossover = crossover,
-        bitflip_frequency = bitflip_frequency,
-        K_init_file= K_init_file,)
-
-        self.neural = NeuralVariationalStates(
-        N,
-        H,
-        S,
-        precision,
-        K_init=K_init,
-        update_decoder = update_decoder,
-        encoder= encoder,
-        sampling = sampling,
-        bitflipping = bitflipping,
-        n_samples = n_samples,
-        lr= lr,
-        training=training,
-        k_updating=k_updating,
-        **kwargs,
+            N,
+            H,
+            S,
+            precision,
+            parent_selection,
+            mutation,
+            n_parents,
+            n_generations,
+            n_children=n_children,
+            crossover=crossover,
+            bitflip_frequency=bitflip_frequency,
+            K_init_file=K_init_file,
         )
 
-        self.scheduler=scheduler
+        self.neural = NeuralVariationalStates(
+            N,
+            H,
+            S,
+            precision,
+            K_init=K_init,
+            update_decoder=update_decoder,
+            encoder=encoder,
+            sampling=sampling,
+            bitflipping=bitflipping,
+            n_samples=n_samples,
+            lr=lr,
+            training=training,
+            k_updating=k_updating,
+            **kwargs,
+        )
+
+        self.scheduler = scheduler
+
     def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
         """Generate new variational states, update K and lpj with best samples and their lpj.
 
@@ -77,7 +80,7 @@ class NeuralEvoVariationalStates(TVOVariationalStates):
         :param model: the model being used
         :returns: average number of variational state substitutions per datapoint performed
         """
-        cutoff=len(self.scheduler)
+        cutoff = len(self.scheduler)
         idx1 = idx[0:cutoff]
         batch1 = batch[0:cutoff]
         idx2 = idx[cutoff:-1]

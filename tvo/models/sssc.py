@@ -71,9 +71,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         self._theta["Psi"] = self._init_Psi(Psi_init)
         self._theta["pies"] = self._init_pies(pies_init)
 
-        self._log2pi = to.log(
-            to.tensor([2.0 * MATH_PI], dtype=precision, device=device)
-        )
+        self._log2pi = to.log(to.tensor([2.0 * MATH_PI], dtype=precision, device=device))
 
         self._my_sum_y_szT = to.zeros((D, H), dtype=precision, device=device)
         self._my_sum_xpt_sz_xpt_szT = to.zeros((H, H), dtype=precision, device=device)
@@ -82,9 +80,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_sz = to.zeros((H,), dtype=precision, device=device)
         self._my_sum_xpt_ssT = to.zeros((H, H), dtype=precision, device=device)
         self._my_sum_xpt_ssz = (
-            to.zeros((H, H), dtype=precision, device=device)
-            if reformulated_psi_update
-            else None
+            to.zeros((H, H), dtype=precision, device=device) if reformulated_psi_update else None
         )
         self._my_sum_diag_yyT = to.zeros((D,), dtype=precision, device=device)
         self._my_N = to.tensor([0], dtype=to.int, device=device)
@@ -220,8 +216,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         return (
             s1
             - 0.5 * log_det_C_s
-            - 0.5
-            * (to.einsum("nsx,nsxd->nsd", data_norm, Inv_C_s) * data_norm).sum(dim=2)
+            - 0.5 * (to.einsum("nsx,nsxd->nsd", data_norm, Inv_C_s) * data_norm).sum(dim=2)
         )
 
     def _common_e_m_step_terms(
@@ -269,13 +264,9 @@ class SSSC(Sampler, Optimized, Reconstructor):
         :param batch_size: Batch size
         """
 
-        use_storage = (
-            self._use_storage if not (incomplete and batch_size > 1) else False
-        )
+        use_storage = self._use_storage if not (incomplete and batch_size > 1) else False
         if self._use_storage != use_storage:
-            pprint(
-                "Disabled storage (inaccurate for incomplete data and batch_size > 1)"
-            )
+            pprint("Disabled storage (inaccurate for incomplete data and batch_size > 1)")
             self._use_storage = use_storage
 
     def _reformulated_lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
@@ -293,9 +284,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         Kfloat = states.to(dtype=precision)
         batch_size, S = data.shape[0], Kbool.shape[1]
 
-        self._check_if_storage_reliable(
-            incomplete=to.isnan(data).any(), batch_size=batch_size
-        )
+        self._check_if_storage_reliable(incomplete=to.isnan(data).any(), batch_size=batch_size)
         use_storage = self._use_storage
 
         notnan = to.logical_not(to.isnan(data))
@@ -323,8 +312,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
                     ) = self._common_e_m_step_terms(Kbool[n, s], notnan[n])
 
                     Inv_C_s = (
-                        to.eye(D_notnan, dtype=self.precision, device=get_device())
-                        / sigma2
+                        to.eye(D_notnan, dtype=self.precision, device=get_device()) / sigma2
                         - W_s @ Lambda_s_W_s_sigma2inv / sigma2
                     )  # (D_nonnan, D_nonnan)
                     log_det_C_s_wo_last_term = (
@@ -394,16 +382,12 @@ class SSSC(Sampler, Optimized, Reconstructor):
         Kfloat = states.K[idx].to(dtype=lpj.dtype)
         batch_size, S, H = Kbool.shape
 
-        use_storage = (
-            self._use_storage and self._storage is not None and len(self._storage) > 0
-        )
+        use_storage = self._use_storage and self._storage is not None and len(self._storage) > 0
 
         # TODO: Add option to neglect reconstructed values
         notnan = to.ones_like(batch, dtype=to.bool, device=batch.device)
 
-        batch_kappas = to.zeros(
-            (batch_size, S, H), dtype=precision, device=get_device()
-        )
+        batch_kappas = to.zeros((batch_size, S, H), dtype=precision, device=get_device())
         batch_Lambdas_plus_kappas_kappasT = to.zeros(
             (batch_size, S, H, H), dtype=precision, device=get_device()
         )
@@ -442,8 +426,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
                     mus_s + Lambda_s_W_s_sigma2inv @ datapoint_norm
                 )  # is (|state|,)
                 batch_Lambdas_plus_kappas_kappasT[n, s][to.outer(state, state)] = (
-                    Lambda_s
-                    + to.outer(batch_kappas[n, s][state], batch_kappas[n, s][state])
+                    Lambda_s + to.outer(batch_kappas[n, s][state], batch_kappas[n, s][state])
                 ).flatten()  # (|state|, |state|)
 
         batch_xpt_s = mean_posterior(Kfloat, lpj)  # is (batch_size,H)
@@ -466,7 +449,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_sz.add_(to.sum(batch_xpt_sz, dim=0))  # (H,)
         self._my_sum_xpt_sz_xpt_szT.add_(batch_xpt_sz.t() @ batch_xpt_sz)  # (H, H)
         self._my_sum_xpt_szszT.add_(to.sum(batch_xpt_szszT, dim=0))  # (H, H)
-        self._my_sum_diag_yyT.add_(to.sum(batch ** 2, dim=0))  # (D,)
+        self._my_sum_diag_yyT.add_(to.sum(batch**2, dim=0))  # (D,)
         self._my_sum_y_szT.add_(batch.t() @ batch_xpt_sz)  # (D, H)
         self._my_N.add_(batch_size)  # (1,)
         if self._reformulated_psi_update:
@@ -529,9 +512,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
                 pprint("W update: Used noisy pseudo-inverse")
             except Exception:
                 W[:] = W + eps * to.randn_like(W)
-                pprint(
-                    "W update: Failed to compute W^(new). Pertubed current W with AWGN."
-                )
+                pprint("W update: Failed to compute W^(new). Pertubed current W with AWGN.")
 
         pies[:] = self._my_sum_xpt_s / N
         mus[:] = self._my_sum_xpt_sz / (self._my_sum_xpt_s + dtype_eps)
@@ -550,8 +531,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
                 self._my_sum_xpt_szszT - self._my_sum_xpt_ssT * to.outer(mus, mus)
             ) * Inv_my_sum_xpt_ssT + eps_eyeH
         sigma2[:] = (
-            self._my_sum_diag_yyT.sum()
-            - to.trace(self._my_sum_xpt_sz_xpt_szT @ (W.t() @ W))
+            self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_xpt_sz_xpt_szT @ (W.t() @ W))
         ) / N / D + eps
 
         self._my_sum_y_szT[:] = 0.0
@@ -585,15 +565,11 @@ class SSSC(Sampler, Optimized, Reconstructor):
         batch_size, S, H = K.shape
         Kbool = K.to(dtype=to.bool)
         W = self.theta["W"]
-        use_storage = (
-            self._use_storage and self._storage is not None and len(self._storage) > 0
-        )
+        use_storage = self._use_storage and self._storage is not None and len(self._storage) > 0
 
         notnan = to.logical_not(to.isnan(batch))
 
-        batch_kappas = to.zeros(
-            (batch_size, S, H), dtype=precision, device=get_device()
-        )
+        batch_kappas = to.zeros((batch_size, S, H), dtype=precision, device=get_device())
         for n in range(batch_size):
             for s in range(S):
                 state = Kbool[n, s]
@@ -627,6 +603,4 @@ class SSSC(Sampler, Optimized, Reconstructor):
                     mus_s + Lambda_s_W_s_sigma2inv @ datapoint_norm
                 )  # is (|state|,)
 
-        return to.sum(
-            W.unsqueeze(0) * mean_posterior(batch_kappas, lpj).unsqueeze(1), dim=2
-        )
+        return to.sum(W.unsqueeze(0) * mean_posterior(batch_kappas, lpj).unsqueeze(1), dim=2)

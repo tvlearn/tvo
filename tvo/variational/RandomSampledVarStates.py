@@ -55,8 +55,7 @@ class RandomSampledVarStates(TVOVariationalStates):
         batch_size, S, H = K.shape
         self.lpj[idx] = lpj_fn(batch, K)
         new_K = (
-            to.rand(batch_size, self.config["S_new"], H, device=K.device)
-            < self.config["sparsity"]
+            to.rand(batch_size, self.config["S_new"], H, device=K.device) < self.config["sparsity"]
         ).byte()
         new_lpj = lpj_fn(batch, new_K)
 

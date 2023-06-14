@@ -29,11 +29,7 @@ class EpochLog:
                 continue
             # log_kind is one of "train", "valid" or "test"
             # (while data_kind is one of "train" or "test")
-            log_kind = (
-                "valid"
-                if data_kind == "test" and "train_F" in self._results
-                else data_kind
-            )
+            log_kind = "valid" if data_kind == "test" and "train_F" in self._results else data_kind
             F, subs = get(self._results, f"{data_kind}_F", f"{data_kind}_subs")
             pprint(f"\t{log_kind} F/N: {F:<10.5f} avg subs: {subs:<6.2f}")
         if self.runtime is not None:

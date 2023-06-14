@@ -78,9 +78,7 @@ class ShufflingSampler(Sampler):
         if self.n_samples > self._ds_len:
             n_extra_samples = self.n_samples - self._ds_len
             replace = True if n_extra_samples > idxs.size else False
-            extra_samples = np.random.choice(
-                idxs, size=n_extra_samples, replace=replace
-            )
+            extra_samples = np.random.choice(idxs, size=n_extra_samples, replace=replace)
             idxs = np.concatenate((idxs, extra_samples))
         else:
             idxs = idxs[: self.n_samples]

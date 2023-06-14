@@ -200,8 +200,9 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         # update the theta dict
         self._theta = new_theta
         if self.W is not None:
-            warn('Setting theta is supported only for usage with external_model.')
+            warn("Setting theta is supported only for usage with external_model.")
             # TODO: extend this method to update the W and b manually.
+
 
 class GaussianTVAE(_TVAE):
     def __init__(

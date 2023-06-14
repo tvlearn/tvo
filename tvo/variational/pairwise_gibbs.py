@@ -1,4 +1,5 @@
-import  numpy as np
+import numpy as np
+
 
 class PairwiseGibbs:
     """
@@ -24,8 +25,9 @@ class PairwiseGibbs:
         self.covariance_matrices = covariance_matrices
 
         # Convert covariance matrix to correlation matrix # todo: find a good way to produce the correlation matrix
-        self.correlation_matrices = [self.C2R(covariance_matrix) for covariance_matrix in covariance_matrices]
-
+        self.correlation_matrices = [
+            self.C2R(covariance_matrix) for covariance_matrix in covariance_matrices
+        ]
 
         # TODO: verify accuracy AFTER a program is built to do it.
         self.conditional_probabilities = np.zeros_like(self.correlation_matrix)
@@ -34,14 +36,21 @@ class PairwiseGibbs:
                 if i == j:
                     self.conditional_probabilities[i, j] = 0
                 else:
-                    self.conditional_probabilities[i, j] = self.correlation_matrix[i, j] / np.sum(self.correlation_matrix[i]) - self.correlation_matrix[i, i]
+                    self.conditional_probabilities[i, j] = (
+                        self.correlation_matrix[i, j] / np.sum(self.correlation_matrix[i])
+                        - self.correlation_matrix[i, i]
+                    )
 
         # Calculate seed probability
         self.seed_probability = self.means / np.sum(self.means)
 
         # Decide how many bits to select # todo: find a way to compute M. Alternatively, find a way to
         expected_value = np.sum(self.means)
-        variance_of_expected_value = np.sum(np.diag(self.covariance_matrices)) + 2 * np.sum(self.covariance_matrices) - 2 * np.sum(np.outer(self.means, self.means))
+        variance_of_expected_value = (
+            np.sum(np.diag(self.covariance_matrices))
+            + 2 * np.sum(self.covariance_matrices)
+            - 2 * np.sum(np.outer(self.means, self.means))
+        )
 
     def sample(self):
         # TODO: DO NOT FIND A SMARTER WAY TO DO THIS
@@ -56,7 +65,7 @@ class PairwiseGibbs:
         samples = [s0]
 
         # Do M-1 loops
-        for i in range(self.M-1):
+        for i in range(self.M - 1):
             conditional_probability_vector = self.conditional_probabilities[s0]
             s1 = np.random.choice(len(self.means), p=conditional_probability_vector)
             samples.append(s1)

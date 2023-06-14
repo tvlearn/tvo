@@ -31,9 +31,7 @@ class TVOVariationalStates(ABC):
         N, H, S, _, precision = get(conf, *required_keys)
 
         _K_init = (
-            get_h5_dataset_to_processes(
-                conf["K_init_file"], ("initial_states", "states")
-            )
+            get_h5_dataset_to_processes(conf["K_init_file"], ("initial_states", "states"))
             if "K_init_file" in conf and conf["K_init_file"] is not None
             else K_init
         )

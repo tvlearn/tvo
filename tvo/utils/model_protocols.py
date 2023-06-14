@@ -142,11 +142,13 @@ class Trainable(Protocol):
             prec = dt
         return prec
 
+
 class Encoder(Protocol):
-    '''
+    """
     Base Encoder protocol. It requires an inference method that produces latent space parameters, and a sampler
     method which produces latents.
-    '''
+    """
+
     _phi: Dict[str, to.Tensor]
     _config: Dict[str, Any] = {}
 
@@ -158,14 +160,13 @@ class Encoder(Protocol):
     def encode(self):
         pass
 
+
 @runtime_checkable
 class Optimized(Trainable, Protocol):
     """Additionally implements log_pseudo_joint, init_storage, init_batch, init_epoch."""
 
     @abstractmethod
-    def log_joint(
-        self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None
-    ) -> to.Tensor:
+    def log_joint(self, data: to.Tensor, states: to.Tensor, lpj: to.Tensor = None) -> to.Tensor:
         """Evaluate log-joint probabilities for this model.
 
         :param data: shape is (N,D)
