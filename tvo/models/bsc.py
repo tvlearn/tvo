@@ -19,6 +19,7 @@ from tvo.utils._utils import get_lstsq
 
 lstsq = get_lstsq(torch=to)
 
+
 class BSC(Optimized, Sampler, Reconstructor):
     def __init__(
         self,
