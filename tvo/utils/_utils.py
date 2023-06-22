@@ -25,19 +25,19 @@ def get_lstsq(torch):
     Input: torch
     """
     torch_major_version, torch_minor_version = torch.__version__.split(".")[:2]
-    if torch_major_version >= 2:
+    if int(torch_major_version) >= 2:
 
         def lstsq(a, b):
             return torch.linalg.lstsq(b, a)
 
-    elif torch_minor_version >= 10:
+    elif int(torch_minor_version) >= 10:
         # pytorch 1.10 deprecates to.lstsq in favour of to.linalg.lstsq,
         # which takes arguments in reversed order
         def lstsq(a, b):
             return torch.linalg.lstsq(b, a)
 
-    elif torch_minor_version >= 2:
-        # pytorch 1.2 deprecates to.gels in favour of to.lstsq
+    elif int(torch_minor_version) >= 2:
+        # pytorch 1.2 deprecates to.gels in favour of to.lstsqgit
         lstsq = torch.lstsq
 
     else:
