@@ -14,21 +14,9 @@ from tvo.variational.TVOVariationalStates import TVOVariationalStates
 from tvo.variational._utils import mean_posterior, lpj2pjc
 from tvo.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvo.utils.sanity import fix_theta
+from tvo.utils._utils import get_lstsq
 
-torch_minor_version = int(to.__version__.split(".")[1])
-if torch_minor_version >= 10:
-    # pytorch 1.10 deprecates to.lstsq in favour of to.linalg.lstsq,
-    # which takes arguments in reversed order
-    def lstsq(a, b):
-        return to.linalg.lstsq(b, a)
-
-elif torch_minor_version >= 2:
-    # pytorch 1.2 deprecates to.gels in favour of to.lstsq
-    lstsq = to.lstsq
-
-else:
-    raise ValueError("Pytorch versions below 1.2 are unsupported")
-
+lstsq = get_lstsq(torch=to)
 
 class BSC(Optimized, Sampler, Reconstructor):
     def __init__(
@@ -197,7 +185,7 @@ class BSC(Optimized, Sampler, Reconstructor):
         broadcast(Wold_noisy)
         theta_new = {}
         try:
-            theta_new["W"] = lstsq(self.my_Wp.t(), self.my_Wq)[0].t()
+            theta_new["W"] = to.linalg.lstsq(self.my_Wq, self.my_Wp.t())[0].t()
         except RuntimeError:
             pprint("Inversion error. Will not update W but add some noise instead.")
             theta_new["W"] = Wold_noisy

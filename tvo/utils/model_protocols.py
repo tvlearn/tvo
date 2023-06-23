@@ -73,7 +73,7 @@ class Trainable(Protocol):
         or even not implement it at all.
         """
         # by default, do nothing
-        pass
+        return
 
     def free_energy(
         self, idx: to.Tensor, batch: to.Tensor, states: "TVOVariationalStates"

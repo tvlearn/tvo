@@ -75,7 +75,3 @@ To run on GPU (requires cudatoolkit to be installed), run, e.g.:
 ```bash
 env TVO_GPU=0 python main.py nor
 ```
-
-
-# Reference
-[1] "Evolutionary Variational Optimization of Generative Models", Jakob Drefs, Enrico Guiraud, Jörg Lücke. Journal of Machine Learning Research, in press, 2022. Pointer will follow, see [here](https://arxiv.org/abs/2012.12294) for a preliminary arXiv version.

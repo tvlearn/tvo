@@ -14,8 +14,9 @@ from PIL import Image
 from skimage.metrics import peak_signal_noise_ratio
 from typing import Dict, Union
 
-from tvo import get_run_policy
+from tvo import get_run_policy, get_device
 from tvo.utils.parallel import init_processes as _init_processes
+from tvo.models import GaussianTVAE
 
 
 def init_processes() -> Tuple[int, int]:
@@ -50,7 +51,7 @@ class stdout_logger(object):
         pass
 
 
-def get_image(image_file: str, rescale: float = None) -> to.Tensor:
+def get_image(image_file: str, rescale: float) -> to.Tensor:
     """Read image from file, optionally rescale image size and return as to.Tensor
 
     :param image_file: Full path to image file (.png, .jpg, ...)
@@ -61,7 +62,7 @@ def get_image(image_file: str, rescale: float = None) -> to.Tensor:
     isrgb = np.ndim(img) == 3 and img.shape[2] == 3
     isgrey = np.ndim(img) == 2
     assert isrgb or isgrey, "Expect img image to be either RGB or grey"
-    if rescale is not None:
+    if rescale != 1.0:
         orig_shape = img.shape
         target_shape = [int(orig_shape[1] * rescale), int(orig_shape[0] * rescale)]
         img = (
@@ -125,3 +126,23 @@ def eval_fn(
             data_range=data_range,
         )
     )
+
+
+def get_singleton_means(theta: Dict[str, to.Tensor]) -> to.Tensor:
+    """Initialize TVAE model with parameters `theta` and compute NN output for NN input vectors
+       corresponding to singleton states (only one active unit per unit vector).
+
+    :param theta: Dictionary with TVAE model parameters
+    :return: Decoded means
+    """
+    n_layers = len(tuple(k for k in theta.keys() if k.startswith("W_")))
+    W = tuple(theta[f"W_{ind_layer}"].clone().detach() for ind_layer in range(n_layers))
+    b = tuple(theta[f"b_{ind_layer}"].clone().detach() for ind_layer in range(n_layers))
+    sigma2 = float(theta["sigma2"])
+    H0 = W[0].shape[0]
+    m = GaussianTVAE(W_init=W, b_init=b, sigma2_init=sigma2)
+    singletons = to.eye(H0).to(get_device())
+    means = m.forward(singletons).detach().cpu()
+    D = W[-1].shape[-1]
+    assert means.shape == (H0, D)
+    return means

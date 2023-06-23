@@ -26,7 +26,6 @@ dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
 def bars_test():
-
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
@@ -52,7 +51,6 @@ def bars_test():
     # generate data set
     D = int((args.H_gen / 2) ** 2)
     if comm_rank == 0:
-
         gfs = get_bars_gfs(no_bars=args.H_gen, bar_amp=args.bar_amp, precision=PRECISION)
         assert gfs.shape == (D, args.H_gen)
         pi_gen = args.pi_gen if args.pi_gen is not None else 2 / args.H_gen
@@ -151,8 +149,8 @@ def bars_test():
         else Visualizer(  # type: ignore
             viz_every=args.viz_every if args.viz_every is not None else args.no_epochs,
             output_directory=output_directory,
-            datapoints=data[:15],
-            theta_gen=theta_gen,
+            datapoints=data[:15].detach().cpu(),
+            theta_gen={k: v.detach().cpu() for k, v in theta_gen.items()},
             L_gen=ll_gen,
             gif_framerate=args.gif_framerate,
         )
@@ -167,7 +165,9 @@ def bars_test():
         if comm_rank == 0:
             assert isinstance(visualizer, _Visualizer)  # to make mypy happy
             visualizer.process_epoch(
-                epoch=epoch, F=summary._results["train_F"], theta=exp.trainer.model.theta
+                epoch=epoch,
+                F=summary._results["train_F"],
+                theta={k: v.detach().cpu() for k, v in exp.trainer.model.theta.items()},
             )
 
     barrier()

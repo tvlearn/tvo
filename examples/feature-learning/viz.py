@@ -2,118 +2,94 @@
 # Copyright (C) 2022 Machine Learning Group of the University of Oldenburg.
 # Licensed under the Academic Free License version 3.0
 
-from __future__ import division, print_function
-
 import os
 import re
 import glob
+import math
 import numpy as np
 import torch as to
+import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-from utils import eval_fn
-import matplotlib
-from typing import Optional, List, Dict
-
-matplotlib.use("agg")
-import matplotlib.pyplot as plt  # noqa
-from tvutil.viz import make_grid_with_black_boxes_and_white_background, scale  # noqa
+from typing import Tuple, Optional, List, Dict
+from tvutil.viz import make_grid_with_black_boxes_and_white_background
 
 
 class Visualizer(object):
     def __init__(
         self,
-        viz_every: int,
         output_directory: str,
-        clean_image: to.Tensor,
-        noisy_image: to.Tensor,
-        patch_size: Optional[int] = None,
-        ncol_gfs: int = 5,
-        sort_gfs: bool = True,
+        viz_every: int,
+        datapoints: to.Tensor,
+        patch_size: Tuple[int, int],
+        ncol_gfs: int = 16,
+        sort_acc_to_desc_priors: bool = True,
         topk_gfs: bool = None,
-        cmap: Optional[matplotlib.colors.Colormap] = None,
-        figsize: List = [9, 3],
         positions: Dict[str, List] = {
-            "clean": [0.001, 0.01, 0.20, 0.85],
-            "noisy": [0.218, 0.01, 0.20, 0.85],
-            "rec": [0.433, 0.01, 0.20, 0.85],
-            "gfs": [0.715, 0.37, 0.28, 0.56],
-            "pies": [0.731, 0.18, 0.26, 0.24],
+            "datapoints": [0.0, 0.0, 0.07, 0.94],
+            "gfs": [0.08, 0.00, 0.40, 0.94],
+            "F": [0.6, 0.6, 0.38, 0.38],
+            "pies": [0.6, 0.1, 0.38, 0.38],
         },
-        labelsize: int = 10,
+        global_clims: bool = False,
         gif_framerate: Optional[str] = None,
     ):
-        self._viz_every = viz_every
-        self._output_directory = output_directory
         self._gif_framerate = gif_framerate
         if gif_framerate is not None and viz_every > 1:
             print("Choose --viz_every=1 for best gif results")
-        self._clean_image = clean_image.detach().cpu().numpy()
-        self._noisy_image = noisy_image.detach().cpu().numpy()
+        self._output_directory = output_directory
+        self._viz_every = viz_every
+        self._datapoints = datapoints
         self._patch_size = patch_size
         self._ncol_gfs = ncol_gfs
-        self._sort_gfs = sort_gfs
-        if sort_gfs:
-            print(
-                "Displayed GFs will be ordered according to prior activation (from highest "
-                "to lowest)"
-            )
+        self._sort_acc_to_desc_priors = sort_acc_to_desc_priors
         self._topk_gfs = topk_gfs
-        self._isrgb = np.ndim(clean_image) == 3
-        self._cmap = (plt.cm.jet if self._isrgb else plt.cm.gray) if cmap is None else cmap
-        self._positions = positions
-        self._labelsize = labelsize
+        self._cmap = plt.cm.jet
+        self._global_clims = global_clims
+        self._labelsize = 10
+        self._legendfontsize = 8
 
-        self._fig = plt.figure(figsize=figsize)
-        self._axes = {k: self._fig.add_axes(v, xmargin=0, ymargin=0) for k, v in positions.items()}
+        D = datapoints.shape[1]
+        patch_height, patch_width = self._patch_size
+        self._no_channels = int(D / patch_height / patch_width)
+
+        self._memory = {"F": []}
+        self._fig = plt.figure()
+        self._axes = {k: self._fig.add_axes(v) for k, v in positions.items()}
         self._handles = {k: None for k in positions}
-        self._viz_clean()
-        self._viz_noisy()
+        self._viz_datapoints()
 
-    def _viz_clean(self):
-        assert "clean" in self._axes
-        ax = self._axes["clean"]
-        clean = scale(self._clean_image, [0.0, 1.0]) if self._isrgb else self._clean_image
-        self._handles["clean"] = ax.imshow(clean)
+    def _viz_datapoints(self):
+        assert "datapoints" in self._axes
+        ax = self._axes["datapoints"]
+        datapoints = self._datapoints
+        N = datapoints.shape[0]
+        patch_height, patch_width = self._patch_size
+        no_channels = self._no_channels
+        grid, cmap, vmin, vmax, scale_suff = make_grid_with_black_boxes_and_white_background(
+            images=datapoints.numpy().reshape(N, no_channels, patch_height, patch_width),
+            nrow=int(math.ceil(N / self._ncol_gfs)),
+            surrounding=0,
+            padding=8,
+            repeat=20,
+            global_clim=self._global_clims,
+            sym_clim=True,
+            cmap=self._cmap,
+            eps=0.01,
+        )
+
+        self._handles["datapoints"] = ax.imshow(np.squeeze(grid), interpolation="none")
         ax.axis("off")
-        self._handles["clean"].set_cmap(self._cmap)
-        ax.set_title("Clean\n")
 
-    def _viz_noisy(self):
-        assert "noisy" in self._axes
-        ax = self._axes["noisy"]
-        noisy = self._noisy_image
-        psnr_noisy = eval_fn(self._clean_image, noisy)
-        print("psnr of noisy = {:.2f}".format(psnr_noisy))
-        noisy = scale(noisy, [0.0, 1.0]) if self._isrgb else noisy
-        self._handles["noisy"] = ax.imshow(noisy)
-        ax.axis("off")
-        self._handles["noisy"].set_cmap(self._cmap)
-        ax.set_title("Noisy\nPSNR={:.2f})".format(psnr_noisy))
-
-    def _viz_rec(self, epoch: int, rec: np.ndarray):
-        assert "rec" in self._axes
-        ax = self._axes["rec"]
-        rec = scale(rec, [0.0, 1.0]) if self._isrgb else rec
-        if self._handles["rec"] is None:
-            self._handles["rec"] = ax.imshow(rec)
-            ax.axis("off")
-        else:
-            self._handles["rec"].set_data(rec)
-        self._handles["rec"].set_cmap(self._cmap)
-        self._handles["rec"].set_clim(vmin=np.min(rec), vmax=np.max(rec))
-        psnr = eval_fn(self._clean_image, rec)
-        ax.set_title("Reco @ {}\n(PSNR={:.2f})".format(epoch, psnr))
+        self._handles["datapoints"].set_cmap(cmap)
+        self._handles["datapoints"].set_clim(vmin=vmin, vmax=vmax)
+        ax.set_title(r"$\vec{y}^{\,(n)}$")
 
     def _viz_weights(self, epoch: int, gfs: np.ndarray, suffix: str = ""):
         assert "gfs" in self._axes
         ax = self._axes["gfs"]
-        D, H = gfs.shape
-        no_channels = 3 if self._isrgb else 1
-        patch_height, patch_width = (
-            (int(np.sqrt(D / no_channels)), int(np.sqrt(D / no_channels)))
-            if self._patch_size is None
-            else self._patch_size
-        )
+        H = gfs.shape[1]
+        patch_height, patch_width = self._patch_size
+        no_channels = self._no_channels
         grid, cmap, vmin, vmax, scale_suff = make_grid_with_black_boxes_and_white_background(
             images=gfs.T.reshape(H, no_channels, patch_height, patch_width),
             nrow=int(np.ceil(H / self._ncol_gfs)),
@@ -126,7 +102,7 @@ class Visualizer(object):
             eps=0.02,
         )
 
-        gfs = grid.transpose(1, 2, 0) if self._isrgb else np.squeeze(grid)
+        gfs = grid.transpose(1, 2, 0) if no_channels > 1 else np.squeeze(grid)
         if self._handles["gfs"] is None:
             self._handles["gfs"] = ax.imshow(gfs, interpolation="none")
             ax.axis("off")
@@ -134,7 +110,30 @@ class Visualizer(object):
             self._handles["gfs"].set_data(gfs)
         self._handles["gfs"].set_cmap(cmap)
         self._handles["gfs"].set_clim(vmin=vmin, vmax=vmax)
-        ax.set_title("GFs @ {}".format(epoch) + ("\n" + suffix) if suffix else "")
+        ax.set_title("GFs @ {}".format(epoch) + (" ({})".format(suffix) if suffix else ""))
+
+    def _viz_free_energy(self):
+        memory = self._memory
+        assert "F" in memory
+        assert "F" in self._axes
+        ax = self._axes["F"]
+        xdata = to.arange(1, len(memory["F"]) + 1)
+        ydata_learned = memory["F"]
+        if self._handles["F"] is None:
+            (self._handles["F"],) = ax.plot(
+                xdata,
+                ydata_learned,
+                "b",
+            )
+            ax.set_xlabel("Epoch", fontsize=self._labelsize)
+            ax.set_ylabel(r"$\mathcal{F}(\mathcal{K},\Theta)$", fontsize=self._labelsize)
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        else:
+            self._handles["F"].set_xdata(xdata)
+            self._handles["F"].set_ydata(ydata_learned)
+            ax.set_ylabel(r"$\mathcal{F}(\mathcal{K},\Theta)$", fontsize=self._labelsize)
+            ax.relim()
+            ax.autoscale_view()
 
     def _viz_pies(self, epoch: int, pies: np.ndarray, suffix: str = ""):
         assert "pies" in self._axes
@@ -156,10 +155,10 @@ class Visualizer(object):
             )
             ax.set_xlabel(r"$h$", fontsize=self._labelsize)
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-            ax.tick_params(axis="x", labelrotation=30)
+            # ax.tick_params(axis="x", labelrotation=30)
             self._handles["pies_summed"] = ax.text(
                 0.81,
-                0.76,
+                0.85,
                 r"$\sum_h \pi_h$ = " + "{:.2f}".format(pies.sum()),
                 horizontalalignment="center",
                 verticalalignment="center",
@@ -175,30 +174,31 @@ class Visualizer(object):
                 r"$\sum_h \pi_h$ = " + "{:.2f}".format(pies.sum())
             )
 
-    def viz_epoch(self, epoch: int, pies: to.Tensor, gfs: to.Tensor, rec: Optional[to.Tensor]):
+    def viz_epoch(self, epoch: int, pies: to.Tensor, gfs: to.Tensor):
         pies = pies.detach().cpu().numpy()
         gfs = gfs.detach().cpu().numpy()
-        inds_sort = np.argsort(pies)[::-1] if self._sort_gfs else np.arange(len(pies))
+        inds_sort = (
+            np.argsort(pies)[::-1] if self._sort_acc_to_desc_priors else np.arange(len(pies))
+        )
         inds_sort_gfs = inds_sort[: self._topk_gfs] if self._topk_gfs is not None else inds_sort
-        if rec is not None:
-            assert isinstance(rec, to.Tensor)
-            rec = rec.detach().cpu().numpy()
-            self._viz_rec(epoch, rec)
         suffix_gfs = (
             (
                 "sorted, top {}".format(self._topk_gfs)
-                if self._sort_gfs
+                if self._sort_acc_to_desc_priors
                 else "top {}".format(self._topk_gfs)
             )
             if self._topk_gfs
-            else ("sorted" if self._sort_gfs else "")
+            else ("sorted" if self._sort_acc_to_desc_priors else "")
         )
         self._viz_weights(epoch, gfs.copy()[:, inds_sort_gfs], suffix_gfs)
-        self._viz_pies(epoch, pies[inds_sort], "(sorted)" if self._sort_gfs else "")
+        self._viz_pies(epoch, pies[inds_sort], "(sorted)" if self._sort_acc_to_desc_priors else "")
+        self._viz_free_energy()
 
-    def process_epoch(self, epoch: int, pies: to.Tensor, gfs: to.Tensor, rec: Optional[to.Tensor]):
+    def process_epoch(self, epoch: int, F: float, pies: to.Tensor, gfs: to.Tensor):
+        memory = self._memory
+        memory["F"].append(F)
         if epoch % self._viz_every == 0:
-            self.viz_epoch(epoch, pies, gfs, rec)
+            self.viz_epoch(epoch, pies, gfs)
             self.save_epoch(epoch)
 
     def save_epoch(self, epoch: int):

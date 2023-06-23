@@ -37,7 +37,6 @@ def make_var_states(
     RandomSampledVarStates,
     NeuralVariationalStates,
 ]:
-
     if isinstance(conf, FullEMConfig):
         assert conf.n_states == 2**H, "FullEMConfig and model have different H"
         return FullEM(N, H, precision)

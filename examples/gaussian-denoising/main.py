@@ -10,7 +10,7 @@ import torch as to
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
-from tvo.models import BSC
+from tvo.models import BSC, GaussianTVAE
 from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape, gather_from_processes
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 from tvo.utils.model_protocols import Reconstructor
@@ -30,6 +30,7 @@ from utils import (
     store_as_h5,
     get_epochs_from_every,
     eval_fn,
+    get_singleton_means,
 )
 from viz import Visualizer
 
@@ -38,8 +39,7 @@ PRECISION = to.float32
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
-def gaussian_denoising_example():
-
+def gaussian_denoising_example():  # noqa: C901
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
@@ -70,38 +70,57 @@ def gaussian_denoising_example():
     if comm_rank == 0:
         clean = get_image(args.clean_image, args.rescale).to(**dtype_device_kwargs)
         isrgb = clean.dim() == 3 and clean.shape[2] == 3
-        noisy = clean + args.noise_level * to.randn(clean.shape)
+        noisy = clean + args.noise_level * to.randn(clean.shape).to(**dtype_device_kwargs)
         print("Added white Gaussian noise with σ={}".format(args.noise_level))
         OVP = MultiDimOverlappingPatches if isrgb else OverlappingPatches
         ovp = OVP(noisy, args.patch_height, patch_width, patch_shift=1)
         train_data = ovp.get().t()
         store_as_h5({"data": train_data}, data_file)
+    else:
+        clean = None
     isrgb = len(bcast_shape(clean, 0)) == 3
     D = args.patch_height * patch_width * (3 if isrgb else 1)
+    barrier()
+
+    pprint("Initializing model")
 
     # initialize model
-    W_init = (
-        init_W_data_mean(data=train_data, H=args.H, dtype=PRECISION, device=DEVICE).contiguous()
-        if comm_rank == 0
-        else to.zeros((D, args.H), dtype=PRECISION, device=DEVICE)
-    )
-    sigma2_init = (
-        init_sigma2_default(train_data, PRECISION, DEVICE)
-        if comm_rank == 0
-        else to.zeros((1), dtype=PRECISION, device=DEVICE)
-    )
-    barrier()
-    broadcast(W_init)
-    broadcast(sigma2_init)
-    model = BSC(
-        H=args.H,
-        D=D,
-        W_init=W_init,
-        sigma2_init=sigma2_init,
-        pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
-        precision=PRECISION,
-    )
+    if args.model == "bsc":
+        W_init = (
+            init_W_data_mean(data=train_data, H=args.H, dtype=PRECISION, device=DEVICE).contiguous()
+            if comm_rank == 0
+            else to.zeros((D, args.H), dtype=PRECISION, device=DEVICE)
+        )
+        sigma2_init = (
+            init_sigma2_default(train_data, PRECISION, DEVICE)
+            if comm_rank == 0
+            else to.zeros((1), dtype=PRECISION, device=DEVICE)
+        )
+        barrier()
+        broadcast(W_init)
+        broadcast(sigma2_init)
+
+        model = BSC(
+            H=args.H,
+            D=D,
+            W_init=W_init,
+            sigma2_init=sigma2_init,
+            pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
+            precision=PRECISION,
+        )
+    elif args.model == "tvae":
+        model = GaussianTVAE(
+            shape=[
+                D,
+            ]
+            + args.inner_net_shape,
+            min_lr=0.0001,
+            max_lr=0.01,
+        )
+
     assert isinstance(model, Reconstructor)
+
+    pprint("Initializing experiment")
 
     # define hyperparameters of the variational optimization
     estep_conf = EVOConfig(
@@ -123,7 +142,6 @@ def gaussian_denoising_example():
         log_blacklist=[],
         log_only_latest_theta=True,
     )
-    pprint("Initializing experiment")
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, train_data_file=data_file)
     logger, trainer = exp.logger, exp.trainer
     # append the noisy image to the data logger
@@ -142,7 +160,7 @@ def gaussian_denoising_example():
             noisy_image=noisy,
             patch_size=(args.patch_height, patch_width),
             sort_gfs=True,
-            ncol_gfs=4,
+            ncol_gfs=3,
             gif_framerate=args.gif_framerate,
         )
         if comm_rank == 0
@@ -157,10 +175,10 @@ def gaussian_denoising_example():
         # merge reconstructed image patches and generate reconstructed image
         gather = epoch in (reco_epochs + 1)
         assert hasattr(trainer, "train_reconstruction")
-        rec_patches = gather_from_processes(trainer.train_reconstruction).t() if gather else None
+        rec_patches = gather_from_processes(trainer.train_reconstruction) if gather else None
         merge = gather and comm_rank == 0
         imgs = {
-            k: ovp.set_and_merge(rec_patches, merge_method=v) if merge else None
+            k: ovp.set_and_merge(rec_patches.t(), merge_method=v) if merge else None
             for k, v in merge_strategies.items()
         }
         barrier()
@@ -183,10 +201,15 @@ def gaussian_denoising_example():
 
         # visualize epoch
         if comm_rank == 0:
+            if args.model == "bsc":
+                gfs = model.theta["W"]
+            elif args.model == "tvae":
+                gfs = get_singleton_means(model.theta).T
+
             visualizer.process_epoch(
                 epoch=epoch,
                 pies=model.theta["pies"],
-                gfs=model.theta["W"],
+                gfs=gfs,
                 rec=imgs["mean"] if merge else None,
             )
         barrier()

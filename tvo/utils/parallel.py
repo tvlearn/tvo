@@ -135,7 +135,6 @@ def scatter_to_processes(*tensors: Tensor, src: int = 0) -> Iterable[Tensor]:
     elif tvo.get_run_policy() == "mpi":
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for data in tensors:
-
             this_dtype = bcast_dtype(data, src)
             is_bool = this_dtype == torch.bool
             if is_bool:  # workaround to avoid `IndexError: map::at` when scattering to.bool tensor
@@ -214,7 +213,6 @@ def gather_from_processes(*my_tensors: Tensor, dst: int = 0) -> Union[Tensor, It
     elif tvo.get_run_policy() == "mpi":
         comm_size, comm_rank = dist.get_world_size(), dist.get_rank()
         for my_data in my_tensors:
-
             local_length = my_data.shape[0]
             other_length = tuple(my_data.shape[1:])
             total_length = torch.tensor([local_length])
