@@ -60,7 +60,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
         lpj[idx] = lpj_fn(batch, K[idx])
         self.lpj_call_count += lpj[idx].numel()
 
-        with torch.no_grad:
+        with torch.no_grad():
             new_K, _ = self.sampler.sample(batch, nsamples=self.nsamples, idx=None, dist=self.dist)
 
         new_K = (new_K > 0.5).transpose(0, 1).byte()
