@@ -205,6 +205,8 @@ class GaussianTVAE(_TVAE):
         activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
+        *args,
+        **kwargs,
     ):
         """Create a TVAE model with Gaussian observables.
 
@@ -481,6 +483,8 @@ class BernoulliTVAE(_TVAE):
         activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
+        *args,
+        **kwargs,
     ):
         """Create a TVAE model with Bernoulli observables.
 
