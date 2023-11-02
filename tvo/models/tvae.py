@@ -205,7 +205,7 @@ class GaussianTVAE(_TVAE):
         activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
-        clrmode: str='triangular2',
+        clrmode: str = "triangular2",
         *args,
         **kwargs,
     ):
