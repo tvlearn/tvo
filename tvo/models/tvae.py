@@ -16,7 +16,6 @@ from abc import abstractmethod
 from warnings import warn
 
 
-
 def _get_net_shape(net_shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
     if net_shape is not None:
         return tuple(reversed(net_shape))
@@ -203,6 +202,7 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         if self.W is not None:
             warn("Setting theta is supported only for usage with external_model.")
             # TODO: extend this method to update the W and b manually.
+
 
 class GaussianTVAE(_TVAE):
     def __init__(
