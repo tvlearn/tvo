@@ -205,6 +205,7 @@ class GaussianTVAE(_TVAE):
         activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
+        clrmode: str='triangular2',
         *args,
         **kwargs,
     ):
@@ -308,6 +309,7 @@ class GaussianTVAE(_TVAE):
             max_lr=max_lr,
             step_size_up=cycliclr_step_size_up,
             cycle_momentum=False,
+            mode=clrmode,
         )
         # number of datapoints processed in a training epoch
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvo.get_device())
