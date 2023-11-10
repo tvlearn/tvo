@@ -13,7 +13,6 @@ import torch as to
 from typing import Tuple, List, Dict, Iterable, Optional, Sequence, Union, Callable
 from math import pi as MATH_PI
 from abc import abstractmethod
-from warnings import warn
 
 
 def _get_net_shape(net_shape: Sequence[int] = None, W_init: Sequence[to.Tensor] = None):
@@ -187,22 +186,6 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         """Forward application of TVAE's MLP to the specified input."""
         ...
 
-    @property
-    def theta(self):
-        return self._theta
-
-    @theta.setter
-    def theta(self, new_theta):
-        # update Ws and Bs
-        for key in self._theta.keys():
-            if hasattr(self, key):
-                setattr(self, key, new_theta[key])
-        # update the theta dict
-        self._theta = new_theta
-        if self.W is not None:
-            warn("Setting theta is supported only for usage with external_model.")
-            # TODO: extend this method to update the W and b manually.
-
 
 class GaussianTVAE(_TVAE):
     def __init__(
@@ -222,6 +205,9 @@ class GaussianTVAE(_TVAE):
         activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
+        clrmode: str = "triangular2",
+        *args,
+        **kwargs,
     ):
         """Create a TVAE model with Gaussian observables.
 
@@ -323,6 +309,7 @@ class GaussianTVAE(_TVAE):
             max_lr=max_lr,
             step_size_up=cycliclr_step_size_up,
             cycle_momentum=False,
+            mode=clrmode,
         )
         # number of datapoints processed in a training epoch
         self._train_datapoints = to.tensor([0], dtype=to.int, device=tvo.get_device())
@@ -498,6 +485,8 @@ class BernoulliTVAE(_TVAE):
         activation: Callable = None,
         external_model: Optional[to.nn.Module] = None,
         optimizer: Optional[opt.Optimizer] = None,
+        *args,
+        **kwargs,
     ):
         """Create a TVAE model with Bernoulli observables.
 
