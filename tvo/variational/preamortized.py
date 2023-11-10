@@ -38,7 +38,7 @@ class PreAmortizedVariationalStates(TVOVariationalStates):
             "use_corr": use_corr,
         }
         self.nsamples = nsamples
-        self.sampler = torch.load(model_path, map_location=torch.device(get_device()))
+        self.sampler = torch.load(model_path, map_location=torch.device(get_device())) # load directly on device
         self.dist = "posterior" if use_corr else "posterior_no_corr"
         self.lpj_call_count = 0
 
