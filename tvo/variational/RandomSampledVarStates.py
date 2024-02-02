@@ -59,6 +59,8 @@ class RandomSampledVarStates(TVOVariationalStates):
         ).byte()
         new_lpj = lpj_fn(batch, new_K)
 
+        set_redundant_lpj_to_low(new_states, new_lpj, states)
+
         return update_states_for_batch(
             new_K, new_lpj, idx, self.K, self.lpj, sort_by_lpj=sort_by_lpj
         )
