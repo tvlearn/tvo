@@ -141,7 +141,6 @@ def gaussian_denoising_example():  # noqa: C901
         reco_epochs=reco_epochs,
         log_blacklist=[],
         log_only_latest_theta=True,
-        rrollback_if_F_decreases=['W', 'sigma2'] if args.model='bsc' else []
     )
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, train_data_file=data_file)
     logger, trainer = exp.logger, exp.trainer
