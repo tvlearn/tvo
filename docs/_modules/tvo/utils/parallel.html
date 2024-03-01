@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.utils.parallel &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.utils.parallel</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.utils.parallel</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+<span class="kn">import</span> <span class="nn">platform</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">h5py</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.distributed</span> <span class="k">as</span> <span class="nn">dist</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span> <span class="nn">tvo</span>
+
+
+<div class="viewcode-block" id="pprint">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.pprint">[docs]</a>
+<span class="k">def</span> <span class="nf">pprint</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">end</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Print on root process of torch.distributed process group.</span>
+
+<span class="sd">    param obj: Message to print</span>
+<span class="sd">    param end: Suffix of message. Default is linebreak.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span> <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="n">end</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="init_processes">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.init_processes">[docs]</a>
+<span class="k">def</span> <span class="nf">init_processes</span><span class="p">(</span><span class="n">multi_node</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialize MPI process group using torch.distributed module.</span>
+
+<span class="sd">    param multi_node: Deploy multiple computing nodes.</span>
+
+<span class="sd">    Eventually updates the value of tvo.device.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+        <span class="k">return</span>
+
+    <span class="n">dist</span><span class="o">.</span><span class="n">init_process_group</span><span class="p">(</span><span class="s2">&quot;mpi&quot;</span><span class="p">)</span>
+
+    <span class="n">global_rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+    <span class="n">comm_size</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">()</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span><span class="p">:</span>
+        <span class="n">device_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">device_count</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">multi_node</span><span class="p">:</span>
+            <span class="n">node_count</span> <span class="o">=</span> <span class="n">comm_size</span> <span class="o">//</span> <span class="n">device_count</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">node_count</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="c1"># 0..device_count (first_node), ..., 0..device_count (last_node)</span>
+        <span class="n">local_rank</span> <span class="o">=</span> <span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">device_count</span><span class="p">))</span> <span class="o">*</span> <span class="n">node_count</span><span class="p">)[</span><span class="n">global_rank</span><span class="p">]</span>
+        <span class="n">device_str</span> <span class="o">=</span> <span class="s2">&quot;cuda:</span><span class="si">%i</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">local_rank</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">device_str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span>
+
+    <span class="n">tvo</span><span class="o">.</span><span class="n">_set_device</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device_str</span><span class="p">))</span>
+
+    <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;Initializting </span><span class="si">%i</span><span class="s2"> processes.&quot;</span> <span class="o">%</span> <span class="n">comm_size</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="s2">&quot;New process on </span><span class="si">%s</span><span class="s2">. Global rank </span><span class="si">%d</span><span class="s2">. Device </span><span class="si">%s</span><span class="s2">. Total no processes </span><span class="si">%d</span><span class="s2">.&quot;</span>
+        <span class="o">%</span> <span class="p">(</span><span class="n">platform</span><span class="o">.</span><span class="n">node</span><span class="p">(),</span> <span class="n">global_rank</span><span class="p">,</span> <span class="n">device_str</span><span class="p">,</span> <span class="n">comm_size</span><span class="p">)</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="bcast_dtype">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.bcast_dtype">[docs]</a>
+<span class="k">def</span> <span class="nf">bcast_dtype</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Broadcast dtype of data on src rank.</span>
+
+<span class="sd">    :param data: Tensor on src rank</span>
+<span class="sd">    :param src: Source rank</span>
+<span class="sd">    :returns: dtype on each rank</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;seq&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">comm_rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+
+        <span class="n">dtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">int16</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">,</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="n">ind_dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">==</span> <span class="n">src</span><span class="p">:</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="n">ind_dtype</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">dtypes</span><span class="p">)]</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">))</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">broadcast</span><span class="p">(</span><span class="n">ind_dtype</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dtypes</span><span class="p">[</span><span class="n">ind_dtype</span><span class="o">.</span><span class="n">item</span><span class="p">()]</span></div>
+
+
+
+<div class="viewcode-block" id="bcast_shape">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.bcast_shape">[docs]</a>
+<span class="k">def</span> <span class="nf">bcast_shape</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Broadcast shape of data on src rank.</span>
+
+<span class="sd">    :param data: Tensor on src rank</span>
+<span class="sd">    :param src: Source rank</span>
+<span class="sd">    :returns: Tensor with shape on each rank</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;seq&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">comm_rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+
+        <span class="n">ndim</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">==</span> <span class="n">src</span><span class="p">:</span>
+            <span class="n">ndim</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">broadcast</span><span class="p">(</span><span class="n">ndim</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">ndim</span><span class="o">.</span><span class="n">item</span><span class="p">(),),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">==</span> <span class="n">src</span><span class="p">:</span>
+            <span class="n">shape</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">broadcast</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">shape</span></div>
+
+
+
+<div class="viewcode-block" id="scatter_to_processes">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.scatter_to_processes">[docs]</a>
+<span class="k">def</span> <span class="nf">scatter_to_processes</span><span class="p">(</span><span class="o">*</span><span class="n">tensors</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Split tensors into chunks and scatter within process group.</span>
+
+<span class="sd">    :param tensors: Tensor to be scattered. Chunks are cut along dimension 0.</span>
+<span class="sd">    :param src: Source rank to scatter from.</span>
+<span class="sd">    :returns: Tensor scattered to local rank.</span>
+
+<span class="sd">    Tensor data is assumed to be None on all but the root processes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">my_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;seq&quot;</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">tensors</span><span class="p">:</span>
+            <span class="n">my_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+        <span class="n">comm_size</span><span class="p">,</span> <span class="n">comm_rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">(),</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">tensors</span><span class="p">:</span>
+            <span class="n">this_dtype</span> <span class="o">=</span> <span class="n">bcast_dtype</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+            <span class="n">is_bool</span> <span class="o">=</span> <span class="n">this_dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">bool</span>
+            <span class="k">if</span> <span class="n">is_bool</span><span class="p">:</span>  <span class="c1"># workaround to avoid `IndexError: map::at` when scattering to.bool tensor</span>
+                <span class="n">this_dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">uint8</span>
+            <span class="n">this_device</span> <span class="o">=</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">()</span>
+
+            <span class="n">shape</span> <span class="o">=</span> <span class="n">bcast_shape</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+            <span class="n">total_length</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">other_length</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+            <span class="c1"># logic to ensure that input to `dist.scatter` is evenly divisible by comm_size</span>
+            <span class="k">assert</span> <span class="p">(</span>
+                <span class="n">total_length</span> <span class="o">/</span> <span class="n">comm_size</span>
+            <span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;number of data points must be greater or equal to number of MPI processes&quot;</span>
+            <span class="n">local_length_ceiled</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">total_length</span> <span class="o">/</span> <span class="n">comm_size</span><span class="p">)</span>
+            <span class="n">total_length_ceiled</span> <span class="o">=</span> <span class="n">local_length_ceiled</span> <span class="o">*</span> <span class="n">comm_size</span>
+            <span class="n">no_dummy</span> <span class="o">=</span> <span class="n">total_length_ceiled</span> <span class="o">-</span> <span class="n">total_length</span>
+            <span class="n">local_length</span> <span class="o">=</span> <span class="n">local_length_ceiled</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">&lt;</span> <span class="n">no_dummy</span> <span class="k">else</span> <span class="n">local_length_ceiled</span>
+
+            <span class="c1"># split into chunks and scatter</span>
+            <span class="n">chunks</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: ignore</span>
+            <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">to_cut_into_chunks</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                    <span class="p">((</span><span class="n">total_length_ceiled</span><span class="p">,)</span> <span class="o">+</span> <span class="n">other_length</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">this_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">this_device</span>
+                <span class="p">)</span>
+                <span class="n">local_start</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">comm_size</span><span class="p">):</span>
+                    <span class="n">local_length_</span> <span class="o">=</span> <span class="n">local_length_ceiled</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">r</span> <span class="o">&lt;</span> <span class="n">no_dummy</span> <span class="k">else</span> <span class="n">local_length_ceiled</span>
+                    <span class="n">to_cut_into_chunks</span><span class="p">[</span>
+                        <span class="n">r</span> <span class="o">*</span> <span class="n">local_length_ceiled</span> <span class="p">:</span> <span class="n">r</span> <span class="o">*</span> <span class="n">local_length_ceiled</span> <span class="o">+</span> <span class="n">local_length_</span>
+                    <span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="nb">range</span><span class="p">(</span><span class="n">local_start</span><span class="p">,</span> <span class="n">local_start</span> <span class="o">+</span> <span class="n">local_length_</span><span class="p">)]</span>
+                    <span class="n">local_start</span> <span class="o">+=</span> <span class="n">local_length_</span>
+                <span class="n">chunks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">chunk</span><span class="p">(</span><span class="n">to_cut_into_chunks</span><span class="p">,</span> <span class="n">comm_size</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+
+            <span class="n">my_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">local_length_ceiled</span><span class="p">,)</span> <span class="o">+</span> <span class="n">other_length</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">this_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">this_device</span>
+            <span class="p">)</span>
+
+            <span class="n">dist</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">my_data</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="n">src</span><span class="p">,</span> <span class="n">scatter_list</span><span class="o">=</span><span class="n">chunks</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">is_bool</span><span class="p">:</span>
+                <span class="n">my_data</span> <span class="o">=</span> <span class="n">my_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bool</span><span class="p">)</span>
+
+            <span class="n">my_data</span> <span class="o">=</span> <span class="n">my_data</span><span class="p">[:</span><span class="n">local_length</span><span class="p">]</span>
+
+            <span class="n">N</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">local_length</span><span class="p">])</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="n">N</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">==</span> <span class="n">total_length</span>
+
+            <span class="n">my_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">my_data</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">my_tensors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">my_tensors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">my_tensors</span></div>
+
+
+
+<div class="viewcode-block" id="gather_from_processes">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.gather_from_processes">[docs]</a>
+<span class="k">def</span> <span class="nf">gather_from_processes</span><span class="p">(</span><span class="o">*</span><span class="n">my_tensors</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">dst</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gather tensors from process group.</span>
+
+<span class="sd">    :param my_tensors: List of tensors to be gathered from local process on process dst.</span>
+<span class="sd">                       For each element tensor.shape[1:] must be identical on</span>
+<span class="sd">                       each process.</span>
+<span class="sd">    :param dst: Rank of destination process to gather tensors.</span>
+<span class="sd">    :returns: List of tensors gathered from process group.</span>
+
+<span class="sd">    Only process with rank dst will contain gathered data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tensors</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;seq&quot;</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">my_tensors</span><span class="p">:</span>
+            <span class="n">tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+        <span class="n">comm_size</span><span class="p">,</span> <span class="n">comm_rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">(),</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">my_data</span> <span class="ow">in</span> <span class="n">my_tensors</span><span class="p">:</span>
+            <span class="n">local_length</span> <span class="o">=</span> <span class="n">my_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">other_length</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">my_data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+            <span class="n">total_length</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">local_length</span><span class="p">])</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="n">total_length</span><span class="p">)</span>
+            <span class="n">total_length</span> <span class="o">=</span> <span class="n">total_length</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">local_length_ceiled</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">total_length</span> <span class="o">/</span> <span class="n">comm_size</span><span class="p">)</span>
+            <span class="n">no_dummy</span> <span class="o">=</span> <span class="n">local_length_ceiled</span> <span class="o">*</span> <span class="n">comm_size</span> <span class="o">-</span> <span class="n">total_length</span>
+
+            <span class="n">chunks</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">local_length_ceiled</span><span class="p">,)</span> <span class="o">+</span> <span class="n">other_length</span><span class="p">,</span>
+                        <span class="n">dtype</span><span class="o">=</span><span class="n">my_data</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                        <span class="n">device</span><span class="o">=</span><span class="n">my_data</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">comm_size</span><span class="p">)</span>
+                <span class="p">]</span>
+                <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">==</span> <span class="mi">0</span>
+                <span class="k">else</span> <span class="p">[]</span>
+            <span class="p">)</span>
+
+            <span class="n">dist</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
+                <span class="n">tensor</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span>
+                    <span class="p">(</span>
+                        <span class="n">my_data</span><span class="p">,</span>
+                        <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+                            <span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">+</span> <span class="n">other_length</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">my_data</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">my_data</span><span class="o">.</span><span class="n">device</span>
+                        <span class="p">),</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">&lt;</span> <span class="n">no_dummy</span>
+                <span class="k">else</span> <span class="n">my_data</span><span class="p">,</span>
+                <span class="n">gather_list</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
+                <span class="n">dst</span><span class="o">=</span><span class="n">dst</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">comm_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">no_dummy</span><span class="p">):</span>
+                    <span class="n">chunks</span><span class="p">[</span><span class="n">r</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunks</span><span class="p">[</span><span class="n">r</span><span class="p">][:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>
+                <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">total_length</span>
+                <span class="n">tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">tensors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tensors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">tensors</span></div>
+
+
+
+<div class="viewcode-block" id="all_reduce">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.all_reduce">[docs]</a>
+<span class="k">def</span> <span class="nf">all_reduce</span><span class="p">(</span><span class="n">tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">dist</span><span class="o">.</span><span class="n">ReduceOp</span><span class="o">.</span><span class="n">SUM</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Equivalent to torch&#39;s all_reduce if tvo.get_run_policy() is &#39;mpi&#39;, no-op otherwise.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="broadcast">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.broadcast">[docs]</a>
+<span class="k">def</span> <span class="nf">broadcast</span><span class="p">(</span><span class="n">tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Equivalent to torch&#39;s broadcast if tvo.get_run_policy() is &#39;mpi&#39;, no-op otherwise.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">broadcast</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="barrier">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.barrier">[docs]</a>
+<span class="k">def</span> <span class="nf">barrier</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Equivalent to torch&#39;s dist.barrier if tvo.get_run_policy() is &#39;mpi&#39;, no-op otherwise.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="mpi_average_grads">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.mpi_average_grads">[docs]</a>
+<span class="k">def</span> <span class="nf">mpi_average_grads</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Average gradients across processes. See https://bit.ly/2FlJsxS.</span>
+
+<span class="sd">    :param theta: dictionary with torch.tensors storing TVO model parameters</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+        <span class="k">return</span>  <span class="c1"># nothing to do</span>
+
+    <span class="n">n_procs</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span>
+    <span class="n">parameters</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">theta</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">]</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">parameters</span><span class="p">:</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">grad</span><span class="p">)</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">grad</span> <span class="o">/=</span> <span class="n">n_procs</span></div>
+
+
+
+<div class="viewcode-block" id="get_h5_dataset_to_processes">
+<a class="viewcode-back" href="../../../tvo.utils.parallel.html#tvo.utils.parallel.get_h5_dataset_to_processes">[docs]</a>
+<span class="k">def</span> <span class="nf">get_h5_dataset_to_processes</span><span class="p">(</span><span class="n">fname</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">possible_keys</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return dataset with the first of `possible_keys` that is found in hdf5 file `fname`.&quot;&quot;&quot;</span>
+    <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="k">if</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="n">f</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">dataset</span> <span class="ow">in</span> <span class="n">possible_keys</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">dataset</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">break</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;File &quot;</span><span class="si">{</span><span class="n">fname</span><span class="si">}</span><span class="s1">&quot; does not contain any of keys </span><span class="si">{</span><span class="n">possible_keys</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="n">dataset</span><span class="p">][</span><span class="o">...</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">scatter_to_processes</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

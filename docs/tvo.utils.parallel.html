@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.utils.parallel &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="tvo.trainer" href="tvo.trainer.html" />
+    <link rel="prev" title="tvo.utils" href="tvo.utils.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">tvo.utils.parallel</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.all_reduce"><code class="docutils literal notranslate"><span class="pre">all_reduce()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.barrier"><code class="docutils literal notranslate"><span class="pre">barrier()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.bcast_dtype"><code class="docutils literal notranslate"><span class="pre">bcast_dtype()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.bcast_shape"><code class="docutils literal notranslate"><span class="pre">bcast_shape()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.broadcast"><code class="docutils literal notranslate"><span class="pre">broadcast()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.gather_from_processes"><code class="docutils literal notranslate"><span class="pre">gather_from_processes()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.get_h5_dataset_to_processes"><code class="docutils literal notranslate"><span class="pre">get_h5_dataset_to_processes()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.init_processes"><code class="docutils literal notranslate"><span class="pre">init_processes()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.mpi_average_grads"><code class="docutils literal notranslate"><span class="pre">mpi_average_grads()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.pprint"><code class="docutils literal notranslate"><span class="pre">pprint()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.parallel.scatter_to_processes"><code class="docutils literal notranslate"><span class="pre">scatter_to_processes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">tvo.utils.parallel</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/tvo.utils.parallel.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-tvo.utils.parallel">
+<span id="tvo-utils-parallel"></span><h1>tvo.utils.parallel<a class="headerlink" href="#module-tvo.utils.parallel" title="Link to this heading"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.all_reduce">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">all_reduce</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op=&lt;RedOpType.SUM:</span> <span class="pre">0&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#all_reduce"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.all_reduce" title="Link to this definition"></a></dt>
+<dd><p>Equivalent to torch’s all_reduce if tvo.get_run_policy() is ‘mpi’, no-op otherwise.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.barrier">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">barrier</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#barrier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.barrier" title="Link to this definition"></a></dt>
+<dd><p>Equivalent to torch’s dist.barrier if tvo.get_run_policy() is ‘mpi’, no-op otherwise.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.bcast_dtype">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">bcast_dtype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#bcast_dtype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.bcast_dtype" title="Link to this definition"></a></dt>
+<dd><p>Broadcast dtype of data on src rank.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor on src rank</p></li>
+<li><p><strong>src</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Source rank</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dtype on each rank</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.bcast_shape">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">bcast_shape</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#bcast_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.bcast_shape" title="Link to this definition"></a></dt>
+<dd><p>Broadcast shape of data on src rank.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor on src rank</p></li>
+<li><p><strong>src</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Source rank</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tensor with shape on each rank</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.broadcast">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">broadcast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#broadcast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.broadcast" title="Link to this definition"></a></dt>
+<dd><p>Equivalent to torch’s broadcast if tvo.get_run_policy() is ‘mpi’, no-op otherwise.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.gather_from_processes">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">gather_from_processes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">my_tensors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#gather_from_processes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.gather_from_processes" title="Link to this definition"></a></dt>
+<dd><p>Gather tensors from process group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>my_tensors</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – List of tensors to be gathered from local process on process dst.
+For each element tensor.shape[1:] must be identical on
+each process.</p></li>
+<li><p><strong>dst</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Rank of destination process to gather tensors.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Iterable</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of tensors gathered from process group.</p>
+</dd>
+</dl>
+<p>Only process with rank dst will contain gathered data.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.get_h5_dataset_to_processes">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">get_h5_dataset_to_processes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">possible_keys</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#get_h5_dataset_to_processes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.get_h5_dataset_to_processes" title="Link to this definition"></a></dt>
+<dd><p>Return dataset with the first of <cite>possible_keys</cite> that is found in hdf5 file <cite>fname</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.init_processes">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">init_processes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">multi_node</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#init_processes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.init_processes" title="Link to this definition"></a></dt>
+<dd><p>Initialize MPI process group using torch.distributed module.</p>
+<p>param multi_node: Deploy multiple computing nodes.</p>
+<p>Eventually updates the value of tvo.device.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.mpi_average_grads">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">mpi_average_grads</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#mpi_average_grads"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.mpi_average_grads" title="Link to this definition"></a></dt>
+<dd><p>Average gradients across processes. See <a class="reference external" href="https://bit.ly/2FlJsxS">https://bit.ly/2FlJsxS</a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>theta</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span>) – dictionary with torch.tensors storing TVO model parameters</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.pprint">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">pprint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'\\n'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#pprint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.pprint" title="Link to this definition"></a></dt>
+<dd><p>Print on root process of torch.distributed process group.</p>
+<p>param obj: Message to print
+param end: Suffix of message. Default is linebreak.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.parallel.scatter_to_processes">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.parallel.</span></span><span class="sig-name descname"><span class="pre">scatter_to_processes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">tensors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/parallel.html#scatter_to_processes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.parallel.scatter_to_processes" title="Link to this definition"></a></dt>
+<dd><p>Split tensors into chunks and scatter within process group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tensors</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor to be scattered. Chunks are cut along dimension 0.</p></li>
+<li><p><strong>src</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Source rank to scatter from.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterable</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tensor scattered to local rank.</p>
+</dd>
+</dl>
+<p>Tensor data is assumed to be None on all but the root processes.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tvo.utils.html" class="btn btn-neutral float-left" title="tvo.utils" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tvo.trainer.html" class="btn btn-neutral float-right" title="tvo.trainer" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

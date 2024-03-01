@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.models.tvae &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.models.tvae</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.models.tvae</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+<span class="kn">from</span> <span class="nn">tvo.utils.model_protocols</span> <span class="kn">import</span> <span class="n">Trainable</span><span class="p">,</span> <span class="n">Sampler</span><span class="p">,</span> <span class="n">Reconstructor</span>
+<span class="kn">from</span> <span class="nn">tvo.variational.TVOVariationalStates</span> <span class="kn">import</span> <span class="n">TVOVariationalStates</span>
+<span class="kn">from</span> <span class="nn">tvo.variational._utils</span> <span class="kn">import</span> <span class="n">mean_posterior</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.parallel</span> <span class="kn">import</span> <span class="n">all_reduce</span><span class="p">,</span> <span class="n">broadcast</span><span class="p">,</span> <span class="n">mpi_average_grads</span>
+<span class="kn">from</span> <span class="nn">tvo.utils</span> <span class="kn">import</span> <span class="n">get</span><span class="p">,</span> <span class="n">CyclicLR</span>
+<span class="kn">import</span> <span class="nn">torch.optim</span> <span class="k">as</span> <span class="nn">opt</span>
+<span class="kn">import</span> <span class="nn">tvo</span>
+<span class="kn">import</span> <span class="nn">torch</span> <span class="k">as</span> <span class="nn">to</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Callable</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">pi</span> <span class="k">as</span> <span class="n">MATH_PI</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">abstractmethod</span>
+
+
+<span class="k">def</span> <span class="nf">_get_net_shape</span><span class="p">(</span><span class="n">net_shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">W_init</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">net_shape</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">net_shape</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="n">W_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">),</span> <span class="s2">&quot;Must pass one of `net_shape` and `W_init` to __init__ of the</span><span class="se">\</span>
+<span class="s2">        TVAE model&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">W_init</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="n">W_init</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],)</span>
+
+
+<span class="k">def</span> <span class="nf">_init_W</span><span class="p">(</span>
+    <span class="n">net_shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return weights initialized with Xavier or to specified init values.</span>
+
+<span class="sd">    This method also makes sure that device and precision are the ones required by</span>
+<span class="sd">    the model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">n_layers</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">net_shape</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">W_shapes</span> <span class="o">=</span> <span class="p">((</span><span class="n">net_shape</span><span class="p">[</span><span class="n">ln</span><span class="p">],</span> <span class="n">net_shape</span><span class="p">[</span><span class="n">ln</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">ln</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_layers</span><span class="p">))</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">xavier_normal_</span><span class="p">,</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">W_shapes</span><span class="p">)))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">init</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">net_shape</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Shape is </span><span class="si">{</span><span class="n">net_shape</span><span class="si">}</span><span class="s2"> but </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">init</span><span class="p">)</span><span class="si">}</span><span class="s2"> weights passed&quot;</span>
+        <span class="n">Wshapes</span> <span class="o">=</span> <span class="p">[</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">init</span><span class="p">]</span>
+        <span class="n">expected_Wshapes</span> <span class="o">=</span> <span class="p">[(</span><span class="n">net_shape</span><span class="p">[</span><span class="n">ln</span><span class="p">],</span> <span class="n">net_shape</span><span class="p">[</span><span class="n">ln</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">ln</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">init</span><span class="p">))]</span>
+        <span class="n">err_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Input W shapes: </span><span class="si">{</span><span class="n">Wshapes</span><span class="si">}</span><span class="se">\n</span><span class="s2">Expected W shapes </span><span class="si">{</span><span class="n">expected_Wshapes</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">ws</span> <span class="o">==</span> <span class="n">exp_s</span> <span class="k">for</span> <span class="n">ws</span><span class="p">,</span> <span class="n">exp_s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">Wshapes</span><span class="p">,</span> <span class="n">expected_Wshapes</span><span class="p">)),</span> <span class="n">err_msg</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">init</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">W</span><span class="p">:</span>
+        <span class="n">broadcast</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">w</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">W</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">_init_b</span><span class="p">(</span>
+    <span class="n">net_shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return biases initialized to zeros or to specified init values.</span>
+
+<span class="sd">    This method also makes sure that device and precision are the ones required by the model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">net_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">b</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">net_shape</span><span class="p">[</span><span class="n">ln</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],)</span> <span class="k">for</span> <span class="n">ln</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">init</span><span class="p">))</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">init</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">B</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">_init_pi</span><span class="p">(</span>
+    <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">H0</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">requires_grad</span><span class="p">:</span> <span class="nb">bool</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">H0</span><span class="p">,),</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">H0</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">H0</span><span class="p">,)</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="n">init</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">pi</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="n">requires_grad</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_init_sigma2</span><span class="p">(</span><span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">requires_grad</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">sigma2</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.01</span><span class="p">]</span> <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[</span><span class="n">init</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">sigma2</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="n">requires_grad</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">_TVAE</span><span class="p">(</span><span class="n">Trainable</span><span class="p">,</span> <span class="n">Sampler</span><span class="p">,</span> <span class="n">Reconstructor</span><span class="p">):</span>
+    <span class="n">_theta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>
+    <span class="n">_precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="n">_net_shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">_scheduler</span><span class="p">:</span> <span class="n">opt</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">_LRScheduler</span>
+    <span class="n">_optimizer</span><span class="p">:</span> <span class="n">opt</span><span class="o">.</span><span class="n">Optimizer</span>
+    <span class="n">_activation</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">_external_model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">log_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">lpj</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span> <span class="nf">_log_pseudo_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">lpj</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lpj_and_mlpout</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lpj</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">_lpj_and_mlpout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span> <span class="nf">free_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">batch</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">free_energy</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">batch</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_free_energy_from_logjoints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logjoints</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">Fn</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">logjoints</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">Fn</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">logjoints</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],)</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">Fn</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">Fn</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">Fn</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">update_param_batch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">batch</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;There are NaNs in this batch&quot;</span><span class="p">)</span>
+        <span class="n">F</span><span class="p">,</span> <span class="n">mlp_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_optimize_nn_params</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">batch</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_accumulate_param_updates</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">batch</span><span class="p">,</span> <span class="n">states</span><span class="p">,</span> <span class="n">mlp_out</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">F</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shape of TVAE model as a bayes net: (D, H0)</span>
+
+<span class="sd">        Neural network shape is ignored.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">net_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Full TVAE network shape (D, Hn, Hn-1, ..., H0).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_optimize_nn_params</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gradient-based optimized parameters are changed in-place. All other arguments are left</span>
+<span class="sd">        untouched.</span>
+
+<span class="sd">        :returns: F and mlp_output _before_ the weight update</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># to make mypy happy</span>
+
+        <span class="n">lpj</span><span class="p">,</span> <span class="n">mlp_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lpj_and_mlpout</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+        <span class="n">F</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_free_energy_from_logjoints</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_joint</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">lpj</span><span class="p">))</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="o">-</span><span class="n">F</span> <span class="o">/</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+
+        <span class="n">mpi_average_grads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">mlp_out</span>
+
+    <span class="k">def</span> <span class="nf">_accumulate_param_updates</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">,</span> <span class="n">mlp_out</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">data_estimator</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">batch</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>  <span class="c1"># type: ignore</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :math:`\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}`  # noqa</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">means</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">K</span><span class="p">)</span>  <span class="c1"># N,S,D</span>
+
+        <span class="k">return</span> <span class="n">mean_posterior</span><span class="p">(</span><span class="n">means</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span>  <span class="c1"># N, D</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward application of TVAE&#39;s MLP to the specified input.&quot;&quot;&quot;</span>
+        <span class="o">...</span>
+
+
+<div class="viewcode-block" id="GaussianTVAE">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.GaussianTVAE">[docs]</a>
+<span class="k">class</span> <span class="nc">GaussianTVAE</span><span class="p">(</span><span class="n">_TVAE</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="n">min_lr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">max_lr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
+        <span class="n">cycliclr_step_size_up</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+        <span class="n">pi_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">W_init</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">b_init</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">sigma2_init</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">analytical_sigma_updates</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">analytical_pi_updates</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">clamp_sigma_updates</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">activation</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">external_model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">opt</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a TVAE model with Gaussian observables.</span>
+
+<span class="sd">        :param shape: Network shape, from observable to most hidden: (D,...,H1,H0). One of shape,</span>
+<span class="sd">                      (W_init, b_init), external_model must be specified exclusively.</span>
+<span class="sd">        :param precision: One of to.float32 or to.float64, indicates the floating point precision</span>
+<span class="sd">                          of model parameters.</span>
+<span class="sd">        :param min_lr: See docs of tvo.utils.CyclicLR</span>
+<span class="sd">        :param max_lr: See docs of tvo.utils.CyclicLR</span>
+<span class="sd">        :param cycliclr_step_size_up: See docs of tvo.utils.CyclicLR</span>
+<span class="sd">        :param pi_init: Optional tensor with initial prior values</span>
+<span class="sd">        :param W_init: Optional list of tensors with initial weight values. Weight matrices</span>
+<span class="sd">                       must be ordered from most hidden to observable layer. One of shape,</span>
+<span class="sd">                       (W_init, b_init), external_model must be specified exclusively.</span>
+<span class="sd">        :param b_init: Optional list of tensors with initial bias. One of shape,</span>
+<span class="sd">                       (W_init, b_init), external_model must be specified exclusively.</span>
+<span class="sd">        :param sigma2_init: Optional initial value for model variance.</span>
+<span class="sd">        :param analytical_sigma_updates: Whether sigmas should be updated via the analytical</span>
+<span class="sd">                                         max-likelihood solution rather than gradient descent.</span>
+<span class="sd">        :param analytical_pi_updates: Whether priors should be updated via the analytical</span>
+<span class="sd">                                      max-likelihood solution rather than gradient descent.</span>
+<span class="sd">        :param clamp_sigma_updates: Whether to limit the rate at which sigma can be updated.</span>
+<span class="sd">        :param activation: Decoder activation function used if external_model is not specified.</span>
+<span class="sd">                           Defaults to ReLU if not specified and external_model not used.</span>
+<span class="sd">        :param external_model: Optional decoder neural network. One of shape, (W_init, b_init),</span>
+<span class="sd">                               external_model must be specified exclusively.</span>
+<span class="sd">        :param optimizer: Gradient optimizer (defaults to Adam if not specified)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clamp_sigma</span> <span class="o">=</span> <span class="n">clamp_sigma_updates</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span> <span class="o">=</span> <span class="n">precision</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span> <span class="o">=</span> <span class="n">activation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span> <span class="o">=</span> <span class="n">external_model</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">shape</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">b_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">shape</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">b_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="p">)</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">shape</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">b_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="p">),</span> <span class="s2">&quot;Must exclusively specify one one `shape`, (`W_init`, `b_init`), `external_model`&quot;</span>
+
+        <span class="k">if</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span>
+                <span class="n">external_model</span><span class="p">,</span> <span class="s2">&quot;H0&quot;</span>
+            <span class="p">),</span> <span class="s2">&quot;for externally defined models, H0 has to be provided manually&quot;</span>
+            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span>
+                <span class="n">external_model</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span>
+            <span class="p">),</span> <span class="s2">&quot;for externally defined models, shape has to be provided manually&quot;</span>
+            <span class="k">assert</span> <span class="n">activation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Must specify activation as part of external_model&quot;</span>
+            <span class="n">H0</span> <span class="o">=</span> <span class="n">external_model</span><span class="o">.</span><span class="n">H0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span> <span class="o">=</span> <span class="n">external_model</span><span class="o">.</span><span class="n">shape</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">gd_parameters</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">external_model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span> <span class="o">=</span> <span class="n">_get_net_shape</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">W_init</span><span class="p">)</span>
+            <span class="n">H0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">=</span> <span class="n">_init_W</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">,</span> <span class="n">precision</span><span class="p">,</span> <span class="n">W_init</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="n">_init_b</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">,</span> <span class="n">precision</span><span class="p">,</span> <span class="n">b_init</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="sa">f</span><span class="s2">&quot;W_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">W</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">W</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">)})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="sa">f</span><span class="s2">&quot;b_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">b</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">)})</span>
+            <span class="n">gd_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span> <span class="k">if</span> <span class="n">activation</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">activation</span>
+            <span class="k">assert</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_init_pi</span><span class="p">(</span>
+            <span class="n">precision</span><span class="p">,</span> <span class="n">pi_init</span><span class="p">,</span> <span class="n">H0</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="ow">not</span> <span class="n">analytical_pi_updates</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_init_sigma2</span><span class="p">(</span>
+            <span class="n">precision</span><span class="p">,</span> <span class="n">sigma2_init</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="ow">not</span> <span class="n">analytical_sigma_updates</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_min_lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_step_size_up</span> <span class="o">=</span> <span class="n">min_lr</span><span class="p">,</span> <span class="n">max_lr</span><span class="p">,</span> <span class="n">cycliclr_step_size_up</span>
+
+        <span class="k">if</span> <span class="n">analytical_sigma_updates</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_sigma2</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_analytical_sigma_updates</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">gd_parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_analytical_sigma_updates</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">analytical_pi_updates</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">H0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_analytical_pi_updates</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">gd_parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_analytical_pi_updates</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">optimizer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">gd_parameters</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">min_lr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="o">=</span> <span class="n">optimizer</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span> <span class="o">=</span> <span class="n">CyclicLR</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span><span class="p">,</span>
+            <span class="n">base_lr</span><span class="o">=</span><span class="n">min_lr</span><span class="p">,</span>
+            <span class="n">max_lr</span><span class="o">=</span><span class="n">max_lr</span><span class="p">,</span>
+            <span class="n">step_size_up</span><span class="o">=</span><span class="n">cycliclr_step_size_up</span><span class="p">,</span>
+            <span class="n">cycle_momentum</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># number of datapoints processed in a training epoch</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">net_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">,</span>
+            <span class="n">activation</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">,</span>
+            <span class="n">external_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span><span class="p">,</span>
+            <span class="n">precision</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span>
+            <span class="n">min_lr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_min_lr</span><span class="p">,</span>
+            <span class="n">max_lr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_max_lr</span><span class="p">,</span>
+            <span class="n">step_size_up</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_size_up</span><span class="p">,</span>
+            <span class="n">analytical_sigma_updates</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_analytical_sigma_updates</span><span class="p">,</span>
+            <span class="n">analytical_pi_updates</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_analytical_pi_updates</span><span class="p">,</span>
+            <span class="n">clamp_sigma_updates</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clamp_sigma</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_lpj_and_mlpout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">N</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">N_</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">assert</span> <span class="n">N</span> <span class="o">==</span> <span class="n">N_</span><span class="p">,</span> <span class="s2">&quot;Shape mismatch between data and states&quot;</span>
+        <span class="n">pi</span><span class="p">,</span> <span class="n">sigma2</span> <span class="o">=</span> <span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="s2">&quot;pies&quot;</span><span class="p">,</span> <span class="s2">&quot;sigma2&quot;</span><span class="p">)</span>
+        <span class="n">states</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+
+        <span class="n">mlp_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">states</span><span class="p">)</span>  <span class="c1"># (N, S, D)</span>
+
+        <span class="c1"># nansum used to automatically ignore missing data</span>
+        <span class="n">s1</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">nansum</span><span class="p">((</span><span class="n">data</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">mlp_out</span><span class="p">)</span><span class="o">.</span><span class="n">pow_</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">div_</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">sigma2</span><span class="p">)</span>  <span class="c1"># (N, S)</span>
+        <span class="n">s2</span> <span class="o">=</span> <span class="n">states</span> <span class="o">@</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pi</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">pi</span><span class="p">))</span>  <span class="c1"># (N, S)</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">s2</span> <span class="o">-</span> <span class="n">s1</span>
+        <span class="k">assert</span> <span class="n">lpj</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">S</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">lpj</span><span class="p">,</span> <span class="n">mlp_out</span>
+
+<div class="viewcode-block" id="GaussianTVAE.log_joint">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.GaussianTVAE.log_joint">[docs]</a>
+    <span class="k">def</span> <span class="nf">log_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">,</span> <span class="n">lpj</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">pi</span><span class="p">,</span> <span class="n">sigma2</span> <span class="o">=</span> <span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">,</span> <span class="s2">&quot;pies&quot;</span><span class="p">,</span> <span class="s2">&quot;sigma2&quot;</span><span class="p">)</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N,): ignores missing data</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">D</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N, 1)</span>
+        <span class="k">if</span> <span class="n">lpj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">lpj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_pseudo_joint</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="c1"># TODO: could pre-evaluate the constant factor once per epoch</span>
+        <span class="n">logjoints</span> <span class="o">=</span> <span class="n">lpj</span> <span class="o">-</span> <span class="n">D</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">MATH_PI</span> <span class="o">*</span> <span class="n">sigma2</span><span class="p">)</span> <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">pi</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">logjoints</span></div>
+
+
+<div class="viewcode-block" id="GaussianTVAE.update_param_epoch">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.GaussianTVAE.update_param_epoch">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_param_epoch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+        <span class="n">sigma2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+                        <span class="n">broadcast</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pi</span><span class="o">.</span><span class="n">requires_grad</span> <span class="ow">and</span> <span class="n">sigma2</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="k">return</span>  <span class="c1"># nothing to do</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">D</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="p">)</span>
+            <span class="n">N</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pi</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span><span class="p">)</span>
+            <span class="n">pi</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span> <span class="o">/</span> <span class="n">N</span>
+            <span class="c1"># avoids infinites in lpj evaluation</span>
+            <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">pi</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">pi</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span><span class="o">.</span><span class="n">zero_</span><span class="p">()</span>
+
+        <span class="c1"># FIXME in case of missing data there is a correction that should be applied here</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sigma2</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_new_sigma2</span><span class="p">)</span>
+            <span class="c1"># disallow arbitrary growth of sigma. at each iteration, it can grow by at most 1%</span>
+            <span class="n">new_sigma_min</span> <span class="o">=</span> <span class="p">(</span><span class="n">sigma2</span> <span class="o">-</span> <span class="n">sigma2</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span> <span class="o">*</span> <span class="mf">0.01</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">new_sigma_max</span> <span class="o">=</span> <span class="p">(</span><span class="n">sigma2</span> <span class="o">+</span> <span class="n">sigma2</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span> <span class="o">*</span> <span class="mf">0.01</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">sigma2</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_new_sigma2</span> <span class="o">/</span> <span class="p">(</span><span class="n">N</span> <span class="o">*</span> <span class="n">D</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clamp_sigma</span><span class="p">:</span>
+                <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">sigma2</span><span class="p">,</span> <span class="n">new_sigma_min</span><span class="p">,</span> <span class="n">new_sigma_max</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">sigma2</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_sigma2</span><span class="o">.</span><span class="n">zero_</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="GaussianTVAE.generate_data">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.GaussianTVAE.generate_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+        <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">hidden_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+            <span class="n">hidden_state</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pies</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">pies</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">pies</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">N</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">shape</span> <span class="o">=</span> <span class="n">hidden_state</span><span class="o">.</span><span class="n">shape</span>
+                <span class="k">assert</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;hidden_state has shape </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">, expected (</span><span class="si">{</span><span class="n">N</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">H</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">mlp_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">hidden_state</span><span class="p">)</span>
+        <span class="n">Y</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">mlp_out</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]))</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">)</span> <span class="k">if</span> <span class="n">must_return_hidden_state</span> <span class="k">else</span> <span class="n">Y</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_optimize_nn_params</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">F</span><span class="p">,</span> <span class="n">mlp_out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_optimize_nn_params</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">sigma2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">sigma2</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+                <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">sigma2</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">sigma2</span><span class="p">)</span>
+            <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">pi</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+                <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">pi</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">pi</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">F</span><span class="p">,</span> <span class="n">mlp_out</span>
+
+    <span class="k">def</span> <span class="nf">_accumulate_param_updates</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">,</span> <span class="n">mlp_out</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate partial updates to pi and sigma2.&quot;&quot;&quot;</span>
+        <span class="n">K_batch</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="c1"># \pi_h = \frac{1}{N} \sum_n &lt; K_nsh &gt;_{q^n}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">mean_posterior</span><span class="p">(</span><span class="n">K_batch</span><span class="p">,</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="c1"># \sigma2 = \frac{1}{DN} \sum_{n,d} &lt; (y^n_d - \vec{a}^L_d)^2 &gt;_{q^n}</span>
+            <span class="c1"># TODO would it be better (faster or more numerically stable) to</span>
+            <span class="c1"># sum over D _before_ taking the mean_posterior?</span>
+            <span class="n">y_minus_a_sqr</span> <span class="o">=</span> <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">mlp_out</span><span class="p">)</span><span class="o">.</span><span class="n">pow_</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># (N, S, D)</span>
+            <span class="k">assert</span> <span class="n">y_minus_a_sqr</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">idx</span><span class="o">.</span><span class="n">numel</span><span class="p">(),</span> <span class="n">K_batch</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_sigma2</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">mean_posterior</span><span class="p">(</span><span class="n">y_minus_a_sqr</span><span class="p">,</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+<div class="viewcode-block" id="GaussianTVAE.forward">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.GaussianTVAE.forward">[docs]</a>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward application of TVAE&#39;s MLP to the specified input.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;Incompatible shape in forward input&quot;</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">output</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">,</span> <span class="n">Sequence</span>
+            <span class="p">)</span>  <span class="c1"># to make mypy happy</span>
+            <span class="k">assert</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">)</span>  <span class="c1"># to make mypy happy</span>
+
+            <span class="c1"># middle layers (relu)</span>
+            <span class="k">for</span> <span class="n">W</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="c1"># output = self._activation(output @ W + b)</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">(</span><span class="n">output</span> <span class="o">@</span> <span class="n">W</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span>
+
+            <span class="c1"># output layer (linear)</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">output</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">output</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="BernoulliTVAE">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.BernoulliTVAE">[docs]</a>
+<span class="k">class</span> <span class="nc">BernoulliTVAE</span><span class="p">(</span><span class="n">_TVAE</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="n">min_lr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">max_lr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
+        <span class="n">cycliclr_step_size_up</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+        <span class="n">pi_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">W_init</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">b_init</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">analytical_pi_updates</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">activation</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">external_model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">opt</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a TVAE model with Bernoulli observables.</span>
+
+<span class="sd">        :param shape: Network shape, from observable to most hidden: (D,...,H1,H0).</span>
+<span class="sd">                      Can be None if W_init is not None.</span>
+<span class="sd">        :param precision: One of to.float32 or to.float64, indicates the floating point precision</span>
+<span class="sd">                          of model parameters.</span>
+<span class="sd">        :param min_lr: See docs of tvo.utils.CyclicLR</span>
+<span class="sd">        :param max_lr: See docs of tvo.utils.CyclicLR</span>
+<span class="sd">        :param cycliclr_step_size_up: See docs of tvo.utils.CyclicLR</span>
+<span class="sd">        :param pi_init: Optional tensor with initial prior values</span>
+<span class="sd">        :param W_init: Optional list of tensors with initial weight values. Weight matrices</span>
+<span class="sd">                       must be ordered from most hidden to observable layer. If this parameter</span>
+<span class="sd">                       is not None, the shape parameter can be omitted.</span>
+<span class="sd">        :param b_init: Optional list of tensors with initial.</span>
+<span class="sd">        :param analytical_pi_updates: Whether priors should be updated via the analytical</span>
+<span class="sd">                                      max-likelihood solution rather than gradient descent.</span>
+<span class="sd">        :param activation: Decoder activation function used if external_model is not specified.</span>
+<span class="sd">                           Defaults to ReLU if not specified and external_model not used.</span>
+<span class="sd">        :param external_model: Optional decoder neural network. One of shape, (W_init, b_init),</span>
+<span class="sd">                               external_model must be specified exclusively.</span>
+<span class="sd">        :param optimizer: Gradient optimizer (defaults to Adam if not specified)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span> <span class="o">=</span> <span class="n">precision</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span> <span class="o">=</span> <span class="n">activation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span> <span class="o">=</span> <span class="n">external_model</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">shape</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">b_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">shape</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">b_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="p">)</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">shape</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">b_init</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="p">),</span> <span class="s2">&quot;Must exclusively specify one one `shape`, (`W_init`, `b_init`), `external_model`&quot;</span>
+
+        <span class="k">if</span> <span class="n">external_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span>
+                <span class="n">external_model</span><span class="p">,</span> <span class="s2">&quot;H0&quot;</span>
+            <span class="p">),</span> <span class="s2">&quot;for externally defined models, H0 has to be provided manually&quot;</span>
+            <span class="k">assert</span> <span class="nb">hasattr</span><span class="p">(</span>
+                <span class="n">external_model</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span>
+            <span class="p">),</span> <span class="s2">&quot;for externally defined models, shape has to be provided manually&quot;</span>
+            <span class="k">assert</span> <span class="n">activation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Must specify activation as part of external_model&quot;</span>
+            <span class="n">H0</span> <span class="o">=</span> <span class="n">external_model</span><span class="o">.</span><span class="n">H0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span> <span class="o">=</span> <span class="n">external_model</span><span class="o">.</span><span class="n">shape</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">gd_parameters</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">external_model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span> <span class="o">=</span> <span class="n">_get_net_shape</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">W_init</span><span class="p">)</span>
+            <span class="n">H0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">=</span> <span class="n">_init_W</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">,</span> <span class="n">precision</span><span class="p">,</span> <span class="n">W_init</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="n">_init_b</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">,</span> <span class="n">precision</span><span class="p">,</span> <span class="n">b_init</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="sa">f</span><span class="s2">&quot;W_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">W</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">W</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">)})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="sa">f</span><span class="s2">&quot;b_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">b</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">)})</span>
+            <span class="n">gd_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">W</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span> <span class="k">if</span> <span class="n">activation</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">activation</span>
+            <span class="k">assert</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_init_pi</span><span class="p">(</span>
+            <span class="n">precision</span><span class="p">,</span> <span class="n">pi_init</span><span class="p">,</span> <span class="n">H0</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="ow">not</span> <span class="n">analytical_pi_updates</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_min_lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_max_lr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_step_size_up</span> <span class="o">=</span> <span class="n">min_lr</span><span class="p">,</span> <span class="n">max_lr</span><span class="p">,</span> <span class="n">cycliclr_step_size_up</span>
+
+        <span class="k">if</span> <span class="n">analytical_pi_updates</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">H0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_analytical_pi_updates</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">gd_parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_analytical_pi_updates</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">optimizer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">gd_parameters</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">min_lr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span> <span class="o">=</span> <span class="n">optimizer</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span> <span class="o">=</span> <span class="n">CyclicLR</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer</span><span class="p">,</span>
+            <span class="n">base_lr</span><span class="o">=</span><span class="n">min_lr</span><span class="p">,</span>
+            <span class="n">max_lr</span><span class="o">=</span><span class="n">max_lr</span><span class="p">,</span>
+            <span class="n">step_size_up</span><span class="o">=</span><span class="n">cycliclr_step_size_up</span><span class="p">,</span>
+            <span class="n">cycle_momentum</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># number of datapoints processed in a training epoch</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">net_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">,</span>
+            <span class="n">activation</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">,</span>
+            <span class="n">external_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span><span class="p">,</span>
+            <span class="n">precision</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span>
+            <span class="n">min_lr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_min_lr</span><span class="p">,</span>
+            <span class="n">max_lr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_max_lr</span><span class="p">,</span>
+            <span class="n">step_size_up</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_step_size_up</span><span class="p">,</span>
+            <span class="n">analytical_pi_updates</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_analytical_pi_updates</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_lpj_and_mlpout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">N</span><span class="p">,</span> <span class="n">D</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">N_</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">assert</span> <span class="n">N</span> <span class="o">==</span> <span class="n">N_</span><span class="p">,</span> <span class="s2">&quot;Shape mismatch between data and states&quot;</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+        <span class="n">states</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+
+        <span class="n">mlp_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">states</span><span class="p">)</span>  <span class="c1"># (N, S, D)</span>
+
+        <span class="c1"># nansum used to automatically ignore missing data</span>
+        <span class="n">s1</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">nansum</span><span class="p">(</span>
+            <span class="n">to</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">binary_cross_entropy</span><span class="p">(</span>
+                <span class="n">mlp_out</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">D</span><span class="p">),</span> <span class="n">reduction</span><span class="o">=</span><span class="s2">&quot;none&quot;</span>
+            <span class="p">),</span>
+            <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>  <span class="c1"># (N, S)</span>
+        <span class="n">s2</span> <span class="o">=</span> <span class="n">states</span> <span class="o">@</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pi</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">pi</span><span class="p">))</span>  <span class="c1"># (N, S)</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">s2</span> <span class="o">-</span> <span class="n">s1</span>
+        <span class="k">assert</span> <span class="n">lpj</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">S</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">lpj</span><span class="p">,</span> <span class="n">mlp_out</span>
+
+<div class="viewcode-block" id="BernoulliTVAE.log_joint">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.BernoulliTVAE.log_joint">[docs]</a>
+    <span class="k">def</span> <span class="nf">log_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">,</span> <span class="n">lpj</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N,): ignores missing data</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">D</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N, 1)</span>
+        <span class="k">if</span> <span class="n">lpj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">lpj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_pseudo_joint</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="c1"># TODO: could pre-evaluate the constant factor once per epoch</span>
+        <span class="n">logjoints</span> <span class="o">=</span> <span class="n">lpj</span> <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">logjoints</span></div>
+
+
+<div class="viewcode-block" id="BernoulliTVAE.update_param_epoch">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.BernoulliTVAE.update_param_epoch">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_param_epoch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+                        <span class="n">broadcast</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pi</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="k">return</span>  <span class="c1"># nothing to do</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="p">)</span>
+            <span class="n">N</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span><span class="p">)</span>
+            <span class="n">pi</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span> <span class="o">/</span> <span class="n">N</span>
+            <span class="c1"># avoids infinites in lpj evaluation</span>
+            <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">pi</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">pi</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span><span class="o">.</span><span class="n">zero_</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="BernoulliTVAE.generate_data">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.BernoulliTVAE.generate_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+        <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">hidden_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+            <span class="n">hidden_state</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pies</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">pies</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">pies</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">N</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">shape</span> <span class="o">=</span> <span class="n">hidden_state</span><span class="o">.</span><span class="n">shape</span>
+                <span class="k">assert</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;hidden_state has shape </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">, expected (</span><span class="si">{</span><span class="n">N</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">H</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">mlp_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">hidden_state</span><span class="p">)</span>
+        <span class="n">Y</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">Bernoulli</span><span class="p">(</span><span class="n">mlp_out</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">)</span> <span class="k">if</span> <span class="n">must_return_hidden_state</span> <span class="k">else</span> <span class="n">Y</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_optimize_nn_params</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">F</span><span class="p">,</span> <span class="n">mlp_out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_optimize_nn_params</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">to</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">pi</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+                <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">pi</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">pi</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">F</span><span class="p">,</span> <span class="n">mlp_out</span>
+
+    <span class="k">def</span> <span class="nf">_accumulate_param_updates</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">,</span> <span class="n">mlp_out</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate partial updates to pi.&quot;&quot;&quot;</span>
+        <span class="n">K_batch</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
+            <span class="c1"># \pi_h = \frac{1}{N} \sum_n &lt; K_nsh &gt;_{q^n}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_new_pi</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">mean_posterior</span><span class="p">(</span><span class="n">K_batch</span><span class="p">,</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+<div class="viewcode-block" id="BernoulliTVAE.forward">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.BernoulliTVAE.forward">[docs]</a>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward application of TVAE&#39;s MLP to the specified input.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;Incompatible shape in forward input&quot;</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_external_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">output</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">,</span> <span class="n">Sequence</span>
+            <span class="p">)</span>  <span class="c1"># to make mypy happy</span>
+            <span class="k">assert</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">)</span>  <span class="c1"># to make mypy happy</span>
+
+            <span class="c1"># middle layers (relu)</span>
+            <span class="k">for</span> <span class="n">W</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_activation</span><span class="p">(</span><span class="n">output</span> <span class="o">@</span> <span class="n">W</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span>
+
+            <span class="c1"># output layer (sigmoid)</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">output</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">output</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

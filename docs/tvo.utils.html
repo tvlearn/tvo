@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.utils &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="tvo.utils.parallel" href="tvo.utils.parallel.html" />
+    <link rel="prev" title="tvo.variational" href="tvo.variational.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">tvo.utils</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.CyclicLR"><code class="docutils literal notranslate"><span class="pre">CyclicLR</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.utils.CyclicLR.get_lr"><code class="docutils literal notranslate"><span class="pre">CyclicLR.get_lr()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.generate_bars"><code class="docutils literal notranslate"><span class="pre">generate_bars()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.utils.get"><code class="docutils literal notranslate"><span class="pre">get()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">tvo.utils</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/tvo.utils.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-tvo.utils">
+<span id="tvo-utils"></span><h1>tvo.utils<a class="headerlink" href="#module-tvo.utils" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.utils.CyclicLR">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.utils.</span></span><span class="sig-name descname"><span class="pre">CyclicLR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_lr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_lr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_size_up</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_size_down</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'triangular'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gamma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_fn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cycle'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycle_momentum</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_momentum</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_momentum</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_epoch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/CyclicLR.html#CyclicLR"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.CyclicLR" title="Link to this definition"></a></dt>
+<dd><p>Sets the learning rate of each parameter group according to
+cyclical learning rate policy (CLR). The policy cycles the learning
+rate between two boundaries with a constant frequency, as detailed in
+the paper <a class="reference external" href="https://arxiv.org/abs/1506.01186">Cyclical Learning Rates for Training Neural Networks</a>.
+The distance between the two boundaries can be scaled on a per-iteration
+or per-cycle basis.
+Cyclical learning rate policy changes the learning rate after every batch.
+<cite>step</cite> should be called after a batch has been used for training.
+This class has three built-in policies, as put forth in the paper:
+“triangular”:</p>
+<blockquote>
+<div><p>A basic triangular cycle w/ no amplitude scaling.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>“triangular2”:</dt><dd><p>A basic triangular cycle that scales initial amplitude by half each cycle.</p>
+</dd>
+<dt>“exp_range”:</dt><dd><p>A cycle that scales initial amplitude by gamma**(cycle iterations) at each
+cycle iteration.</p>
+</dd>
+</dl>
+<p>This implementation was adapted from the github repo: <a class="reference external" href="https://github.com/bckenstler/CLR">bckenstler/CLR</a>
+Args:</p>
+<blockquote>
+<div><p>optimizer (Optimizer): Wrapped optimizer.
+base_lr (float or list): Initial learning rate which is the</p>
+<blockquote>
+<div><p>lower boundary in the cycle for each parameter group.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>max_lr (float or list): Upper learning rate boundaries in the cycle</dt><dd><p>for each parameter group. Functionally,
+it defines the cycle amplitude (max_lr - base_lr).
+The lr at any cycle is the sum of base_lr
+and some scaling of the amplitude; therefore
+max_lr may not actually be reached depending on
+scaling function.</p>
+</dd>
+<dt>step_size_up (int): Number of training iterations in the</dt><dd><p>increasing half of a cycle. Default: 2000</p>
+</dd>
+<dt>step_size_down (int): Number of training iterations in the</dt><dd><p>decreasing half of a cycle. If step_size_down is None,
+it is set to step_size_up. Default: None</p>
+</dd>
+<dt>mode (str): One of {triangular, triangular2, exp_range}.</dt><dd><p>Values correspond to policies detailed above.
+If scale_fn is not None, this argument is ignored.
+Default: ‘triangular’</p>
+</dd>
+<dt>gamma (float): Constant in ‘exp_range’ scaling function:</dt><dd><p>gamma**(cycle iterations)
+Default: 1.0</p>
+</dd>
+<dt>scale_fn (function): Custom scaling policy defined by a single</dt><dd><p>argument lambda function, where
+0 &lt;= scale_fn(x) &lt;= 1 for all x &gt;= 0.
+If specified, then ‘mode’ is ignored.
+Default: None</p>
+</dd>
+<dt>scale_mode (str): {‘cycle’, ‘iterations’}.</dt><dd><p>Defines whether scale_fn is evaluated on
+cycle number or cycle iterations (training
+iterations since start of cycle).
+Default: ‘cycle’</p>
+</dd>
+<dt>cycle_momentum (bool): If <code class="docutils literal notranslate"><span class="pre">True</span></code>, momentum is cycled inversely</dt><dd><p>to learning rate between ‘base_momentum’ and ‘max_momentum’.
+Default: True</p>
+</dd>
+<dt>base_momentum (float or list): Lower momentum boundaries in the cycle</dt><dd><p>for each parameter group. Note that momentum is cycled inversely
+to learning rate; at the peak of a cycle, momentum is
+‘base_momentum’ and learning rate is ‘max_lr’.
+Default: 0.8</p>
+</dd>
+<dt>max_momentum (float or list): Upper momentum boundaries in the cycle</dt><dd><p>for each parameter group. Functionally,
+it defines the cycle amplitude (max_momentum - base_momentum).
+The momentum at any cycle is the difference of max_momentum
+and some scaling of the amplitude; therefore
+base_momentum may not actually be reached depending on
+scaling function. Note that momentum is cycled inversely
+to learning rate; at the start of a cycle, momentum is ‘max_momentum’
+and learning rate is ‘base_lr’
+Default: 0.9</p>
+</dd>
+<dt>last_epoch (int): The index of the last batch. This parameter is used when</dt><dd><p>resuming a training job. Since <cite>step()</cite> should be invoked after each
+batch instead of after each epoch, this number represents the total
+number of <em>batches</em> computed, not the total number of epochs computed.
+When last_epoch=-1, the schedule is started from the beginning.
+Default: -1</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl>
+<dt>Example:</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scheduler</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">CyclicLR</span><span class="p">(</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">base_lr</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">max_lr</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data_loader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">data_loader</span><span class="p">:</span>
+<span class="gp">&gt;&gt;&gt; </span>        <span class="n">train_batch</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span>        <span class="n">scheduler</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.utils.CyclicLR.get_lr">
+<span class="sig-name descname"><span class="pre">get_lr</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/CyclicLR.html#CyclicLR.get_lr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.CyclicLR.get_lr" title="Link to this definition"></a></dt>
+<dd><p>Calculates the learning rate at batch index. This function treats
+<cite>self.last_epoch</cite> as the last batch index.
+If <cite>self.cycle_momentum</cite> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, this function has a side effect of
+updating the optimizer’s momentum.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.generate_bars">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.</span></span><span class="sig-name descname"><span class="pre">generate_bars</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bar_amp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">neg_amp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bg_amp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_unit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/gen.html#generate_bars"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.generate_bars" title="Link to this definition"></a></dt>
+<dd><p>Generate a ground-truth dictionary W suitable for a std. bars test</p>
+<p>Creates H bases vectors with horizontal and vertival bars on a R*R pixel grid,
+(wth R = H // 2).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of latent variables</p></li>
+<li><p><strong>bar_amp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – Amplitude of each bar</p></li>
+<li><p><strong>neg_amp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Set probability of amplitudes taking negative values to 50 percent</p></li>
+<li><p><strong>bg_amp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – Background amplitude</p></li>
+<li><p><strong>add_unit</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – If not None an additional unit with amplitude add_unit will be inserted</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – torch.dtype of the returned tensor</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>tensor containing the bars dictionary</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="tvo.utils.get">
+<span class="sig-prename descclassname"><span class="pre">tvo.utils.</span></span><span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">d</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">keys</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/utils/_utils.html#get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.utils.get" title="Link to this definition"></a></dt>
+<dd><p>Shorthand to retrieve valus at specified keys from dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>d</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>]</span>) – input dictionary</p></li>
+<li><p><strong>keys</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></span>) – a list of keys for dictionary d</p></li>
+</ul>
+</dd>
+</dl>
+<p>Example usage:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">val1</span><span class="p">,</span> <span class="n">val2</span> <span class="o">=</span> <span class="n">get</span><span class="p">(</span><span class="n">my_dict</span><span class="p">,</span> <span class="s1">&#39;key1&#39;</span><span class="p">,</span> <span class="s1">&#39;key2&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tvo.variational.html" class="btn btn-neutral float-left" title="tvo.variational" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tvo.utils.parallel.html" class="btn btn-neutral float-right" title="tvo.utils.parallel" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

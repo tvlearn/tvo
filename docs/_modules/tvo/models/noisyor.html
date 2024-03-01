@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.models.noisyor &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.models.noisyor</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.models.noisyor</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+
+<span class="kn">from</span> <span class="nn">tvo.utils.model_protocols</span> <span class="kn">import</span> <span class="n">Optimized</span><span class="p">,</span> <span class="n">Sampler</span>
+<span class="kn">from</span> <span class="nn">tvo.variational</span> <span class="kn">import</span> <span class="n">TVOVariationalStates</span>  <span class="c1"># type: ignore</span>
+<span class="kn">from</span> <span class="nn">tvo.variational._utils</span> <span class="kn">import</span> <span class="n">mean_posterior</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.parallel</span> <span class="kn">import</span> <span class="n">all_reduce</span><span class="p">,</span> <span class="n">broadcast</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">import</span> <span class="nn">torch</span> <span class="k">as</span> <span class="nn">to</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">import</span> <span class="nn">tvo</span>
+
+
+<div class="viewcode-block" id="NoisyOR">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.NoisyOR">[docs]</a>
+<span class="k">class</span> <span class="nc">NoisyOR</span><span class="p">(</span><span class="n">Optimized</span><span class="p">,</span> <span class="n">Sampler</span><span class="p">):</span>
+    <span class="n">eps</span> <span class="o">=</span> <span class="mf">1e-7</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">H</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">D</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">W_init</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pi_init</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shallow NoisyOR model.</span>
+
+<span class="sd">        :param H: Number of hidden units.</span>
+<span class="sd">        :param D: Number of observables.</span>
+<span class="sd">        :param W_init: Tensor with shape (D,H), initializes NoisyOR weights.</span>
+<span class="sd">        :param pi_init: Tensor with shape (H,), initializes NoisyOR priors.</span>
+<span class="sd">        :param precision: Floating point precision required. Must be one of torch.float32 or</span>
+<span class="sd">                          torch.float64.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">assert</span> <span class="n">precision</span> <span class="ow">in</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="s2">&quot;precision must be one of torch.float{32,64}&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span> <span class="o">=</span> <span class="n">precision</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">W_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">W_init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">W_init</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">broadcast</span><span class="p">(</span><span class="n">W_init</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pi_init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">pi_init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">H</span><span class="p">,)</span>
+            <span class="k">assert</span> <span class="p">(</span><span class="n">pi_init</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">and</span> <span class="p">(</span><span class="n">pi_init</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pi_init</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">H</span><span class="p">,),</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">H</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;pies&quot;</span><span class="p">:</span> <span class="n">pi_init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">),</span>
+            <span class="s2">&quot;W&quot;</span><span class="p">:</span> <span class="n">W_init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">),</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_pi</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Btilde</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Ctilde</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+        <span class="c1"># number of datapoints processed in a training epoch</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">H</span><span class="o">=</span><span class="n">H</span><span class="p">,</span> <span class="n">D</span><span class="o">=</span><span class="n">D</span><span class="p">,</span> <span class="n">precision</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
+
+<div class="viewcode-block" id="NoisyOR.log_pseudo_joint">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.NoisyOR.log_pseudo_joint">[docs]</a>
+    <span class="k">def</span> <span class="nf">log_pseudo_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>  <span class="c1"># type: ignore</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate log-pseudo-joints for NoisyOR.&quot;&quot;&quot;</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">states</span>
+        <span class="n">Y</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="k">assert</span> <span class="n">K</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">to</span><span class="o">.</span><span class="n">uint8</span> <span class="ow">and</span> <span class="n">Y</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">to</span><span class="o">.</span><span class="n">uint8</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span>
+        <span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">dev</span> <span class="o">=</span> <span class="n">pi</span><span class="o">.</span><span class="n">device</span>
+
+        <span class="n">logPriors</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">pi</span><span class="p">),</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pi</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">pi</span><span class="p">)))</span>
+
+        <span class="n">logPy</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span>
+        <span class="c1"># We will manually set the lpjs of all-zero states to the appropriate value.</span>
+        <span class="c1"># For now, transform all-zero states in all-one states, to avoid computation of log(0).</span>
+        <span class="n">zeroStatesInd</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">nonzero</span><span class="p">((</span><span class="n">K</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+        <span class="c1"># https://discuss.pytorch.org/t/use-torch-nonzero-as-index/33218</span>
+        <span class="n">zeroStatesInd</span> <span class="o">=</span> <span class="p">(</span><span class="n">zeroStatesInd</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">zeroStatesInd</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="n">K</span><span class="p">[</span><span class="n">zeroStatesInd</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="c1"># prods_nsd = prod{h}{1-W_dh*K_nkh}</span>
+        <span class="n">prods</span> <span class="o">=</span> <span class="p">(</span><span class="n">W</span> <span class="o">*</span> <span class="n">K</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">W</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span><span class="o">.</span><span class="n">neg_</span><span class="p">()</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">prods</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">prods</span><span class="p">)</span>
+        <span class="c1"># logPy_nk = sum{d}{y_nd*log(1/prods_nkd - 1) + log(prods_nkd)}</span>
+        <span class="n">f1</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">prods</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="n">indeces</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">Y</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+        <span class="c1"># convert to BoolTensor in pytorch&gt;=1.2, leave it as ByteTensor in earlier versions</span>
+        <span class="n">indeces</span> <span class="o">=</span> <span class="n">indeces</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">f1</span><span class="p">[</span><span class="n">indeces</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">logPy</span><span class="p">[:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">f1</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">prods</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">K</span><span class="p">[</span><span class="n">zeroStatesInd</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">logPriors</span> <span class="o">+</span> <span class="n">logPy</span>
+        <span class="c1"># for all-zero states, set lpj to arbitrary very low value if y!=0, 0 otherwise</span>
+        <span class="c1"># in the end we want exp(lpj(y,s=0)) = 1 if y=0, 0 otherwise</span>
+        <span class="n">lpj</span><span class="p">[</span><span class="n">zeroStatesInd</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1e30</span> <span class="o">*</span> <span class="n">data</span><span class="p">[</span><span class="n">zeroStatesInd</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="p">),</span> <span class="s2">&quot;some NoisyOR lpj values are invalid!&quot;</span>
+        <span class="k">return</span> <span class="n">lpj</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">states</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>  <span class="c1"># (N, S)</span></div>
+
+
+<div class="viewcode-block" id="NoisyOR.update_param_batch">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.NoisyOR.update_param_batch">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_param_batch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">idx</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">,</span>
+        <span class="n">mstep_factors</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">Kfloat</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span>
+
+        <span class="c1"># pi_h = sum{n}{&lt;K_hns&gt;} / N</span>
+        <span class="c1"># (division by N has to wait until after the mpi all_reduce)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_pi</span> <span class="o">+=</span> <span class="n">mean_posterior</span><span class="p">(</span><span class="n">Kfloat</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">new_pi</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+
+        <span class="c1"># Ws_nsdh = 1 - (W_dh * Kfloat_nsh)</span>
+        <span class="n">Ws</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">][</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">*</span> <span class="n">Kfloat</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:])</span><span class="o">.</span><span class="n">neg_</span><span class="p">()</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">Ws_prod</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">Ws</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">keepdim</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">Kfloat</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">Ws</span> <span class="o">*</span> <span class="n">Ws_prod</span><span class="o">.</span><span class="n">neg</span><span class="p">()</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">)</span>  <span class="c1"># (N,S,D,H)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Btilde</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">mean_posterior</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">mul_</span><span class="p">(</span><span class="n">Ws_prod</span><span class="p">)</span><span class="o">.</span><span class="n">div_</span><span class="p">(</span><span class="n">Ws</span><span class="p">)</span>  <span class="c1"># (N,S,D,H)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Ctilde</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mean_posterior</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">lpj</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ctilde</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Btilde</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="NoisyOR.update_param_epoch">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.NoisyOR.update_param_epoch">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_param_epoch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="p">)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">new_pi</span><span class="p">)</span>
+        <span class="n">N</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">][:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_pi</span> <span class="o">/</span> <span class="n">N</span>
+        <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_pi</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Btilde</span><span class="p">)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ctilde</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">][:]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">Btilde</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ctilde</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">)</span>
+        <span class="n">to</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Btilde</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Ctilde</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_train_datapoints</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="NoisyOR.log_joint">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.NoisyOR.log_joint">[docs]</a>
+    <span class="k">def</span> <span class="nf">log_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">,</span> <span class="n">lpj</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">lpj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">lpj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_pseudo_joint</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="c1"># TODO: could pre-evaluate the constant factor once per epoch</span>
+        <span class="k">return</span> <span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">pi</span><span class="p">))</span> <span class="o">+</span> <span class="n">lpj</span></div>
+
+
+<div class="viewcode-block" id="NoisyOR.generate_data">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.NoisyOR.generate_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Use hidden states to sample datapoints according to the NoisyOR generative model.</span>
+
+<span class="sd">        :param hidden_state: a tensor with shape (N, H) where H is the number of hidden units.</span>
+<span class="sd">        :returns: the datapoints, as a tensor with shape (N, D) where D is</span>
+<span class="sd">                  the number of observables.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span>
+        <span class="n">D</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">W</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="k">if</span> <span class="n">hidden_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pies</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+            <span class="n">hidden_state</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pies</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">pies</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">pies</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">N</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">shape</span> <span class="o">=</span> <span class="n">hidden_state</span><span class="o">.</span><span class="n">shape</span>
+                <span class="k">assert</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;hidden_state has shape </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">, expected (</span><span class="si">{</span><span class="n">N</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">H</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># py_nd = 1 - prod_h (1 - W_dh * s_nh)</span>
+        <span class="n">py</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">to</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">W</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">*</span> <span class="n">hidden_state</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">W</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">Y</span> <span class="o">=</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">rand_like</span><span class="p">(</span><span class="n">py</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">py</span><span class="p">)</span><span class="o">.</span><span class="n">byte</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">)</span> <span class="k">if</span> <span class="n">must_return_hidden_state</span> <span class="k">else</span> <span class="n">Y</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.variational.evo &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.variational.evo</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.variational.evo</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span> <span class="k">as</span> <span class="nn">to</span>
+
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">combinations</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+
+<span class="kn">import</span> <span class="nn">tvo</span>
+<span class="kn">from</span> <span class="nn">tvo.utils</span> <span class="kn">import</span> <span class="n">get</span>
+<span class="kn">from</span> <span class="nn">tvo.variational.TVOVariationalStates</span> <span class="kn">import</span> <span class="n">TVOVariationalStates</span>
+<span class="kn">from</span> <span class="nn">tvo.variational._utils</span> <span class="kn">import</span> <span class="n">update_states_for_batch</span><span class="p">,</span> <span class="n">set_redundant_lpj_to_low</span>
+
+<span class="kn">from</span> <span class="nn">tvo.utils.model_protocols</span> <span class="kn">import</span> <span class="n">Optimized</span><span class="p">,</span> <span class="n">Trainable</span>
+
+
+<div class="viewcode-block" id="EVOVariationalStates">
+<a class="viewcode-back" href="../../../tvo.variational.html#tvo.variational.EVOVariationalStates">[docs]</a>
+<span class="k">class</span> <span class="nc">EVOVariationalStates</span><span class="p">(</span><span class="n">TVOVariationalStates</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">H</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">S</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+        <span class="n">parent_selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">mutation</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">n_parents</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_generations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">crossover</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">bitflip_frequency</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">K_init_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evolutionary Variational Optimization class.</span>
+
+<span class="sd">        :param N: number of datapoints</span>
+<span class="sd">        :param H: number of latents</span>
+<span class="sd">        :param S: number of variational states</span>
+<span class="sd">        :param precision: floating point precision to be used for log_joint values.</span>
+<span class="sd">                          Must be one of to.float32 or to.float64.</span>
+<span class="sd">        :param selection: one of &quot;batch_fitparents&quot; or &quot;randparents&quot;</span>
+<span class="sd">        :param mutation: one of &quot;randflip&quot; or &quot;sparseflip&quot;</span>
+<span class="sd">        :param n_parents: number of parent states to select</span>
+<span class="sd">        :param n_generations: number of EA generations to produce</span>
+<span class="sd">        :param n_children: if crossover is False, number of children states to produce per</span>
+<span class="sd">                           generation. Must be None if crossover is True.</span>
+<span class="sd">        :param crossover: if True, apply crossover. Must be False if n_children is specified.</span>
+<span class="sd">        :param bitflip_frequency: Probability of flipping a bit during the mutation step (e.g.</span>
+<span class="sd">                                  2/H for an average of 2 bitflips per mutation). Required when</span>
+<span class="sd">                                  using the &#39;sparsity&#39; mutation algorithm.</span>
+<span class="sd">        :param K_init_file: Full path to H5 file providing initial states</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="n">crossover</span> <span class="ow">or</span> <span class="n">n_children</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">),</span> <span class="s2">&quot;Exactly one of n_children and crossover may be provided.&quot;</span>
+        <span class="k">if</span> <span class="n">crossover</span><span class="p">:</span>
+            <span class="n">mutation</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cross_</span><span class="si">{</span><span class="n">mutation</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">n_children</span> <span class="o">=</span> <span class="n">n_parents</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">assert</span> <span class="n">n_children</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># make mypy happy</span>
+        <span class="n">S_new</span> <span class="o">=</span> <span class="n">get_n_new_states</span><span class="p">(</span><span class="n">mutation</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">n_children</span><span class="p">,</span> <span class="n">n_generations</span><span class="p">)</span>
+
+        <span class="n">conf</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span>
+            <span class="n">H</span><span class="o">=</span><span class="n">H</span><span class="p">,</span>
+            <span class="n">S</span><span class="o">=</span><span class="n">S</span><span class="p">,</span>
+            <span class="n">S_new</span><span class="o">=</span><span class="n">S_new</span><span class="p">,</span>
+            <span class="n">precision</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span>
+            <span class="n">parent_selection</span><span class="o">=</span><span class="n">parent_selection</span><span class="p">,</span>
+            <span class="n">mutation</span><span class="o">=</span><span class="n">mutation</span><span class="p">,</span>
+            <span class="n">n_parents</span><span class="o">=</span><span class="n">n_parents</span><span class="p">,</span>
+            <span class="n">n_children</span><span class="o">=</span><span class="n">n_children</span><span class="p">,</span>
+            <span class="n">n_generations</span><span class="o">=</span><span class="n">n_generations</span><span class="p">,</span>
+            <span class="n">p_bf</span><span class="o">=</span><span class="n">bitflip_frequency</span><span class="p">,</span>
+            <span class="n">K_init_file</span><span class="o">=</span><span class="n">K_init_file</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">conf</span><span class="p">)</span>
+
+<div class="viewcode-block" id="EVOVariationalStates.update">
+<a class="viewcode-back" href="../../../tvo.variational.html#tvo.variational.EVOVariationalStates.update">[docs]</a>
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">batch</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">Trainable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">Optimized</span><span class="p">):</span>
+            <span class="n">lpj_fn</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">log_pseudo_joint</span>
+            <span class="n">sort_by_lpj</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">sorted_by_lpj</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">lpj_fn</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">log_joint</span>
+            <span class="n">sort_by_lpj</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">K</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">K</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lpj</span>
+
+        <span class="n">parent_selection</span><span class="p">,</span> <span class="n">mutation</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">n_children</span><span class="p">,</span> <span class="n">n_generations</span> <span class="o">=</span> <span class="n">get</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;parent_selection&quot;</span><span class="p">,</span> <span class="s2">&quot;mutation&quot;</span><span class="p">,</span> <span class="s2">&quot;n_parents&quot;</span><span class="p">,</span> <span class="s2">&quot;n_children&quot;</span><span class="p">,</span> <span class="s2">&quot;n_generations&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">lpj_fn</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+
+        <span class="k">def</span> <span class="nf">lpj_fn_</span><span class="p">(</span><span class="n">states</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">lpj_fn</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+
+        <span class="n">new_states</span><span class="p">,</span> <span class="n">new_lpj</span> <span class="o">=</span> <span class="n">evolve_states</span><span class="p">(</span>
+            <span class="n">lpj</span><span class="o">=</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span>
+            <span class="n">states</span><span class="o">=</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">),</span>
+            <span class="n">lpj_fn</span><span class="o">=</span><span class="n">lpj_fn_</span><span class="p">,</span>
+            <span class="n">n_parents</span><span class="o">=</span><span class="n">n_parents</span><span class="p">,</span>
+            <span class="n">n_children</span><span class="o">=</span><span class="n">n_children</span><span class="p">,</span>
+            <span class="n">n_generations</span><span class="o">=</span><span class="n">n_generations</span><span class="p">,</span>
+            <span class="n">parent_selection</span><span class="o">=</span><span class="n">parent_selection</span><span class="p">,</span>
+            <span class="n">mutation</span><span class="o">=</span><span class="n">mutation</span><span class="p">,</span>
+            <span class="n">sparsity</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="k">if</span> <span class="s2">&quot;sparseflip&quot;</span> <span class="ow">in</span> <span class="n">mutation</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">p_bf</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;p_bf&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">update_states_for_batch</span><span class="p">(</span>
+            <span class="n">new_states</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">K</span><span class="o">.</span><span class="n">device</span><span class="p">),</span> <span class="n">new_lpj</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">lpj</span><span class="o">.</span><span class="n">device</span><span class="p">),</span> <span class="n">idx</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">lpj</span><span class="p">,</span> <span class="n">sort_by_lpj</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span> <span class="nf">evolve_states</span><span class="p">(</span>
+    <span class="n">lpj</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">states</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">lpj_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">n_parents</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">n_generations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">parent_selection</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;batch_fitparents&quot;</span><span class="p">,</span>
+    <span class="n">mutation</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cross_randflip&quot;</span><span class="p">,</span>
+    <span class="n">sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">p_bf</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Take old variational states states (N,K,H) with lpj values (N,K) and</span>
+<span class="sd">    return new states and their log-pseudo-joints for each datapoint. The</span>
+<span class="sd">    helper function `evo.get_n_new_states` can be used to retrieve the</span>
+<span class="sd">    exact number S of states generated depending on the chosen genetic</span>
+<span class="sd">    algorithm. lpj_fn must be a callable that takes a set of states with</span>
+<span class="sd">    shape (N,M,H) as arguments and returns a tuple of log-pseudo-joint</span>
+<span class="sd">    evaluations for those states (shape (N,M)). This function does not</span>
+<span class="sd">    guarantee that all new_states returned are unique and not already</span>
+<span class="sd">    contained in states, but it does guarantee that all redundant states</span>
+<span class="sd">    will have lpj&#39;states lower than the minimum lpj of all states already</span>
+<span class="sd">    in states, for each datapoint.</span>
+
+<span class="sd">    Pre-conditions: H &gt;= n_children, K &gt;= n_parents</span>
+
+<span class="sd">    Return: new_states (N,S,H), new_lpj (N,S)</span>
+
+<span class="sd">    Each generation of new states is obtained by selecting `n_parents`</span>
+<span class="sd">    parents from the previous generation following the strategy indicated</span>
+<span class="sd">    by `parent_selection` and then mutating each parent `n_children` times</span>
+<span class="sd">    following the strategy indicated by `genetic_algorithm`.</span>
+
+<span class="sd">    parent_selection can be one of the following:</span>
+<span class="sd">    - &#39;batch_fitparents&#39;</span>
+<span class="sd">        parents are selected using fitness-proportional sampling</span>
+<span class="sd">        _with replacement_.</span>
+<span class="sd">    - &#39;randparents&#39;</span>
+<span class="sd">        random uniform selection of parents.</span>
+
+<span class="sd">    genetic_algorithm can be one of the following:</span>
+<span class="sd">    - &#39;randflip&#39;</span>
+<span class="sd">        each children is obtained by flipping one bit of the parent.</span>
+<span class="sd">        every bit has the same probability of being flipped.</span>
+<span class="sd">    - &#39;sparseflip&#39;</span>
+<span class="sd">        each children is obtained by flipping bits in the parent.</span>
+<span class="sd">        the probability of each bit being flipped depends on the sparsity</span>
+<span class="sd">        and p_bh parameters (see method&#39;states description)</span>
+<span class="sd">    - &#39;cross&#39;</span>
+<span class="sd">        children are generated by one-point-crossover of the parents. each</span>
+<span class="sd">        parent is crossed-over with each other parent</span>
+<span class="sd">        at a point chosen via random uniform sampling.</span>
+<span class="sd">    - &#39;cross_randflip&#39;</span>
+<span class="sd">        as above, but the children additionally go through &#39;randflip&#39;</span>
+<span class="sd">    - &#39;cross_sparseflip&#39;</span>
+<span class="sd">        as &#39;cross&#39;, but the children additionally go through &#39;sparseflip&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dtype_f</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">lpj</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">lpj</span><span class="o">.</span><span class="n">device</span>
+    <span class="n">N</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">max_new_states</span> <span class="o">=</span> <span class="n">get_n_new_states</span><span class="p">(</span><span class="n">mutation</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">n_children</span><span class="p">,</span> <span class="n">n_generations</span><span class="p">)</span>
+    <span class="n">new_states_per_gen</span> <span class="o">=</span> <span class="n">max_new_states</span> <span class="o">//</span> <span class="n">n_generations</span>
+
+    <span class="c1"># Pre-allocations</span>
+    <span class="c1"># It&#39;states probable that not all new_states will be filled with a</span>
+    <span class="c1"># new unique state. Unfilled new_states will remain uninitialized and</span>
+    <span class="c1"># their corresponding new_lpj will be lower than any state in states[n].</span>
+    <span class="n">new_states</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">max_new_states</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">new_lpj</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">max_new_states</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_f</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">parents</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">uint8</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">select</span><span class="p">,</span> <span class="n">mutate</span> <span class="o">=</span> <span class="n">get_EA</span><span class="p">(</span><span class="n">parent_selection</span><span class="p">,</span> <span class="n">mutation</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_generations</span><span class="p">):</span>
+        <span class="c1"># parent selection</span>
+        <span class="n">gen_idx</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">g</span> <span class="o">*</span> <span class="n">new_states_per_gen</span><span class="p">,</span> <span class="p">(</span><span class="n">g</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">new_states_per_gen</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">g</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">parents</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">select</span><span class="p">(</span><span class="n">states</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">old_gen_idx</span> <span class="o">=</span> <span class="n">gen_idx</span> <span class="o">-</span> <span class="n">new_states_per_gen</span>
+            <span class="n">parents</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">select</span><span class="p">(</span><span class="n">new_states</span><span class="p">[:,</span> <span class="n">old_gen_idx</span><span class="p">],</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">new_lpj</span><span class="p">[:,</span> <span class="n">old_gen_idx</span><span class="p">])</span>
+
+        <span class="c1"># children generation</span>
+        <span class="n">new_states</span><span class="p">[:,</span> <span class="n">gen_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">mutate</span><span class="p">(</span><span class="n">parents</span><span class="p">,</span> <span class="n">n_children</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">)</span>
+
+        <span class="c1"># children fitness evaluation</span>
+        <span class="c1"># new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])</span>
+        <span class="n">new_lpj</span><span class="p">[:,</span> <span class="n">gen_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">lpj_fn</span><span class="p">(</span><span class="n">new_states</span><span class="p">[:,</span> <span class="n">gen_idx</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">()))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+            <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">set_redundant_lpj_to_low</span><span class="p">(</span><span class="n">new_states</span><span class="p">,</span> <span class="n">new_lpj</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">new_states</span><span class="p">,</span> <span class="n">new_lpj</span>
+
+
+<span class="k">def</span> <span class="nf">get_n_new_states</span><span class="p">(</span><span class="n">mutation</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_gen</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">mutation</span><span class="p">[:</span><span class="mi">5</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cross&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="p">(</span><span class="n">n_parents</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">n_gen</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span> <span class="o">*</span> <span class="n">n_gen</span>
+
+
+<span class="k">def</span> <span class="nf">get_EA</span><span class="p">(</span><span class="n">parent_selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">mutation</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Refer to the doc of `evolve_states` for the list of valid arguments&quot;&quot;&quot;</span>
+    <span class="n">parent_sel_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;batch_fitparents&quot;</span><span class="p">:</span> <span class="n">batch_fitparents</span><span class="p">,</span> <span class="s2">&quot;randparents&quot;</span><span class="p">:</span> <span class="n">batch_randparents</span><span class="p">}</span>
+    <span class="n">mutation_dict</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;randflip&quot;</span><span class="p">:</span> <span class="n">batch_randflip</span><span class="p">,</span>
+        <span class="s2">&quot;sparseflip&quot;</span><span class="p">:</span> <span class="n">batch_sparseflip</span><span class="p">,</span>
+        <span class="s2">&quot;cross&quot;</span><span class="p">:</span> <span class="n">batch_cross</span><span class="p">,</span>
+        <span class="s2">&quot;cross_randflip&quot;</span><span class="p">:</span> <span class="n">batch_cross_randflip</span><span class="p">,</span>
+        <span class="s2">&quot;cross_sparseflip&quot;</span><span class="p">:</span> <span class="n">batch_cross_sparseflip</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="c1"># input validation</span>
+    <span class="n">valid_parent_sel</span> <span class="o">=</span> <span class="n">parent_sel_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">parent_selection</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_parent_sel</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Parent selection &quot;</span><span class="si">{</span><span class="n">parent_selection</span><span class="si">}</span><span class="s1">&quot; </span><span class="se">\</span>
+<span class="s1">not supported. Valid options: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">valid_parent_sel</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="p">)</span>
+    <span class="n">valid_mutations</span> <span class="o">=</span> <span class="n">mutation_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">mutation</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_mutations</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Mutation operator &quot;</span><span class="si">{</span><span class="n">mutation</span><span class="si">}</span><span class="s1">&quot; not </span><span class="se">\</span>
+<span class="s1">supported. Valid options: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">valid_mutations</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">parent_sel_dict</span><span class="p">[</span><span class="n">parent_selection</span><span class="p">],</span> <span class="n">mutation_dict</span><span class="p">[</span><span class="n">mutation</span><span class="p">])</span>
+
+
+<span class="k">def</span> <span class="nf">batch_randflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate n_children new states from parents by flipping one different bit per children.</span>
+
+<span class="sd">    :param parents: Tensor with shape (N, n_parents, H)</span>
+<span class="sd">    :param n_children: How many children to generate per parent per datapoint</span>
+<span class="sd">    :returns: children, a Tensor with shape (N, n_parents * n_children, H)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="c1"># Select k indices to be flipped by generating H random numbers per parent</span>
+    <span class="c1"># and taking the indexes of the largest k.</span>
+    <span class="c1"># This ensures that, per parent, each child is different.</span>
+    <span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">ind_flip</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">topk</span><span class="p">(</span>
+        <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">),</span>
+        <span class="n">k</span><span class="o">=</span><span class="n">n_children</span><span class="p">,</span>
+        <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="nb">sorted</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">ind_flip</span> <span class="o">=</span> <span class="n">ind_flip</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span><span class="p">)</span>
+
+    <span class="c1"># Each parent is &quot;repeated&quot; n_children times and inserted in children.</span>
+    <span class="c1"># We then flips bits in the children states</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>  <span class="c1"># is (N, n_parents*n_children, H)</span>
+
+    <span class="n">n_idx</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span>  <span class="c1"># broadcastable to ind_flip shape</span>
+    <span class="n">s_idx</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>  <span class="c1"># broadcastable to ind_flip shape</span>
+    <span class="n">children</span><span class="p">[</span><span class="n">n_idx</span><span class="p">,</span> <span class="n">s_idx</span><span class="p">,</span> <span class="n">ind_flip</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">children</span><span class="p">[</span><span class="n">n_idx</span><span class="p">,</span> <span class="n">s_idx</span><span class="p">,</span> <span class="n">ind_flip</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">batch_sparseflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">p_bf</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Take a set of parent bitstrings, generate n_children new bitstrings</span>
+<span class="sd">        by performing bitflips on each of the parents.</span>
+
+<span class="sd">    :param parents: Tensor with shape (N, n_parents, H)</span>
+<span class="sd">    :param n_children: number of children to produce per parent per datapoint</span>
+<span class="sd">    :param sparsity: the algorithm will strive to produce children with the given sparsity</span>
+<span class="sd">    :param p_bf: overall probability that a bit is flipped. the average number</span>
+<span class="sd">                 of bitflips per children is p_bf*parents.shape[1]</span>
+<span class="sd">    :returns: Tensor with shape (N, n_parents*n_children, H)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Initialization</span>
+    <span class="n">precision</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">parents</span><span class="o">.</span><span class="n">device</span>
+    <span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">eps</span> <span class="o">=</span> <span class="mf">1e-100</span>
+    <span class="n">crowdedness</span> <span class="o">=</span> <span class="n">sparsity</span> <span class="o">*</span> <span class="n">H</span>
+
+    <span class="n">H</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
+    <span class="n">s_abs</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>  <span class="c1"># is (N, n_parents)</span>
+
+    <span class="c1"># # Probability to flip a 1 to a 0 and vice versa (Joerg&#39;s idea)</span>
+    <span class="c1"># p_0 = H / ( 2 * ( H - s_abs) + eps) * p_bf,  # is (n_parents,)</span>
+    <span class="c1"># p_1 = H / ( 2 * s_abs + eps) * p_bf # is (n_parents,)</span>
+
+    <span class="c1"># Probability to flip a 1 to a 0 and vice versa (modification of Joerg&#39;s idea)</span>
+    <span class="c1"># is (n_parents)</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">H</span> <span class="o">-</span> <span class="n">s_abs</span><span class="p">)</span>
+        <span class="o">*</span> <span class="p">((</span><span class="n">H</span> <span class="o">*</span> <span class="n">p_bf</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">crowdedness</span> <span class="o">-</span> <span class="n">s_abs</span><span class="p">))</span>
+        <span class="o">/</span> <span class="p">((</span><span class="n">crowdedness</span> <span class="o">-</span> <span class="n">s_abs</span> <span class="o">+</span> <span class="n">H</span> <span class="o">*</span> <span class="n">p_bf</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_abs</span> <span class="o">+</span> <span class="n">eps</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">p_0</span> <span class="o">=</span> <span class="p">(</span><span class="n">H</span> <span class="o">*</span> <span class="n">p_bf</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">H</span> <span class="o">+</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_abs</span><span class="p">)</span> <span class="o">+</span> <span class="n">eps</span>  <span class="c1"># is (N, n_parents)</span>
+    <span class="n">p_1</span> <span class="o">=</span> <span class="n">alpha</span> <span class="o">*</span> <span class="n">p_0</span>
+    <span class="n">p_0</span> <span class="o">=</span> <span class="n">p_0</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span>
+    <span class="n">p_1</span> <span class="o">=</span> <span class="n">p_1</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span>
+
+    <span class="c1"># start from children equal to the parents (with each parent repeated n_children times)</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span>
+    <span class="k">assert</span> <span class="n">children</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+    <span class="n">bool_or_byte</span> <span class="o">=</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">dtype</span>  <span class="c1"># BoolTensor in pytorch&gt;=1.2, ByteTensor otherwise</span>
+    <span class="n">children_idx</span> <span class="o">=</span> <span class="n">children</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">bool_or_byte</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">children_idx</span><span class="p">,</span> <span class="n">p_1</span><span class="p">,</span> <span class="n">p_0</span><span class="p">)</span>
+
+    <span class="c1"># Determine bits to be flipped and do the bitflip</span>
+    <span class="n">flips</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">p</span>
+    <span class="n">children</span><span class="p">[</span><span class="n">flips</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">children</span><span class="p">[</span><span class="n">flips</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="c1"># TODO probably to be made a cython helper function for performance</span>
+<span class="k">def</span> <span class="nf">_fill_crossed_idxs_for_batch</span><span class="p">(</span>
+    <span class="n">parent_pairs</span><span class="p">,</span> <span class="n">crossed_idxs</span><span class="p">,</span> <span class="n">parent1_starts</span><span class="p">,</span> <span class="n">cutting_points_1</span><span class="p">,</span> <span class="n">cutting_points_2</span><span class="p">,</span> <span class="n">parent2_ends</span>
+<span class="p">):</span>
+    <span class="n">n_pairs</span> <span class="o">=</span> <span class="n">parent_pairs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">parent1_starts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">pp_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_pairs</span><span class="p">):</span>
+            <span class="n">parent1</span><span class="p">,</span> <span class="n">parent2</span> <span class="o">=</span> <span class="n">parent_pairs</span><span class="p">[</span><span class="n">pp_idx</span><span class="p">]</span>
+            <span class="n">o1</span> <span class="o">=</span> <span class="n">parent1_starts</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">pp_idx</span><span class="p">]</span>
+            <span class="n">o2</span> <span class="o">=</span> <span class="n">cutting_points_1</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">pp_idx</span><span class="p">]</span>
+            <span class="n">o3</span> <span class="o">=</span> <span class="n">cutting_points_2</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">pp_idx</span><span class="p">]</span>
+            <span class="n">o4</span> <span class="o">=</span> <span class="n">parent2_ends</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">pp_idx</span><span class="p">]</span>
+            <span class="n">crossed_idxs</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">o1</span><span class="p">:</span><span class="n">o2</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent1</span>
+            <span class="n">crossed_idxs</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">o2</span><span class="p">:</span><span class="n">o3</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent2</span>
+            <span class="n">crossed_idxs</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">o3</span><span class="p">:</span><span class="n">o4</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent1</span>
+
+
+<span class="k">def</span> <span class="nf">batch_cross</span><span class="p">(</span><span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;For each datapoint, each pair of parents is crossed generating two children.</span>
+
+<span class="sd">    :param parents: Tensor with shape (N, n_parents, H)</span>
+<span class="sd">    :returns: Tensor with shape (N, n_parents*(n_parents - 1), H)</span>
+
+<span class="sd">    The crossover is performed by selecting a &quot;cut point&quot; and switching the</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">N</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">parent_pairs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">combinations</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_parents</span><span class="p">),</span> <span class="mi">2</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">n_pairs</span> <span class="o">=</span> <span class="n">parent_pairs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">cutting_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">H</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">n_pairs</span><span class="p">))</span>
+    <span class="n">n_children</span> <span class="o">=</span> <span class="n">n_pairs</span> <span class="o">*</span> <span class="mi">2</span>  <span class="c1"># will produce 2 children per pair</span>
+
+    <span class="c1"># The next lines build (N, n_children, H) indexes that swap</span>
+    <span class="c1"># parent elements to produce the desired crossover.</span>
+    <span class="n">crossed_idxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">n_children</span> <span class="o">*</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">parent_pair_idxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_pairs</span><span class="p">)</span>
+    <span class="n">parent1_starts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">parent_pair_idxs</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">H</span><span class="p">),</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># (N, n_children * H)</span>
+    <span class="n">cutting_points_1</span> <span class="o">=</span> <span class="n">parent1_starts</span> <span class="o">+</span> <span class="n">cutting_points</span>
+    <span class="n">cutting_points_2</span> <span class="o">=</span> <span class="n">cutting_points_1</span> <span class="o">+</span> <span class="n">H</span>
+    <span class="n">parent2_ends</span> <span class="o">=</span> <span class="n">parent1_starts</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">H</span>
+    <span class="n">_fill_crossed_idxs_for_batch</span><span class="p">(</span>
+        <span class="n">parent_pairs</span><span class="p">,</span> <span class="n">crossed_idxs</span><span class="p">,</span> <span class="n">parent1_starts</span><span class="p">,</span> <span class="n">cutting_points_1</span><span class="p">,</span> <span class="n">cutting_points_2</span><span class="p">,</span> <span class="n">parent2_ends</span>
+    <span class="p">)</span>
+    <span class="n">crossed_idxs</span> <span class="o">=</span> <span class="n">crossed_idxs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">n_children</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+
+    <span class="n">children</span> <span class="o">=</span> <span class="n">parents</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">crossed_idxs</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">H</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]]</span>
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">batch_cross_randflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">batch_randflip</span><span class="p">(</span><span class="n">batch_cross</span><span class="p">(</span><span class="n">parents</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">batch_cross_sparseflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">batch_sparseflip</span><span class="p">(</span><span class="n">batch_cross</span><span class="p">(</span><span class="n">parents</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">batch_fitparents</span><span class="p">(</span><span class="n">candidates</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">lpj</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="c1"># NOTE: this a fitness-proportional parent selection __with replacement__</span>
+
+    <span class="n">precision</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">lpj</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">candidates</span><span class="o">.</span><span class="n">device</span>
+    <span class="k">assert</span> <span class="n">candidates</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">lpj</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;candidates and lpj must have same shape&quot;</span>
+
+    <span class="c1"># compute fitness (per batch)</span>
+    <span class="n">lpj_fitness</span> <span class="o">=</span> <span class="n">lpj</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">to</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="mf">0.0</span><span class="p">]))</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+    <span class="c1"># is (batch_size, no_candidates).</span>
+    <span class="n">lpj_fitness</span> <span class="o">=</span> <span class="n">lpj_fitness</span> <span class="o">/</span> <span class="n">lpj_fitness</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">assert</span> <span class="n">lpj_fitness</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">lpj</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># we will look for the indeces n for which cum_p[n-1] &lt; x &lt; cump[n]</span>
+    <span class="c1"># last dimension of x &lt; cum_p will be of the form [False,...,False,</span>
+    <span class="c1"># True,...,True]</span>
+    <span class="c1"># summing along the last dimension gives the number of elements greater</span>
+    <span class="c1"># than x subtracting that from the size of the dimension gives the</span>
+    <span class="c1"># desired index n</span>
+    <span class="n">cum_p</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">lpj_fitness</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (x, y, ..., z), same shape as lpj</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="o">*</span><span class="n">cum_p</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">n_parents</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="c1"># (x, y, ..., n_parents)</span>
+
+    <span class="c1"># TODO Find simpler solution</span>
+    <span class="n">x_view</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span>
+    <span class="n">cum_p_view</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">cum_p</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">cum_p_view</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">cum_p_view</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">cum_p_view</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+
+    <span class="n">chosen_idx</span> <span class="o">=</span> <span class="n">cum_p</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">x_view</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">cum_p</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">cum_p_view</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># TODO Find solution without numpy conversion</span>
+    <span class="n">all_idx</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">chosen_idx</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="c1"># TODO Find solution without numpy conversion</span>
+    <span class="n">all_idx</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">chosen_idx</span>
+    <span class="n">choices</span> <span class="o">=</span> <span class="n">candidates</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">all_idx</span><span class="p">)]</span>
+    <span class="k">assert</span> <span class="n">choices</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">candidates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">candidates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">choices</span>
+
+
+<span class="k">def</span> <span class="nf">batch_randparents</span><span class="p">(</span><span class="n">candidates</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">lpj</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">candidates</span><span class="o">.</span><span class="n">device</span>
+    <span class="n">batch_size</span><span class="p">,</span> <span class="n">n_candidates</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">candidates</span><span class="o">.</span><span class="n">shape</span>
+    <span class="c1"># for each batch, choose n_parents random idxs, concatenate all idxs together</span>
+    <span class="n">ind_children</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span>
+        <span class="nb">tuple</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">randperm</span><span class="p">(</span><span class="n">n_candidates</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)[:</span><span class="n">n_parents</span><span class="p">]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">batch_size</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="c1"># generate indxs for the first dimention of candidates that match ind_children, e.g.</span>
+    <span class="c1"># [0,0,1,1,2,2] for batch_size=3 and n_parents=2</span>
+    <span class="c1"># (for each element in the batch, we have 2 ind_children)</span>
+    <span class="c1"># TODO: change to `repeat_interleave(to.arange(batch_size), n_parents)` when</span>
+    <span class="c1"># a new-enough pytorch version becomes available at Oldenburg.</span>
+    <span class="n">ind_batch</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">batch_size</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># need a reshape because the fancy indexing flattens the first two dimensions</span>
+    <span class="n">parents</span> <span class="o">=</span> <span class="n">candidates</span><span class="p">[</span><span class="n">ind_batch</span><span class="p">,</span> <span class="n">ind_children</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parents</span>
+
+
+<span class="c1"># ******* The following functions are currently unused ******* #</span>
+<span class="c1"># THey are kept here as a reference for the new batched implementations.</span>
+
+
+<span class="k">def</span> <span class="nf">fitparents</span><span class="p">(</span><span class="n">candidates</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_parents</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">lpj</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">candidates</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="c1"># compute fitness (per data point)</span>
+    <span class="n">lpj_fitness</span> <span class="o">=</span> <span class="n">lpj</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">min</span><span class="p">([</span><span class="n">to</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">lpj</span><span class="p">),</span> <span class="mf">0.0</span><span class="p">])</span>  <span class="c1"># is (no_candidates,)</span>
+    <span class="n">lpj_fitness</span> <span class="o">=</span> <span class="n">lpj_fitness</span> <span class="o">/</span> <span class="n">lpj_fitness</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="c1"># sample (indices of) parents according to fitness</span>
+    <span class="c1"># TODO Find solution without numpy conversion</span>
+    <span class="n">ind_children</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+        <span class="n">candidates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">n_parents</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">lpj_fitness</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="c1"># is (n_parents, H)</span>
+    <span class="k">return</span> <span class="n">candidates</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ind_children</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)]</span>
+
+
+<span class="k">def</span> <span class="nf">randflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate n_children new states from parents by flipping one different bit per children.&quot;&quot;&quot;</span>
+
+    <span class="n">precision</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">parents</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="c1"># Select k indices to be flipped by generating H random numbers per parent</span>
+    <span class="c1"># and taking the indexes of the largest k.</span>
+    <span class="c1"># This ensures that, per parent, each child is different.</span>
+    <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">ind_flip</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">topk</span><span class="p">(</span>
+        <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">),</span>
+        <span class="n">k</span><span class="o">=</span><span class="n">n_children</span><span class="p">,</span>
+        <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">largest</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="nb">sorted</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">ind_flip_flat</span> <span class="o">=</span> <span class="n">ind_flip</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>  <span class="c1"># [ parent1bitflip1, parent1bitflip2,</span>
+    <span class="c1"># parent2bitflip1, parent2bitflip2 ]</span>
+
+    <span class="c1"># Each parent is &quot;repeated&quot; n_children times and inserted in children.</span>
+    <span class="c1"># We then flips bits in the children states</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+    <span class="c1"># is (n_parents*n_children, H)</span>
+
+    <span class="c1"># for each new state (0 to n_children*n_parents-1), flip bit at the</span>
+    <span class="c1"># position indicated by ind_flip_flat</span>
+    <span class="n">ind_slice_flat</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_children</span> <span class="o">*</span> <span class="n">n_parents</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">parents</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">children</span><span class="p">[</span><span class="n">ind_slice_flat</span><span class="p">,</span> <span class="n">ind_flip_flat</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">children</span><span class="p">[</span><span class="n">ind_slice_flat</span><span class="p">,</span> <span class="n">ind_flip_flat</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">cross_sparseflip</span><span class="p">(</span><span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">sparseflip</span><span class="p">(</span><span class="n">cross</span><span class="p">(</span><span class="n">parents</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">cross_randflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">p_bf</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">randflip</span><span class="p">(</span><span class="n">cross</span><span class="p">(</span><span class="n">parents</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">cross</span><span class="p">(</span><span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Each pair of parents is crossed generating two children.</span>
+
+<span class="sd">    :param parents: Tensor with shape (n_parents, H)</span>
+<span class="sd">    :returns: Tensor with shape (n_parents*(n_parents - 1), H)</span>
+
+<span class="sd">    The crossover is performed by selecting a &quot;cut point&quot; and switching the</span>
+<span class="sd">    contents of the parents after the cut point.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">n_children</span> <span class="o">=</span> <span class="n">n_parents</span> <span class="o">*</span> <span class="p">(</span><span class="n">n_parents</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">cutting_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">H</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n_children</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,))</span>
+    <span class="n">parent_pairs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">combinations</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_parents</span><span class="p">),</span> <span class="mi">2</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="c1"># The next lines build (n_children, H) indexes that swap parent entries to produce</span>
+    <span class="c1"># the desired crossover.</span>
+    <span class="n">crossed_idxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">n_children</span> <span class="o">*</span> <span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">parent_pair_idxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_children</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">parent1_starts</span> <span class="o">=</span> <span class="n">parent_pair_idxs</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">H</span><span class="p">)</span>
+    <span class="n">cutting_points_1</span> <span class="o">=</span> <span class="n">parent1_starts</span> <span class="o">+</span> <span class="n">cutting_points</span>
+    <span class="n">cutting_points_2</span> <span class="o">=</span> <span class="n">cutting_points_1</span> <span class="o">+</span> <span class="n">H</span>
+    <span class="n">parent2_ends</span> <span class="o">=</span> <span class="n">parent1_starts</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">H</span>
+    <span class="k">for</span> <span class="n">pp_idx</span><span class="p">,</span> <span class="n">o1</span><span class="p">,</span> <span class="n">o2</span><span class="p">,</span> <span class="n">o3</span><span class="p">,</span> <span class="n">o4</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="n">parent_pair_idxs</span><span class="p">,</span> <span class="n">parent1_starts</span><span class="p">,</span> <span class="n">cutting_points_1</span><span class="p">,</span> <span class="n">cutting_points_2</span><span class="p">,</span> <span class="n">parent2_ends</span>
+    <span class="p">):</span>
+        <span class="n">parent1</span><span class="p">,</span> <span class="n">parent2</span> <span class="o">=</span> <span class="n">parent_pairs</span><span class="p">[</span><span class="n">pp_idx</span><span class="p">]</span>
+        <span class="n">crossed_idxs</span><span class="p">[</span><span class="n">o1</span><span class="p">:</span><span class="n">o2</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent1</span>
+        <span class="n">crossed_idxs</span><span class="p">[</span><span class="n">o2</span><span class="p">:</span><span class="n">o3</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent2</span>
+        <span class="n">crossed_idxs</span><span class="p">[</span><span class="n">o3</span><span class="p">:</span><span class="n">o4</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent1</span>
+    <span class="n">crossed_idxs</span> <span class="o">=</span> <span class="n">crossed_idxs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n_children</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+
+    <span class="n">children</span> <span class="o">=</span> <span class="n">parents</span><span class="p">[</span><span class="n">crossed_idxs</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">children</span>
+
+
+<span class="k">def</span> <span class="nf">sparseflip</span><span class="p">(</span>
+    <span class="n">parents</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">n_children</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">p_bf</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Take a set of parent bitstrings, generate n_children new bitstrings</span>
+<span class="sd">        by performing bitflips on each of the parents.</span>
+
+<span class="sd">    The returned object has shape(parents.shape[0]*n_children,</span>
+<span class="sd">    parents.shape[1])</span>
+
+<span class="sd">    sparsity and p_bf regulate the probabilities of flipping each bit:</span>
+<span class="sd">    - sparsity: the algorithm will strive to produce children with the</span>
+<span class="sd">      given sparsity</span>
+<span class="sd">    - p_bf: overall probability that a bit is flipped. the average number</span>
+<span class="sd">      of bitflips per children is p_bf*parents.shape[1]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Initialization</span>
+    <span class="n">precision</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">parents</span><span class="o">.</span><span class="n">device</span>
+    <span class="n">n_parents</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">s_abs</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># is (n_parents)</span>
+    <span class="n">children</span> <span class="o">=</span> <span class="n">parents</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+    <span class="n">eps</span> <span class="o">=</span> <span class="mf">1e-100</span>
+    <span class="n">crowdedness</span> <span class="o">=</span> <span class="n">sparsity</span> <span class="o">*</span> <span class="n">H</span>
+
+    <span class="n">H</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">H</span><span class="p">)</span>
+    <span class="n">s_abs</span> <span class="o">=</span> <span class="n">s_abs</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+
+    <span class="c1"># # Probability to flip a 1 to a 0 and vice versa (Joerg&#39;s idea)</span>
+    <span class="c1"># p_0 = H / ( 2 * ( H - s_abs) + eps) * p_bf,  # is (n_parents,)</span>
+    <span class="c1"># p_1 = H / ( 2 * s_abs + eps) * p_bf # is (n_parents,)</span>
+
+    <span class="c1"># Probability to flip a 1 to a 0 and vice versa</span>
+    <span class="c1"># (modification of Joerg&#39;s idea)</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">H</span> <span class="o">-</span> <span class="n">s_abs</span><span class="p">)</span>
+        <span class="o">*</span> <span class="p">((</span><span class="n">H</span> <span class="o">*</span> <span class="n">p_bf</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">crowdedness</span> <span class="o">-</span> <span class="n">s_abs</span><span class="p">))</span>
+        <span class="o">/</span> <span class="p">((</span><span class="n">crowdedness</span> <span class="o">-</span> <span class="n">s_abs</span> <span class="o">+</span> <span class="n">H</span> <span class="o">*</span> <span class="n">p_bf</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_abs</span> <span class="o">+</span> <span class="n">eps</span><span class="p">)</span>
+    <span class="p">)</span>  <span class="c1"># is (n_parents)</span>
+    <span class="n">p_0</span> <span class="o">=</span> <span class="p">(</span><span class="n">H</span> <span class="o">*</span> <span class="n">p_bf</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">H</span> <span class="o">+</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_abs</span><span class="p">)</span> <span class="o">+</span> <span class="n">eps</span>  <span class="c1"># is (n_parents,)</span>
+    <span class="n">p_1</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">alpha</span> <span class="o">*</span> <span class="n">p_0</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span>
+    <span class="p">)</span>  <span class="c1"># is (n_parents*n_children, H)</span>
+    <span class="n">p_0</span> <span class="o">=</span> <span class="n">p_0</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_children</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">))</span>
+    <span class="c1"># is (n_parents*n_children, H)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">p_0</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="c1"># BoolTensor in pytorch&gt;=1.2, ByteTensor otherwise</span>
+    <span class="n">bool_or_byte</span> <span class="o">=</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="n">children_idx</span> <span class="o">=</span> <span class="n">children</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">bool_or_byte</span><span class="p">)</span>
+    <span class="n">p</span><span class="p">[</span><span class="n">children_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">p_1</span><span class="p">[</span><span class="n">children_idx</span><span class="p">]</span>
+    <span class="n">p</span><span class="p">[</span><span class="o">~</span><span class="n">children_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">p_0</span><span class="p">[</span><span class="o">~</span><span class="n">children_idx</span><span class="p">]</span>
+
+    <span class="c1"># Determine bits to be flipped and do the bitflip</span>
+    <span class="n">flips</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">n_parents</span> <span class="o">*</span> <span class="n">n_children</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">H</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">p</span>
+    <span class="n">children</span><span class="p">[</span><span class="n">flips</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">children</span><span class="p">[</span><span class="n">flips</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">children</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

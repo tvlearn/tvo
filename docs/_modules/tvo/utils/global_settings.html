@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.utils.global_settings &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.utils.global_settings</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.utils.global_settings</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">torch</span> <span class="k">as</span> <span class="nn">to</span>
+
+
+<span class="k">def</span> <span class="nf">_choose_device</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+    <span class="n">dev</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;TVO_GPU&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+        <span class="n">gpu_n</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TVO_GPU&quot;</span><span class="p">])</span>
+        <span class="n">dev</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">gpu_n</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dev</span>
+
+
+<span class="k">class</span> <span class="nc">_GlobalDevice</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A singleton object containing the global device settings for the framework.</span>
+
+<span class="sd">    Set and get the corresponding to.device with `{set,get}_device()`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_device</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">_choose_device</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_device</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">set_device</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dev</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">dev</span>
+
+
+<div class="viewcode-block" id="get_device">
+<a class="viewcode-back" href="../../../tvo.html#tvo.get_device">[docs]</a>
+<span class="k">def</span> <span class="nf">get_device</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the torch.device that all objects in the package will use by default.</span>
+
+<span class="sd">    The default (&#39;cpu&#39;) can be changed by setting the `TVO_GPU` environment variable</span>
+<span class="sd">    to the number of the desired CUDA device. For example, in bash, `export TVO_GPU=0`</span>
+<span class="sd">    will make the framework default to device &#39;cuda:0&#39;. Note that some computations might</span>
+<span class="sd">    still be performed on CPU for performance reasons.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_GlobalDevice</span><span class="o">.</span><span class="n">get_device</span><span class="p">()</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_set_device</span><span class="p">(</span><span class="n">dev</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Private method to change the TVO device settings. USE WITH CARE.&quot;&quot;&quot;</span>
+    <span class="n">_GlobalDevice</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">dev</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_choose_run_policy</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">policy</span> <span class="o">=</span> <span class="s2">&quot;seq&quot;</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="s2">&quot;TVO_MPI&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TVO_MPI&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;OMPI_COMM_WORLD_SIZE&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+        <span class="n">policy</span> <span class="o">=</span> <span class="s2">&quot;mpi&quot;</span>
+    <span class="k">return</span> <span class="n">policy</span>
+
+
+<span class="k">class</span> <span class="nc">_GlobalPolicy</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A singleton object containing the global execution policy for the framework.</span>
+
+<span class="sd">    Set and get the policy with `{set,get}_run_policy()`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_policy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_choose_run_policy</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_policy</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_policy</span>
+
+
+<div class="viewcode-block" id="get_run_policy">
+<a class="viewcode-back" href="../../../tvo.html#tvo.get_run_policy">[docs]</a>
+<span class="k">def</span> <span class="nf">get_run_policy</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get the current parallelization policy.</span>
+
+<span class="sd">    * `&#39;seq&#39;`: the framework will not perform any parallelization other than what torch tensors</span>
+<span class="sd">      offer out of the box on the relevant device.</span>
+<span class="sd">    * `&#39;mpi&#39;`: the framework will perform data parallelization for the algorithms that</span>
+<span class="sd">      implement it.</span>
+
+<span class="sd">    The policy is &#39;seq&#39; unless the framework detects that the program is running within `mpirun`,</span>
+<span class="sd">    in which case the policy is &#39;mpi&#39;. The default can also be overridden by setting the</span>
+<span class="sd">    `TVO_MPI` environment variable to a non-zero value, e.g. in bash with</span>
+<span class="sd">    `export TVO_MPI=1`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_GlobalPolicy</span><span class="o">.</span><span class="n">get_policy</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

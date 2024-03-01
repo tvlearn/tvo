@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.models.sssc &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.models.sssc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.models.sssc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2021 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+<span class="kn">import</span> <span class="nn">torch</span> <span class="k">as</span> <span class="nn">to</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">pi</span> <span class="k">as</span> <span class="n">MATH_PI</span>
+<span class="kn">from</span> <span class="nn">tvo</span> <span class="kn">import</span> <span class="n">get_device</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.model_protocols</span> <span class="kn">import</span> <span class="n">Sampler</span><span class="p">,</span> <span class="n">Optimized</span><span class="p">,</span> <span class="n">Reconstructor</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.parallel</span> <span class="kn">import</span> <span class="n">broadcast</span><span class="p">,</span> <span class="n">all_reduce</span><span class="p">,</span> <span class="n">pprint</span>
+<span class="kn">from</span> <span class="nn">tvo.variational.TVOVariationalStates</span> <span class="kn">import</span> <span class="n">TVOVariationalStates</span>
+<span class="kn">from</span> <span class="nn">tvo.variational._utils</span> <span class="kn">import</span> <span class="n">mean_posterior</span>
+
+
+<span class="k">def</span> <span class="nf">_get_hash</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span>
+
+
+<div class="viewcode-block" id="SSSC">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC">[docs]</a>
+<span class="k">class</span> <span class="nc">SSSC</span><span class="p">(</span><span class="n">Sampler</span><span class="p">,</span> <span class="n">Optimized</span><span class="p">,</span> <span class="n">Reconstructor</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">H</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">D</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">W_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">sigma2_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">mus_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">Psi_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pies_init</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">reformulated_lpj</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">use_storage</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">reformulated_psi_update</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Spike-And-Slab Sparse Coding (SSSC) model.</span>
+
+<span class="sd">        :param H: Number of hidden units.</span>
+<span class="sd">        :param D: Number of observables.</span>
+<span class="sd">        :param W_init: Tensor with shape (H, D), initializes SSSC weights.</span>
+<span class="sd">        :param sigma2_init: Tensor initializing SSSC observable variance.</span>
+<span class="sd">        :param mus_init: Tensor with shape (H,), initializes SSSC latent means.</span>
+<span class="sd">        :param Psi_init: Tensor with shape (H, H), initializes SSSC latent variance.</span>
+<span class="sd">        :param pies_init: Tensor with shape (H,), initializes SSSC priors.</span>
+<span class="sd">        :param reformulated_lpj: Use looped instead of batchified E-step and mathematically</span>
+<span class="sd">                                 reformulated form of the log-pseudo-joint formula (exploiting</span>
+<span class="sd">                                 matrix determinant lemma and Woodbury matrix identity). Yields</span>
+<span class="sd">                                 more accurate solutions in large dimensions (i.e. large D and H).</span>
+<span class="sd">        :param use_storage: Whether to memorize state vector-dependent and datapoint independent-</span>
+<span class="sd">                            terms computed in the E-step. Terms will be looked-up rather than re-</span>
+<span class="sd">                            computed if a datapoint evaluates a state that has been evaluated for</span>
+<span class="sd">                            another datapoint before. The storage will be cleared after each epoch.</span>
+<span class="sd">        :param reformulated_psi_update: Whether to update Psi using reformulated form of the</span>
+<span class="sd">                                        update equation.</span>
+<span class="sd">        :param precision: Floating point precision required. Must be one of torch.float32 or</span>
+<span class="sd">                          torch.float64.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">precision</span> <span class="ow">in</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="s2">&quot;precision must be one of torch.float{32,64}&quot;</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">get_device</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span> <span class="o">=</span> <span class="n">precision</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_lpj</span> <span class="o">=</span> <span class="n">reformulated_lpj</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span> <span class="o">=</span> <span class="n">use_storage</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_psi_update</span> <span class="o">=</span> <span class="n">reformulated_psi_update</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_W</span><span class="p">(</span><span class="n">W_init</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_sigma2</span><span class="p">(</span><span class="n">sigma2_init</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;mus&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_mus</span><span class="p">(</span><span class="n">mus_init</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;Psi&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_Psi</span><span class="p">(</span><span class="n">Psi_init</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_init_pies</span><span class="p">(</span><span class="n">pies_init</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log2pi</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">MATH_PI</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_y_szT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz_xpt_szT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">H</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">H</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">H</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">H</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">H</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">H</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="k">if</span> <span class="n">reformulated_psi_update</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_diag_yyT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_N</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">int</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_eps_eyeH</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1e-6</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">use_storage</span> <span class="k">else</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">,</span>
+            <span class="n">reformulated_lpj</span><span class="o">=</span><span class="n">reformulated_lpj</span><span class="p">,</span>
+            <span class="n">reformulated_psi_update</span><span class="o">=</span><span class="n">reformulated_psi_update</span><span class="p">,</span>
+            <span class="n">use_storage</span><span class="o">=</span><span class="n">use_storage</span><span class="p">,</span>
+            <span class="n">precision</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_init_W</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]):</span>
+        <span class="n">D</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">W_init</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">D</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+            <span class="n">broadcast</span><span class="p">(</span><span class="n">W_init</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">W_init</span>
+
+    <span class="k">def</span> <span class="nf">_init_sigma2</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span>
+            <span class="k">return</span> <span class="n">init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_init_mus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]):</span>
+        <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">H</span><span class="p">,)</span>
+            <span class="k">return</span> <span class="n">init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mus_init</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span>
+                <span class="n">mean</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">()),</span>
+                <span class="n">std</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">()),</span>
+            <span class="p">)</span>
+            <span class="n">broadcast</span><span class="p">(</span><span class="n">mus_init</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">mus_init</span>
+
+    <span class="k">def</span> <span class="nf">_init_Psi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]):</span>
+        <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">to</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_init_pies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]):</span>
+        <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">init</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">H</span><span class="p">,)</span>
+            <span class="k">return</span> <span class="n">init</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.1</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+
+<div class="viewcode-block" id="SSSC.generate_data">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC.generate_data">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">hidden_state</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
+        <span class="n">precision</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">get_device</span><span class="p">()</span>
+        <span class="n">D</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="k">if</span> <span class="n">hidden_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">N</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">pies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span>
+            <span class="n">hidden_state</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">pies</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">shape</span> <span class="o">=</span> <span class="n">hidden_state</span><span class="o">.</span><span class="n">shape</span>
+            <span class="k">if</span> <span class="n">N</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">N</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;hidden_state has shape </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">, expected (</span><span class="si">{</span><span class="n">N</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">H</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">must_return_hidden_state</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">Z</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">multivariate_normal</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span>
+            <span class="n">loc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;mus&quot;</span><span class="p">],</span>
+            <span class="n">covariance_matrix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;Psi&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">Wbar</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;dh,nh-&gt;nd&quot;</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">],</span> <span class="n">hidden_state</span> <span class="o">*</span> <span class="n">Z</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">N</span><span class="p">,))))</span>
+
+        <span class="n">Y</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">multivariate_normal</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span>
+            <span class="n">loc</span><span class="o">=</span><span class="n">Wbar</span><span class="p">,</span>
+            <span class="n">covariance_matrix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">()),</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">Y</span><span class="o">.</span><span class="n">sample</span><span class="p">(),</span> <span class="n">hidden_state</span><span class="p">)</span> <span class="k">if</span> <span class="n">must_return_hidden_state</span> <span class="k">else</span> <span class="n">Y</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_lpj_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Straightforward batchified implementation of log-pseudo joint for SSSC</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span>
+        <span class="n">W</span><span class="p">,</span> <span class="n">sigma2</span><span class="p">,</span> <span class="n">_pies</span><span class="p">,</span> <span class="n">mus</span><span class="p">,</span> <span class="n">Psi</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;mus&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;Psi&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="n">pies</span> <span class="o">=</span> <span class="n">_pies</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1e-2</span><span class="p">)</span>
+        <span class="n">Kfloat</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">type_as</span><span class="p">(</span><span class="n">pies</span><span class="p">)</span>
+        <span class="n">N</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span> <span class="o">+</span> <span class="n">states</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">eyeD</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+
+        <span class="n">s1</span> <span class="o">=</span> <span class="n">Kfloat</span> <span class="o">@</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pies</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">pies</span><span class="p">))</span>  <span class="c1"># (N, S)</span>
+        <span class="n">Ws</span> <span class="o">=</span> <span class="n">Kfloat</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">W</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N, S, D, H)</span>
+        <span class="n">data_norm</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">Ws</span> <span class="o">@</span> <span class="n">mus</span>  <span class="c1"># (N, S, D)</span>
+        <span class="n">data_norm</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data_norm</span><span class="p">)]</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="n">WsPsi</span> <span class="o">=</span> <span class="n">Ws</span> <span class="o">@</span> <span class="n">Psi</span>  <span class="c1"># (N, S, D, H)</span>
+        <span class="n">WsPsiWsT</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">to</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">WsPsi</span><span class="p">,</span> <span class="n">Ws</span><span class="o">.</span><span class="n">permute</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">]))</span>
+            <span class="k">if</span> <span class="n">precision</span> <span class="o">==</span> <span class="n">to</span><span class="o">.</span><span class="n">float32</span>
+            <span class="k">else</span> <span class="n">to</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;nsxh,nsyh-&gt;nsxy&quot;</span><span class="p">,</span> <span class="n">WsPsi</span><span class="p">,</span> <span class="n">Ws</span><span class="p">)</span>
+        <span class="p">)</span>  <span class="c1"># (N, S, D, D)</span>
+        <span class="n">C_s</span> <span class="o">=</span> <span class="n">WsPsiWsT</span> <span class="o">+</span> <span class="n">sigma2</span> <span class="o">*</span> <span class="n">eyeD</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N, S, D, D)</span>
+        <span class="n">log_det_C_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">slogdet</span><span class="p">(</span><span class="n">C_s</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">Inv_C_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">C_s</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">Inv_C_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">C_s</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">s1</span>
+            <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">log_det_C_s</span>
+            <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;nsx,nsxd-&gt;nsd&quot;</span><span class="p">,</span> <span class="n">data_norm</span><span class="p">,</span> <span class="n">Inv_C_s</span><span class="p">)</span> <span class="o">*</span> <span class="n">data_norm</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_common_e_m_step_terms</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">inds_d_not_isnan</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span>
+        <span class="n">sigma2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]</span>
+        <span class="n">Psi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;Psi&quot;</span><span class="p">]</span>
+        <span class="n">mus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;mus&quot;</span><span class="p">]</span>
+
+        <span class="n">W_s</span> <span class="o">=</span> <span class="n">W</span><span class="p">[</span><span class="n">inds_d_not_isnan</span><span class="p">][:,</span> <span class="n">state</span><span class="p">]</span>
+        <span class="n">Psi_s</span> <span class="o">=</span> <span class="n">Psi</span><span class="p">[</span><span class="n">state</span><span class="p">,</span> <span class="p">:][:,</span> <span class="n">state</span><span class="p">]</span>
+        <span class="n">mus_s</span> <span class="o">=</span> <span class="n">mus</span><span class="p">[</span><span class="n">state</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">Inv_Psi_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">Psi_s</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">Inv_Psi_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">Psi_s</span><span class="p">)</span>
+
+        <span class="n">Inv_Lambda_s</span> <span class="o">=</span> <span class="n">W_s</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">W_s</span> <span class="o">/</span> <span class="n">sigma2</span> <span class="o">+</span> <span class="n">Inv_Psi_s</span>  <span class="c1"># (|state|, |state|)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">Lambda_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">Inv_Lambda_s</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">Lambda_s</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">Inv_Lambda_s</span><span class="p">)</span>
+
+        <span class="n">Lambda_s_W_s_sigma2inv</span> <span class="o">=</span> <span class="n">Lambda_s</span> <span class="o">@</span> <span class="n">W_s</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">/</span> <span class="n">sigma2</span>  <span class="c1"># (|state|, D_nonnan)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">W_s</span><span class="p">,</span>
+            <span class="n">mus_s</span><span class="p">,</span>
+            <span class="n">Psi_s</span><span class="p">,</span>
+            <span class="n">Inv_Lambda_s</span><span class="p">,</span>
+            <span class="n">Lambda_s</span><span class="p">,</span>
+            <span class="n">Lambda_s_W_s_sigma2inv</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_check_if_storage_reliable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">incomplete</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Disable the storage logic by setting `self._use_storage=False` if data is incomplete</span>
+<span class="sd">        and if the specified batch_size is larger than one. The terms stored by the storage are</span>
+<span class="sd">        only data-independent if the data does not contain missing values; otherwise,</span>
+<span class="sd">        data-dependent indices of missing values are included in the computations of the</span>
+<span class="sd">        respective terms.</span>
+
+<span class="sd">        :param incomplete: Boolean indicating whether the data contains missing values</span>
+<span class="sd">        :param batch_size: Batch size</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">use_storage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span> <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">incomplete</span> <span class="ow">and</span> <span class="n">batch_size</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">else</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span> <span class="o">!=</span> <span class="n">use_storage</span><span class="p">:</span>
+            <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;Disabled storage (inaccurate for incomplete data and batch_size &gt; 1)&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span> <span class="o">=</span> <span class="n">use_storage</span>
+
+    <span class="k">def</span> <span class="nf">_reformulated_lpj_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Batchified implementation of log-pseudo joint for SSSC using matrix determinant lemma and</span>
+<span class="sd">        Woodbury matrix identity to compute determinant and inverse of matrix C_s</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span>
+        <span class="n">sigma2</span><span class="p">,</span> <span class="n">_pies</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="n">pies</span> <span class="o">=</span> <span class="n">_pies</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1e-2</span><span class="p">)</span>
+        <span class="n">Kbool</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">bool</span><span class="p">)</span>
+        <span class="n">Kfloat</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">)</span>
+        <span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">Kbool</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_if_storage_reliable</span><span class="p">(</span><span class="n">incomplete</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">(),</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">)</span>
+        <span class="n">use_storage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span>
+
+        <span class="n">notnan</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">logical_not</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">Kfloat</span> <span class="o">@</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pies</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">pies</span><span class="p">))</span>  <span class="c1"># initial allocation, (N, S)</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">batch_size</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">S</span><span class="p">):</span>
+                <span class="n">hsh</span> <span class="o">=</span> <span class="n">_get_hash</span><span class="p">(</span><span class="n">Kbool</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
+                <span class="n">datapoint_notnan</span><span class="p">,</span> <span class="n">D_notnan</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">notnan</span><span class="p">[</span><span class="n">n</span><span class="p">]],</span> <span class="n">notnan</span><span class="p">[</span><span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">use_storage</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">hsh</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">:</span>
+                    <span class="n">W_s</span><span class="p">,</span> <span class="n">mus_s</span><span class="p">,</span> <span class="n">log_det_C_s_wo_last_term</span><span class="p">,</span> <span class="n">Inv_C_s</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;W_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;mus_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;log_det_C_s_wo_last_term&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;Inv_C_s&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="p">(</span>
+                        <span class="n">W_s</span><span class="p">,</span>
+                        <span class="n">mus_s</span><span class="p">,</span>
+                        <span class="n">Psi_s</span><span class="p">,</span>
+                        <span class="n">Inv_Lambda_s</span><span class="p">,</span>
+                        <span class="n">Lambda_s</span><span class="p">,</span>
+                        <span class="n">Lambda_s_W_s_sigma2inv</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_common_e_m_step_terms</span><span class="p">(</span><span class="n">Kbool</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">],</span> <span class="n">notnan</span><span class="p">[</span><span class="n">n</span><span class="p">])</span>
+
+                    <span class="n">Inv_C_s</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">to</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">D_notnan</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span> <span class="o">/</span> <span class="n">sigma2</span>
+                        <span class="o">-</span> <span class="n">W_s</span> <span class="o">@</span> <span class="n">Lambda_s_W_s_sigma2inv</span> <span class="o">/</span> <span class="n">sigma2</span>
+                    <span class="p">)</span>  <span class="c1"># (D_nonnan, D_nonnan)</span>
+                    <span class="n">log_det_C_s_wo_last_term</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">slogdet</span><span class="p">(</span><span class="n">Inv_Lambda_s</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">slogdet</span><span class="p">(</span><span class="n">Psi_s</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="p">)</span>  <span class="c1"># matrix determinant lemma, last term added in log_joint (1,)</span>
+
+                    <span class="k">if</span> <span class="n">use_storage</span><span class="p">:</span>
+                        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="s2">&quot;W_s&quot;</span><span class="p">:</span> <span class="n">W_s</span><span class="p">,</span>
+                            <span class="s2">&quot;mus_s&quot;</span><span class="p">:</span> <span class="n">mus_s</span><span class="p">,</span>
+                            <span class="s2">&quot;Lambda_s&quot;</span><span class="p">:</span> <span class="n">Lambda_s</span><span class="p">,</span>
+                            <span class="s2">&quot;Lambda_s_W_s_sigma2inv&quot;</span><span class="p">:</span> <span class="n">Lambda_s_W_s_sigma2inv</span><span class="p">,</span>
+                            <span class="s2">&quot;log_det_C_s_wo_last_term&quot;</span><span class="p">:</span> <span class="n">log_det_C_s_wo_last_term</span><span class="p">,</span>
+                            <span class="s2">&quot;Inv_C_s&quot;</span><span class="p">:</span> <span class="n">Inv_C_s</span><span class="p">,</span>
+                        <span class="p">}</span>
+
+                <span class="n">datapoint_norm</span> <span class="o">=</span> <span class="n">datapoint_notnan</span> <span class="o">-</span> <span class="n">W_s</span> <span class="o">@</span> <span class="n">mus_s</span>  <span class="c1"># (D_nonnan,)</span>
+
+                <span class="n">lpj</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">]</span> <span class="o">-=</span> <span class="p">(</span>
+                    <span class="mf">0.5</span>
+                    <span class="o">*</span> <span class="p">(</span>
+                        <span class="n">log_det_C_s_wo_last_term</span>
+                        <span class="o">+</span> <span class="p">(</span><span class="n">datapoint_norm</span> <span class="o">*</span> <span class="p">(</span><span class="n">Inv_C_s</span> <span class="o">@</span> <span class="n">datapoint_norm</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">lpj</span>
+
+<div class="viewcode-block" id="SSSC.log_pseudo_joint">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC.log_pseudo_joint">[docs]</a>
+    <span class="k">def</span> <span class="nf">log_pseudo_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate log-pseudo-joints for SSSC.&quot;&quot;&quot;</span>
+        <span class="n">lpj_fn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_lpj_fn</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_lpj</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lpj_fn</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">lpj_fn</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="n">min_</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">min</span>
+        <span class="n">lpj</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">lpj</span><span class="p">)]</span> <span class="o">=</span> <span class="n">min_</span>
+        <span class="n">lpj</span><span class="p">[</span><span class="n">to</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">lpj</span><span class="p">)]</span> <span class="o">=</span> <span class="n">min_</span>
+        <span class="k">return</span> <span class="n">lpj</span></div>
+
+
+<div class="viewcode-block" id="SSSC.log_joint">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC.log_joint">[docs]</a>
+    <span class="k">def</span> <span class="nf">log_joint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">states</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">lpj</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate log-joints for SSSC.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">states</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">to</span><span class="o">.</span><span class="n">uint8</span>
+        <span class="n">notnan</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">logical_not</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">lpj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">lpj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_pseudo_joint</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">states</span><span class="p">)</span>
+        <span class="c1"># TODO: could pre-evaluate the constant factor once per epoch</span>
+        <span class="n">pies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1e-2</span><span class="p">)</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">notnan</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># (N,)</span>
+        <span class="n">logjoints</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">lpj</span>
+            <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">pies</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="o">-</span> <span class="n">D</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_log2pi</span> <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">]))</span>
+        <span class="p">)</span>
+        <span class="k">assert</span> <span class="n">logjoints</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">lpj</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">logjoints</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">logjoints</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">logjoints</span></div>
+
+
+<div class="viewcode-block" id="SSSC.update_param_batch">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC.update_param_batch">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_param_batch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">Kbool</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">bool</span><span class="p">)</span>
+        <span class="n">Kfloat</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">lpj</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">Kbool</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="n">use_storage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+        <span class="c1"># TODO: Add option to neglect reconstructed values</span>
+        <span class="n">notnan</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">bool</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">batch</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="n">batch_kappas</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="n">batch_Lambdas_plus_kappas_kappasT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">batch_size</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">S</span><span class="p">):</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="n">Kbool</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">hsh</span> <span class="o">=</span> <span class="n">_get_hash</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+                <span class="n">datapoint</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="n">n</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">use_storage</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">assert</span> <span class="n">hsh</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span>
+                    <span class="n">W_s</span><span class="p">,</span> <span class="n">mus_s</span><span class="p">,</span> <span class="n">Lambda_s</span><span class="p">,</span> <span class="n">Lambda_s_W_s_sigma2inv</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;W_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;mus_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;Lambda_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;Lambda_s_W_s_sigma2inv&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="p">(</span>
+                        <span class="n">W_s</span><span class="p">,</span>
+                        <span class="n">mus_s</span><span class="p">,</span>
+                        <span class="n">_</span><span class="p">,</span>
+                        <span class="n">_</span><span class="p">,</span>
+                        <span class="n">Lambda_s</span><span class="p">,</span>
+                        <span class="n">Lambda_s_W_s_sigma2inv</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_common_e_m_step_terms</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">notnan</span><span class="p">[</span><span class="n">n</span><span class="p">])</span>
+
+                <span class="n">datapoint_norm</span> <span class="o">=</span> <span class="n">datapoint</span> <span class="o">-</span> <span class="n">W_s</span> <span class="o">@</span> <span class="n">mus_s</span>  <span class="c1"># (D_nonnan,)</span>
+
+                <span class="n">batch_kappas</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">][</span><span class="n">state</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">mus_s</span> <span class="o">+</span> <span class="n">Lambda_s_W_s_sigma2inv</span> <span class="o">@</span> <span class="n">datapoint_norm</span>
+                <span class="p">)</span>  <span class="c1"># is (|state|,)</span>
+                <span class="n">batch_Lambdas_plus_kappas_kappasT</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">][</span><span class="n">to</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">state</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">Lambda_s</span> <span class="o">+</span> <span class="n">to</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">batch_kappas</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">][</span><span class="n">state</span><span class="p">],</span> <span class="n">batch_kappas</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">][</span><span class="n">state</span><span class="p">])</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>  <span class="c1"># (|state|, |state|)</span>
+
+        <span class="n">batch_xpt_s</span> <span class="o">=</span> <span class="n">mean_posterior</span><span class="p">(</span><span class="n">Kfloat</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span>  <span class="c1"># is (batch_size,H)</span>
+        <span class="n">batch_xpt_ssT</span> <span class="o">=</span> <span class="n">mean_posterior</span><span class="p">(</span>
+            <span class="n">Kfloat</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="o">*</span> <span class="n">Kfloat</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">lpj</span>
+        <span class="p">)</span>  <span class="c1"># (batch_size, H, H)</span>
+        <span class="n">batch_xpt_sz</span> <span class="o">=</span> <span class="n">mean_posterior</span><span class="p">(</span><span class="n">batch_kappas</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span>  <span class="c1"># (batch_size, H)</span>
+        <span class="n">batch_xpt_szszT</span> <span class="o">=</span> <span class="n">mean_posterior</span><span class="p">(</span>
+            <span class="n">batch_Lambdas_plus_kappas_kappasT</span><span class="p">,</span> <span class="n">lpj</span>
+        <span class="p">)</span>  <span class="c1"># (batch_size, H, H)</span>
+        <span class="n">batch_xpt_sszT</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">batch_xpt_s</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">batch_xpt_sz</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_psi_update</span>
+            <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="c1"># is (batch_size, H, H)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_s</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">batch_xpt_s</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>  <span class="c1"># (H,)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">batch_xpt_ssT</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>  <span class="c1"># (H, H)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">batch_xpt_sz</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>  <span class="c1"># (H,)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz_xpt_szT</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">batch_xpt_sz</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">batch_xpt_sz</span><span class="p">)</span>  <span class="c1"># (H, H)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">batch_xpt_szszT</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>  <span class="c1"># (H, H)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_diag_yyT</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">batch</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>  <span class="c1"># (D,)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_y_szT</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">batch_xpt_sz</span><span class="p">)</span>  <span class="c1"># (D, H)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_N</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">batch_size</span><span class="p">)</span>  <span class="c1"># (1,)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_psi_update</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">batch_xpt_sszT</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">batch_xpt_sszT</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>  <span class="c1"># (H, H)</span>
+
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_invert_my_sum_xpt_ssT</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">eps_eyeH</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eps_eyeH</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">Inv_my_sum_xpt_ssT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">Inv_my_sum_xpt_ssT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span> <span class="o">+</span> <span class="n">eps_eyeH</span><span class="p">)</span>
+                <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;Psi update: Addd diag(eps) before computing inverse&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">Inv_my_sum_xpt_ssT</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span> <span class="o">+</span> <span class="n">eps_eyeH</span><span class="p">)</span>
+                <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;Psi update: Added diag(eps) and computed pseudo-inverse&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Inv_my_sum_xpt_ssT</span>
+
+<div class="viewcode-block" id="SSSC.update_param_epoch">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC.update_param_epoch">[docs]</a>
+    <span class="k">def</span> <span class="nf">update_param_epoch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span>
+        <span class="n">precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">get_device</span><span class="p">()</span>
+        <span class="n">dtype_eps</span><span class="p">,</span> <span class="n">eps</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">,</span> <span class="mf">1e-5</span>
+        <span class="n">eps_eyeH</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eps_eyeH</span>
+        <span class="n">D</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="n">W</span><span class="p">,</span> <span class="n">sigma2</span><span class="p">,</span> <span class="n">pies</span><span class="p">,</span> <span class="n">Psi</span><span class="p">,</span> <span class="n">mus</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">],</span>
+            <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;sigma2&quot;</span><span class="p">],</span>
+            <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;pies&quot;</span><span class="p">],</span>
+            <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;Psi&quot;</span><span class="p">],</span>
+            <span class="n">theta</span><span class="p">[</span><span class="s2">&quot;mus&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_y_szT</span><span class="p">)</span>  <span class="c1"># (D, H)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span><span class="p">)</span>  <span class="c1"># (H, H)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz_xpt_szT</span><span class="p">)</span>  <span class="c1"># (H, H)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_s</span><span class="p">)</span>  <span class="c1"># (H,)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz</span><span class="p">)</span>  <span class="c1"># (H,)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span><span class="p">)</span>  <span class="c1"># (H, H)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_diag_yyT</span><span class="p">)</span>  <span class="c1"># (D,)</span>
+        <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_N</span><span class="p">)</span>  <span class="c1"># (1,)</span>
+
+        <span class="n">N</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_N</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+        <span class="n">Inv_my_sum_xpt_ssT</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_invert_my_sum_xpt_ssT</span><span class="p">()</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sum_xpt_szszT_inv</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span><span class="p">)</span>
+            <span class="n">W</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_y_szT</span> <span class="o">@</span> <span class="n">sum_xpt_szszT_inv</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">noise</span> <span class="o">=</span> <span class="n">eps</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="n">noise</span> <span class="o">=</span> <span class="n">noise</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">noise</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">sum_xpt_szszT_inv</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span> <span class="o">+</span> <span class="n">noise</span><span class="p">)</span>
+                <span class="n">W</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_y_szT</span> <span class="o">@</span> <span class="n">sum_xpt_szszT_inv</span>
+                <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;W update: Used noisy pseudo-inverse&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">W</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">W</span> <span class="o">+</span> <span class="n">eps</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">W</span><span class="p">)</span>
+                <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;W update: Failed to compute W^(new). Pertubed current W with AWGN.&quot;</span><span class="p">)</span>
+
+        <span class="n">pies</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_s</span> <span class="o">/</span> <span class="n">N</span>
+        <span class="n">mus</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_s</span> <span class="o">+</span> <span class="n">dtype_eps</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reformulated_psi_update</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">all_reduce</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span><span class="p">)</span>  <span class="c1"># (H, H)</span>
+            <span class="n">_Psi</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">to</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">mus</span><span class="p">,</span> <span class="n">mus</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span>
+                <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">mus</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span>
+            <span class="p">)</span>
+            <span class="n">Psi</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">_Psi</span> <span class="o">*</span> <span class="n">Inv_my_sum_xpt_ssT</span> <span class="o">+</span> <span class="n">eps_eyeH</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssz</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">Psi</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span> <span class="o">*</span> <span class="n">to</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">mus</span><span class="p">,</span> <span class="n">mus</span><span class="p">)</span>
+            <span class="p">)</span> <span class="o">*</span> <span class="n">Inv_my_sum_xpt_ssT</span> <span class="o">+</span> <span class="n">eps_eyeH</span>
+        <span class="n">sigma2</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_diag_yyT</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">-</span> <span class="n">to</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz_xpt_szT</span> <span class="o">@</span> <span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">t</span><span class="p">()</span> <span class="o">@</span> <span class="n">W</span><span class="p">))</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="n">N</span> <span class="o">/</span> <span class="n">D</span> <span class="o">+</span> <span class="n">eps</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_y_szT</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_szszT</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_s</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_ssT</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_diag_yyT</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_sum_xpt_sz_xpt_szT</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_my_N</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="SSSC.data_estimator">
+<a class="viewcode-back" href="../../../tvo.models.html#tvo.models.SSSC.data_estimator">[docs]</a>
+    <span class="k">def</span> <span class="nf">data_estimator</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">idx</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">batch</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">states</span><span class="p">:</span> <span class="n">TVOVariationalStates</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimator used for data reconstruction. Data reconstruction can only be supported</span>
+<span class="sd">        by a model if it implements this method. The estimator to be implemented is defined</span>
+<span class="sd">        as follows:&quot;&quot;&quot;</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        :math:`\\langle \langle y_d \rangle_{p(y_d|\vec</span><span class="si">{s}</span><span class="s2">,\Theta)} \rangle_{q(\vec</span><span class="si">{s}</span><span class="s2">|\mathcal</span><span class="si">{K}</span><span class="s2">,\Theta)}`  # noqa</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO Find solution to avoid redundant computations in `data_estimator` and</span>
+        <span class="c1"># `log_pseudo_joint`</span>
+        <span class="n">precision</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span>
+        <span class="n">lpj</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">Kbool</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">to</span><span class="o">.</span><span class="n">bool</span><span class="p">)</span>
+        <span class="n">W</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta</span><span class="p">[</span><span class="s2">&quot;W&quot;</span><span class="p">]</span>
+        <span class="n">use_storage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_storage</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+        <span class="n">notnan</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">logical_not</span><span class="p">(</span><span class="n">to</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">batch</span><span class="p">))</span>
+
+        <span class="n">batch_kappas</span> <span class="o">=</span> <span class="n">to</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">S</span><span class="p">,</span> <span class="n">H</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">batch_size</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">S</span><span class="p">):</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="n">Kbool</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">hsh</span> <span class="o">=</span> <span class="n">_get_hash</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+                <span class="n">datapoint_notnan</span> <span class="o">=</span> <span class="n">batch</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">notnan</span><span class="p">[</span><span class="n">n</span><span class="p">]]</span>
+
+                <span class="k">if</span> <span class="n">use_storage</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">assert</span> <span class="n">hsh</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span>
+                    <span class="n">W_s</span><span class="p">,</span> <span class="n">mus_s</span><span class="p">,</span> <span class="n">Lambda_s_W_s_sigma2inv</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;W_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;mus_s&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_storage</span><span class="p">[</span><span class="n">hsh</span><span class="p">][</span><span class="s2">&quot;Lambda_s_W_s_sigma2inv&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="p">(</span>
+                        <span class="n">W_s</span><span class="p">,</span>
+                        <span class="n">mus_s</span><span class="p">,</span>
+                        <span class="n">_</span><span class="p">,</span>
+                        <span class="n">_</span><span class="p">,</span>
+                        <span class="n">_</span><span class="p">,</span>
+                        <span class="n">Lambda_s_W_s_sigma2inv</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_common_e_m_step_terms</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">notnan</span><span class="p">[</span><span class="n">n</span><span class="p">])</span>
+
+                <span class="n">datapoint_norm</span> <span class="o">=</span> <span class="n">datapoint_notnan</span> <span class="o">-</span> <span class="n">W_s</span> <span class="o">@</span> <span class="n">mus_s</span>  <span class="c1"># (D_nonnan,)</span>
+
+                <span class="n">batch_kappas</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">s</span><span class="p">][</span><span class="n">state</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">mus_s</span> <span class="o">+</span> <span class="n">Lambda_s_W_s_sigma2inv</span> <span class="o">@</span> <span class="n">datapoint_norm</span>
+                <span class="p">)</span>  <span class="c1"># is (|state|,)</span>
+
+        <span class="k">return</span> <span class="n">to</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">mean_posterior</span><span class="p">(</span><span class="n">batch_kappas</span><span class="p">,</span> <span class="n">lpj</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.models &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="tvo.variational" href="tvo.variational.html" />
+    <link rel="prev" title="tvo.exp" href="tvo.exp.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">tvo.models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.BSC"><code class="docutils literal notranslate"><span class="pre">BSC</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.data_estimator"><code class="docutils literal notranslate"><span class="pre">BSC.data_estimator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.generate_data"><code class="docutils literal notranslate"><span class="pre">BSC.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.log_joint"><code class="docutils literal notranslate"><span class="pre">BSC.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.log_pseudo_joint"><code class="docutils literal notranslate"><span class="pre">BSC.log_pseudo_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.shape"><code class="docutils literal notranslate"><span class="pre">BSC.shape</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.update_param_batch"><code class="docutils literal notranslate"><span class="pre">BSC.update_param_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BSC.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">BSC.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.BernoulliTVAE"><code class="docutils literal notranslate"><span class="pre">BernoulliTVAE</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BernoulliTVAE.forward"><code class="docutils literal notranslate"><span class="pre">BernoulliTVAE.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BernoulliTVAE.generate_data"><code class="docutils literal notranslate"><span class="pre">BernoulliTVAE.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BernoulliTVAE.log_joint"><code class="docutils literal notranslate"><span class="pre">BernoulliTVAE.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.BernoulliTVAE.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">BernoulliTVAE.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.GMM"><code class="docutils literal notranslate"><span class="pre">GMM</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.data_estimator"><code class="docutils literal notranslate"><span class="pre">GMM.data_estimator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.generate_data"><code class="docutils literal notranslate"><span class="pre">GMM.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.log_joint"><code class="docutils literal notranslate"><span class="pre">GMM.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.log_pseudo_joint"><code class="docutils literal notranslate"><span class="pre">GMM.log_pseudo_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.shape"><code class="docutils literal notranslate"><span class="pre">GMM.shape</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.update_param_batch"><code class="docutils literal notranslate"><span class="pre">GMM.update_param_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GMM.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">GMM.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.GaussianTVAE"><code class="docutils literal notranslate"><span class="pre">GaussianTVAE</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GaussianTVAE.forward"><code class="docutils literal notranslate"><span class="pre">GaussianTVAE.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GaussianTVAE.generate_data"><code class="docutils literal notranslate"><span class="pre">GaussianTVAE.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GaussianTVAE.log_joint"><code class="docutils literal notranslate"><span class="pre">GaussianTVAE.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.GaussianTVAE.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">GaussianTVAE.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.NoisyOR"><code class="docutils literal notranslate"><span class="pre">NoisyOR</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.NoisyOR.generate_data"><code class="docutils literal notranslate"><span class="pre">NoisyOR.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.NoisyOR.log_joint"><code class="docutils literal notranslate"><span class="pre">NoisyOR.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.NoisyOR.log_pseudo_joint"><code class="docutils literal notranslate"><span class="pre">NoisyOR.log_pseudo_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.NoisyOR.update_param_batch"><code class="docutils literal notranslate"><span class="pre">NoisyOR.update_param_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.NoisyOR.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">NoisyOR.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.PMM"><code class="docutils literal notranslate"><span class="pre">PMM</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.data_estimator"><code class="docutils literal notranslate"><span class="pre">PMM.data_estimator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.generate_data"><code class="docutils literal notranslate"><span class="pre">PMM.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.log_joint"><code class="docutils literal notranslate"><span class="pre">PMM.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.log_pseudo_joint"><code class="docutils literal notranslate"><span class="pre">PMM.log_pseudo_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.shape"><code class="docutils literal notranslate"><span class="pre">PMM.shape</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.update_param_batch"><code class="docutils literal notranslate"><span class="pre">PMM.update_param_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.PMM.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">PMM.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.models.SSSC"><code class="docutils literal notranslate"><span class="pre">SSSC</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.SSSC.data_estimator"><code class="docutils literal notranslate"><span class="pre">SSSC.data_estimator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.SSSC.generate_data"><code class="docutils literal notranslate"><span class="pre">SSSC.generate_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.SSSC.log_joint"><code class="docutils literal notranslate"><span class="pre">SSSC.log_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.SSSC.log_pseudo_joint"><code class="docutils literal notranslate"><span class="pre">SSSC.log_pseudo_joint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.SSSC.update_param_batch"><code class="docutils literal notranslate"><span class="pre">SSSC.update_param_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.models.SSSC.update_param_epoch"><code class="docutils literal notranslate"><span class="pre">SSSC.update_param_epoch()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">tvo.models</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/tvo.models.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-tvo.models">
+<span id="tvo-models"></span><h1>tvo.models<a class="headerlink" href="#module-tvo.models" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.BSC">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">BSC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma2_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pies_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">individual_priors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC" title="Link to this definition"></a></dt>
+<dd><p>Shallow Binary Sparse Coding (BSC) model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of hidden units.</p></li>
+<li><p><strong>D</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of observables.</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (D,H), initializes BSC weights.</p></li>
+<li><p><strong>pies_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H,), initializes BSC priors.</p></li>
+<li><p><strong>individual_priors</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to use a Bernoulli prior with H individual prior
+probabilities. If False, the same prior probability will be used for all latents.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – Floating point precision required. Must be one of torch.float32 or
+torch.float64.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BSC.data_estimator">
+<span class="sig-name descname"><span class="pre">data_estimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC.data_estimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC.data_estimator" title="Link to this definition"></a></dt>
+<dd><p>Estimator used for data reconstruction. Data reconstruction can only be supported
+by a model if it implements this method. The estimator to be implemented is defined
+as follows:
+<span class="math notranslate nohighlight">\(\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}\)</span>  # noqa</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BSC.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Sample N datapoints from this model. At least one of N or hidden_state must be provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of data points to be generated.</p></li>
+<li><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (N,H) where H is the number of units in the
+first latent layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>if hidden_state was not provided, a tuple (data, hidden_state) where data is
+a Tensor with shape (N, D) where D is the number of observables for this model
+and hidden_state is the corresponding tensor of hidden variables with shape
+(N, H) where H is the number of hidden variables for this model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BSC.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joints for BSC.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BSC.log_pseudo_joint">
+<span class="sig-name descname"><span class="pre">log_pseudo_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC.log_pseudo_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC.log_pseudo_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-pseudo-joints for BSC</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="tvo.models.BSC.shape">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">shape</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tvo.models.BSC.shape" title="Link to this definition"></a></dt>
+<dd><p>The model shape, i.e. number of observables D and latents H as tuple (D,H)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the model shape: observable layer size followed by hidden layer size, e.g. (D, H)</p>
+</dd>
+</dl>
+<p>The default implementation returns self._shape if present, otherwise it tries to infer the
+model’s shape from the parameters self.theta: the number of latents is assumed to be equal
+to the first dimension of the first tensor in self.theta, and the number of observables is
+assumed to be equal to the last dimension of the last parameter in self.theta.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BSC.update_param_batch">
+<span class="sig-name descname"><span class="pre">update_param_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC.update_param_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC.update_param_batch" title="Link to this definition"></a></dt>
+<dd><p>Execute batch-wise M-step or batch-wise section of an M-step computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – indexes of the datapoints that compose the batch within the dataset</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of datapoints, Tensor with shape (N,D)</p></li>
+<li><p><strong>states</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="tvo.variational.html#tvo.variational.TVOVariationalStates" title="tvo.variational.TVOVariationalStates.TVOVariationalStates"><code class="xref py py-class docutils literal notranslate"><span class="pre">TVOVariationalStates</span></code></a></span>) – all variational states for this dataset</p></li>
+<li><p><strong>mstep_factors</strong> – optional dictionary containing the Tensors that were evaluated            by the lpj_fn function returned by get_lpj_func during this batch’s E-step.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+<p>If the model allows it, as an optimization this method can return this batch’s free energy
+evaluated _before_ the model parameter update. If the batch’s free energy is returned here,
+Trainers will skip a direct per-batch call to the free_energy method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BSC.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/bsc.html#BSC.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BSC.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.BernoulliTVAE">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">BernoulliTVAE</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycliclr_step_size_up</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pi_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analytical_pi_updates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">external_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#BernoulliTVAE"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BernoulliTVAE" title="Link to this definition"></a></dt>
+<dd><p>Create a TVAE model with Bernoulli observables.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>shape</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Network shape, from observable to most hidden: (D,…,H1,H0).
+Can be None if W_init is not None.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – One of to.float32 or to.float64, indicates the floating point precision
+of model parameters.</p></li>
+<li><p><strong>min_lr</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – See docs of tvo.utils.CyclicLR</p></li>
+<li><p><strong>max_lr</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – See docs of tvo.utils.CyclicLR</p></li>
+<li><p><strong>cycliclr_step_size_up</strong> – See docs of tvo.utils.CyclicLR</p></li>
+<li><p><strong>pi_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Optional tensor with initial prior values</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span>) – Optional list of tensors with initial weight values. Weight matrices
+must be ordered from most hidden to observable layer. If this parameter
+is not None, the shape parameter can be omitted.</p></li>
+<li><p><strong>b_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span>) – Optional list of tensors with initial.</p></li>
+<li><p><strong>analytical_pi_updates</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether priors should be updated via the analytical
+max-likelihood solution rather than gradient descent.</p></li>
+<li><p><strong>activation</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></span>) – Decoder activation function used if external_model is not specified.
+Defaults to ReLU if not specified and external_model not used.</p></li>
+<li><p><strong>external_model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code>]</span>) – Optional decoder neural network. One of shape, (W_init, b_init),
+external_model must be specified exclusively.</p></li>
+<li><p><strong>optimizer</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Optimizer</span></code>]</span>) – Gradient optimizer (defaults to Adam if not specified)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BernoulliTVAE.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#BernoulliTVAE.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BernoulliTVAE.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward application of TVAE’s MLP to the specified input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BernoulliTVAE.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#BernoulliTVAE.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BernoulliTVAE.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Sample N datapoints from this model. At least one of N or hidden_state must be provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of data points to be generated.</p></li>
+<li><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (N,H) where H is the number of units in the
+first latent layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>if hidden_state was not provided, a tuple (data, hidden_state) where data is
+a Tensor with shape (N, D) where D is the number of observables for this model
+and hidden_state is the corresponding tensor of hidden variables with shape
+(N, H) where H is the number of hidden variables for this model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BernoulliTVAE.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#BernoulliTVAE.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BernoulliTVAE.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joint probabilities for this model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – shape is (N,D)</p></li>
+<li><p><strong>states</strong> – shape is (N,S,H)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>log-joints for data and states - shape is (N,S)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.BernoulliTVAE.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#BernoulliTVAE.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.BernoulliTVAE.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.GMM">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">GMM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma2_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pies_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM" title="Link to this definition"></a></dt>
+<dd><p>Gaussian Mixture model (GMM).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of hidden units.</p></li>
+<li><p><strong>D</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of observables.</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (D,H), initializes GM weights.</p></li>
+<li><p><strong>pies_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H,), initializes GM priors.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – Floating point precision required. Must be one of torch.float32 or
+torch.float64.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GMM.data_estimator">
+<span class="sig-name descname"><span class="pre">data_estimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM.data_estimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM.data_estimator" title="Link to this definition"></a></dt>
+<dd><p>Estimator used for data reconstruction. Data reconstruction can only be supported
+by a model if it implements this method. The estimator to be implemented is defined
+as follows:
+<span class="math notranslate nohighlight">\(\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}\)</span>  # noqa</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GMM.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Sample N datapoints from this model. At least one of N or hidden_state must be provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of data points to be generated.</p></li>
+<li><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (N,H) where H is the number of units in the
+first latent layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>if hidden_state was not provided, a tuple (data, hidden_state) where data is
+a Tensor with shape (N, D) where D is the number of observables for this model
+and hidden_state is the corresponding tensor of hidden variables with shape
+(N, H) where H is the number of hidden variables for this model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GMM.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joints for GMM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GMM.log_pseudo_joint">
+<span class="sig-name descname"><span class="pre">log_pseudo_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM.log_pseudo_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM.log_pseudo_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-pseudo-joints for GMM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="tvo.models.GMM.shape">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">shape</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tvo.models.GMM.shape" title="Link to this definition"></a></dt>
+<dd><p>The model shape, i.e. number of observables D and latents H as tuple (D,H)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the model shape: observable layer size followed by hidden layer size, e.g. (D, H)</p>
+</dd>
+</dl>
+<p>The default implementation returns self._shape if present, otherwise it tries to infer the
+model’s shape from the parameters self.theta: the number of latents is assumed to be equal
+to the first dimension of the first tensor in self.theta, and the number of observables is
+assumed to be equal to the last dimension of the last parameter in self.theta.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GMM.update_param_batch">
+<span class="sig-name descname"><span class="pre">update_param_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM.update_param_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM.update_param_batch" title="Link to this definition"></a></dt>
+<dd><p>Execute batch-wise M-step or batch-wise section of an M-step computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – indexes of the datapoints that compose the batch within the dataset</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of datapoints, Tensor with shape (N,D)</p></li>
+<li><p><strong>states</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – all variational states for this dataset</p></li>
+<li><p><strong>mstep_factors</strong> – optional dictionary containing the Tensors that were evaluated            by the lpj_fn function returned by get_lpj_func during this batch’s E-step.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+<p>If the model allows it, as an optimization this method can return this batch’s free energy
+evaluated _before_ the model parameter update. If the batch’s free energy is returned here,
+Trainers will skip a direct per-batch call to the free_energy method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GMM.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/gmm.html#GMM.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GMM.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.GaussianTVAE">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">GaussianTVAE</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycliclr_step_size_up</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pi_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma2_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analytical_sigma_updates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">analytical_pi_updates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clamp_sigma_updates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">external_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#GaussianTVAE"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GaussianTVAE" title="Link to this definition"></a></dt>
+<dd><p>Create a TVAE model with Gaussian observables.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>shape</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>]</span>) – Network shape, from observable to most hidden: (D,…,H1,H0). One of shape,
+(W_init, b_init), external_model must be specified exclusively.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – One of to.float32 or to.float64, indicates the floating point precision
+of model parameters.</p></li>
+<li><p><strong>min_lr</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – See docs of tvo.utils.CyclicLR</p></li>
+<li><p><strong>max_lr</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – See docs of tvo.utils.CyclicLR</p></li>
+<li><p><strong>cycliclr_step_size_up</strong> – See docs of tvo.utils.CyclicLR</p></li>
+<li><p><strong>pi_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Optional tensor with initial prior values</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span>) – Optional list of tensors with initial weight values. Weight matrices
+must be ordered from most hidden to observable layer. One of shape,
+(W_init, b_init), external_model must be specified exclusively.</p></li>
+<li><p><strong>b_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sequence</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span>) – Optional list of tensors with initial bias. One of shape,
+(W_init, b_init), external_model must be specified exclusively.</p></li>
+<li><p><strong>sigma2_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – Optional initial value for model variance.</p></li>
+<li><p><strong>analytical_sigma_updates</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether sigmas should be updated via the analytical
+max-likelihood solution rather than gradient descent.</p></li>
+<li><p><strong>analytical_pi_updates</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether priors should be updated via the analytical
+max-likelihood solution rather than gradient descent.</p></li>
+<li><p><strong>clamp_sigma_updates</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to limit the rate at which sigma can be updated.</p></li>
+<li><p><strong>activation</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></span>) – Decoder activation function used if external_model is not specified.
+Defaults to ReLU if not specified and external_model not used.</p></li>
+<li><p><strong>external_model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code>]</span>) – Optional decoder neural network. One of shape, (W_init, b_init),
+external_model must be specified exclusively.</p></li>
+<li><p><strong>optimizer</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Optimizer</span></code>]</span>) – Gradient optimizer (defaults to Adam if not specified)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GaussianTVAE.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#GaussianTVAE.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GaussianTVAE.forward" title="Link to this definition"></a></dt>
+<dd><p>Forward application of TVAE’s MLP to the specified input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GaussianTVAE.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#GaussianTVAE.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GaussianTVAE.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Sample N datapoints from this model. At least one of N or hidden_state must be provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of data points to be generated.</p></li>
+<li><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (N,H) where H is the number of units in the
+first latent layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>if hidden_state was not provided, a tuple (data, hidden_state) where data is
+a Tensor with shape (N, D) where D is the number of observables for this model
+and hidden_state is the corresponding tensor of hidden variables with shape
+(N, H) where H is the number of hidden variables for this model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GaussianTVAE.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#GaussianTVAE.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GaussianTVAE.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joint probabilities for this model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – shape is (N,D)</p></li>
+<li><p><strong>states</strong> – shape is (N,S,H)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>log-joints for data and states - shape is (N,S)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.GaussianTVAE.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/tvae.html#GaussianTVAE.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.GaussianTVAE.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.NoisyOR">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">NoisyOR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pi_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/noisyor.html#NoisyOR"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.NoisyOR" title="Link to this definition"></a></dt>
+<dd><p>Shallow NoisyOR model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of hidden units.</p></li>
+<li><p><strong>D</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of observables.</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (D,H), initializes NoisyOR weights.</p></li>
+<li><p><strong>pi_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H,), initializes NoisyOR priors.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – Floating point precision required. Must be one of torch.float32 or
+torch.float64.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.NoisyOR.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/noisyor.html#NoisyOR.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.NoisyOR.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Use hidden states to sample datapoints according to the NoisyOR generative model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – a tensor with shape (N, H) where H is the number of hidden units.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the datapoints, as a tensor with shape (N, D) where D is
+the number of observables.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.NoisyOR.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/noisyor.html#NoisyOR.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.NoisyOR.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joint probabilities for this model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – shape is (N,D)</p></li>
+<li><p><strong>states</strong> – shape is (N,S,H)</p></li>
+<li><p><strong>lpj</strong> – shape is (N,S). When lpj is not None it must contain pre-evaluated
+log-pseudo joints for the given data and states. The implementation can take
+advantage of the extra argument to save computation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>log-joints for data and states - shape is (N,S)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.NoisyOR.log_pseudo_joint">
+<span class="sig-name descname"><span class="pre">log_pseudo_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/noisyor.html#NoisyOR.log_pseudo_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.NoisyOR.log_pseudo_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-pseudo-joints for NoisyOR.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.NoisyOR.update_param_batch">
+<span class="sig-name descname"><span class="pre">update_param_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mstep_factors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/noisyor.html#NoisyOR.update_param_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.NoisyOR.update_param_batch" title="Link to this definition"></a></dt>
+<dd><p>Execute batch-wise M-step or batch-wise section of an M-step computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – indexes of the datapoints that compose the batch within the dataset</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of datapoints, Tensor with shape (N,D)</p></li>
+<li><p><strong>states</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="tvo.variational.html#tvo.variational.TVOVariationalStates" title="tvo.variational.TVOVariationalStates.TVOVariationalStates"><code class="xref py py-class docutils literal notranslate"><span class="pre">TVOVariationalStates</span></code></a></span>) – all variational states for this dataset</p></li>
+<li><p><strong>mstep_factors</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]</span>) – optional dictionary containing the Tensors that were evaluated            by the lpj_fn function returned by get_lpj_func during this batch’s E-step.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]</span></p>
+</dd>
+</dl>
+<p>If the model allows it, as an optimization this method can return this batch’s free energy
+evaluated _before_ the model parameter update. If the batch’s free energy is returned here,
+Trainers will skip a direct per-batch call to the free_energy method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.NoisyOR.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/noisyor.html#NoisyOR.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.NoisyOR.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.PMM">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">PMM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pies_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM" title="Link to this definition"></a></dt>
+<dd><p>Poisson Mixture Model (PMM).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of hidden units.</p></li>
+<li><p><strong>D</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of observables.</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (D,H), initializes PMM weights.</p></li>
+<li><p><strong>pies_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H,), initializes PMM priors.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – Floating point precision required. Must be one of torch.float32 or
+torch.float64.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.PMM.data_estimator">
+<span class="sig-name descname"><span class="pre">data_estimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM.data_estimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM.data_estimator" title="Link to this definition"></a></dt>
+<dd><p>Estimator used for data reconstruction. Data reconstruction can only be supported
+by a model if it implements this method. The estimator to be implemented is defined
+as follows:
+<span class="math notranslate nohighlight">\(\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}\)</span>  # noqa</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.PMM.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Sample N datapoints from this model. At least one of N or hidden_state must be provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of data points to be generated.</p></li>
+<li><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (N,H) where H is the number of units in the
+first latent layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>if hidden_state was not provided, a tuple (data, hidden_state) where data is
+a Tensor with shape (N, D) where D is the number of observables for this model
+and hidden_state is the corresponding tensor of hidden variables with shape
+(N, H) where H is the number of hidden variables for this model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.PMM.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joints for PMM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.PMM.log_pseudo_joint">
+<span class="sig-name descname"><span class="pre">log_pseudo_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM.log_pseudo_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM.log_pseudo_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-pseudo-joints for GMM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="tvo.models.PMM.shape">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">shape</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#tvo.models.PMM.shape" title="Link to this definition"></a></dt>
+<dd><p>The model shape, i.e. number of observables D and latents H as tuple (D,H)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>the model shape: observable layer size followed by hidden layer size, e.g. (D, H)</p>
+</dd>
+</dl>
+<p>The default implementation returns self._shape if present, otherwise it tries to infer the
+model’s shape from the parameters self.theta: the number of latents is assumed to be equal
+to the first dimension of the first tensor in self.theta, and the number of observables is
+assumed to be equal to the last dimension of the last parameter in self.theta.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.PMM.update_param_batch">
+<span class="sig-name descname"><span class="pre">update_param_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM.update_param_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM.update_param_batch" title="Link to this definition"></a></dt>
+<dd><p>Execute batch-wise M-step or batch-wise section of an M-step computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – indexes of the datapoints that compose the batch within the dataset</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of datapoints, Tensor with shape (N,D)</p></li>
+<li><p><strong>states</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – all variational states for this dataset</p></li>
+<li><p><strong>mstep_factors</strong> – optional dictionary containing the Tensors that were evaluated            by the lpj_fn function returned by get_lpj_func during this batch’s E-step.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+<p>If the model allows it, as an optimization this method can return this batch’s free energy
+evaluated _before_ the model parameter update. If the batch’s free energy is returned here,
+Trainers will skip a direct per-batch call to the free_energy method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.PMM.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/pmm.html#PMM.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.PMM.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.models.SSSC">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.models.</span></span><span class="sig-name descname"><span class="pre">SSSC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma2_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mus_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Psi_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pies_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reformulated_lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_storage</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reformulated_psi_update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float32</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC" title="Link to this definition"></a></dt>
+<dd><p>Spike-And-Slab Sparse Coding (SSSC) model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of hidden units.</p></li>
+<li><p><strong>D</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of observables.</p></li>
+<li><p><strong>W_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H, D), initializes SSSC weights.</p></li>
+<li><p><strong>sigma2_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor initializing SSSC observable variance.</p></li>
+<li><p><strong>mus_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H,), initializes SSSC latent means.</p></li>
+<li><p><strong>Psi_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H, H), initializes SSSC latent variance.</p></li>
+<li><p><strong>pies_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (H,), initializes SSSC priors.</p></li>
+<li><p><strong>reformulated_lpj</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Use looped instead of batchified E-step and mathematically
+reformulated form of the log-pseudo-joint formula (exploiting
+matrix determinant lemma and Woodbury matrix identity). Yields
+more accurate solutions in large dimensions (i.e. large D and H).</p></li>
+<li><p><strong>use_storage</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to memorize state vector-dependent and datapoint independent-
+terms computed in the E-step. Terms will be looked-up rather than re-
+computed if a datapoint evaluates a state that has been evaluated for
+another datapoint before. The storage will be cleared after each epoch.</p></li>
+<li><p><strong>reformulated_psi_update</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – Whether to update Psi using reformulated form of the
+update equation.</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – Floating point precision required. Must be one of torch.float32 or
+torch.float64.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.SSSC.data_estimator">
+<span class="sig-name descname"><span class="pre">data_estimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC.data_estimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC.data_estimator" title="Link to this definition"></a></dt>
+<dd><p>Estimator used for data reconstruction. Data reconstruction can only be supported
+by a model if it implements this method. The estimator to be implemented is defined
+as follows:
+<span class="math notranslate nohighlight">\(\\langle \langle y_d \rangle_{p(y_d|\vec{s},\Theta)} \rangle_{q(\vec{s}|\mathcal{K},\Theta)}\)</span>  # noqa</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.SSSC.generate_data">
+<span class="sig-name descname"><span class="pre">generate_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC.generate_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC.generate_data" title="Link to this definition"></a></dt>
+<dd><p>Sample N datapoints from this model. At least one of N or hidden_state must be provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of data points to be generated.</p></li>
+<li><p><strong>hidden_state</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – Tensor with shape (N,H) where H is the number of units in the
+first latent layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code>]]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>if hidden_state was not provided, a tuple (data, hidden_state) where data is
+a Tensor with shape (N, D) where D is the number of observables for this model
+and hidden_state is the corresponding tensor of hidden variables with shape
+(N, H) where H is the number of hidden variables for this model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.SSSC.log_joint">
+<span class="sig-name descname"><span class="pre">log_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lpj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC.log_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC.log_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-joints for SSSC.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.SSSC.log_pseudo_joint">
+<span class="sig-name descname"><span class="pre">log_pseudo_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC.log_pseudo_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC.log_pseudo_joint" title="Link to this definition"></a></dt>
+<dd><p>Evaluate log-pseudo-joints for SSSC.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.SSSC.update_param_batch">
+<span class="sig-name descname"><span class="pre">update_param_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">states</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC.update_param_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC.update_param_batch" title="Link to this definition"></a></dt>
+<dd><p>Execute batch-wise M-step or batch-wise section of an M-step computation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – indexes of the datapoints that compose the batch within the dataset</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of datapoints, Tensor with shape (N,D)</p></li>
+<li><p><strong>states</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="tvo.variational.html#tvo.variational.TVOVariationalStates" title="tvo.variational.TVOVariationalStates.TVOVariationalStates"><code class="xref py py-class docutils literal notranslate"><span class="pre">TVOVariationalStates</span></code></a></span>) – all variational states for this dataset</p></li>
+<li><p><strong>mstep_factors</strong> – optional dictionary containing the Tensors that were evaluated            by the lpj_fn function returned by get_lpj_func during this batch’s E-step.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+<p>If the model allows it, as an optimization this method can return this batch’s free energy
+evaluated _before_ the model parameter update. If the batch’s free energy is returned here,
+Trainers will skip a direct per-batch call to the free_energy method.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.models.SSSC.update_param_epoch">
+<span class="sig-name descname"><span class="pre">update_param_epoch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/models/sssc.html#SSSC.update_param_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.models.SSSC.update_param_epoch" title="Link to this definition"></a></dt>
+<dd><p>Execute epoch-wise M-step or epoch-wise section of an M-step computation.</p>
+<p>This method is called at the end of each training epoch.
+Implementing this method is optional: models can leave the body empty (just a <cite>pass</cite>)
+or even not implement it at all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tvo.exp.html" class="btn btn-neutral float-left" title="tvo.exp" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tvo.variational.html" class="btn btn-neutral float-right" title="tvo.variational" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

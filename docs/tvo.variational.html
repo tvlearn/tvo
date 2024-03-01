@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.variational &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="tvo.utils" href="tvo.utils.html" />
+    <link rel="prev" title="tvo.models" href="tvo.models.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">tvo.variational</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.variational.EVOVariationalStates"><code class="docutils literal notranslate"><span class="pre">EVOVariationalStates</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.variational.EVOVariationalStates.update"><code class="docutils literal notranslate"><span class="pre">EVOVariationalStates.update()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.variational.FullEM"><code class="docutils literal notranslate"><span class="pre">FullEM</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.variational.FullEM.update"><code class="docutils literal notranslate"><span class="pre">FullEM.update()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.variational.FullEMSingleCauseModels"><code class="docutils literal notranslate"><span class="pre">FullEMSingleCauseModels</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.variational.FullEMSingleCauseModels.update"><code class="docutils literal notranslate"><span class="pre">FullEMSingleCauseModels.update()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.variational.RandomSampledVarStates"><code class="docutils literal notranslate"><span class="pre">RandomSampledVarStates</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.variational.RandomSampledVarStates.update"><code class="docutils literal notranslate"><span class="pre">RandomSampledVarStates.update()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.variational.TVOVariationalStates"><code class="docutils literal notranslate"><span class="pre">TVOVariationalStates</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.variational.TVOVariationalStates.update"><code class="docutils literal notranslate"><span class="pre">TVOVariationalStates.update()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tvo.variational.TVSVariationalStates"><code class="docutils literal notranslate"><span class="pre">TVSVariationalStates</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tvo.variational.TVSVariationalStates.update"><code class="docutils literal notranslate"><span class="pre">TVSVariationalStates.update()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">tvo.variational</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/tvo.variational.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-tvo.variational">
+<span id="tvo-variational"></span><h1>tvo.variational<a class="headerlink" href="#module-tvo.variational" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.variational.EVOVariationalStates">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.variational.</span></span><span class="sig-name descname"><span class="pre">EVOVariationalStates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent_selection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_parents</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_generations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crossover</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitflip_frequency</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">K_init_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/evo.html#EVOVariationalStates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.EVOVariationalStates" title="Link to this definition"></a></dt>
+<dd><p>Evolutionary Variational Optimization class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of datapoints</p></li>
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of latents</p></li>
+<li><p><strong>S</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of variational states</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – floating point precision to be used for log_joint values.
+Must be one of to.float32 or to.float64.</p></li>
+<li><p><strong>selection</strong> – one of “batch_fitparents” or “randparents”</p></li>
+<li><p><strong>mutation</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – one of “randflip” or “sparseflip”</p></li>
+<li><p><strong>n_parents</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of parent states to select</p></li>
+<li><p><strong>n_generations</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of EA generations to produce</p></li>
+<li><p><strong>n_children</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – if crossover is False, number of children states to produce per
+generation. Must be None if crossover is True.</p></li>
+<li><p><strong>crossover</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></span>) – if True, apply crossover. Must be False if n_children is specified.</p></li>
+<li><p><strong>bitflip_frequency</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – Probability of flipping a bit during the mutation step (e.g.
+2/H for an average of 2 bitflips per mutation). Required when
+using the ‘sparsity’ mutation algorithm.</p></li>
+<li><p><strong>K_init_file</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – Full path to H5 file providing initial states</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.variational.EVOVariationalStates.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/evo.html#EVOVariationalStates.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.EVOVariationalStates.update" title="Link to this definition"></a></dt>
+<dd><p>Generate new variational states, update K and lpj with best samples and their lpj.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – data point indices of batch w.r.t. K</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of data points</p></li>
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Trainable</span></code></span>) – the model being used</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>average number of variational state substitutions per datapoint performed</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.variational.FullEM">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.variational.</span></span><span class="sig-name descname"><span class="pre">FullEM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">K_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/fullem.html#FullEM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.FullEM" title="Link to this definition"></a></dt>
+<dd><p>Full EM class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of datapoints</p></li>
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of latent variables</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – The floating point precision of the lpj values.
+Must be one of to.float32 or to.float64</p></li>
+<li><p><strong>K_init</strong> – Optional initialization of states</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.variational.FullEM.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/fullem.html#FullEM.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.FullEM.update" title="Link to this definition"></a></dt>
+<dd><p>Generate new variational states, update K and lpj with best samples and their lpj.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – data point indices of batch w.r.t. K</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of data points</p></li>
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Trainable</span></code></span>) – the model being used</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>average number of variational state substitutions per datapoint performed</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.variational.FullEMSingleCauseModels">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.variational.</span></span><span class="sig-name descname"><span class="pre">FullEMSingleCauseModels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/fullem.html#FullEMSingleCauseModels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.FullEMSingleCauseModels" title="Link to this definition"></a></dt>
+<dd><p>Full EM class for single causes models.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – Number of datapoints</p></li>
+<li><p><strong>C</strong> – Number of latent variables</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – The floating point precision of the lpj values.
+Must be one of to.float32 or to.float64</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.variational.FullEMSingleCauseModels.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/fullem.html#FullEMSingleCauseModels.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.FullEMSingleCauseModels.update" title="Link to this definition"></a></dt>
+<dd><p>Generate new variational states, update K and lpj with best samples and their lpj.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – data point indices of batch w.r.t. K</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of data points</p></li>
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Trainable</span></code></span>) – the model being used</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>average number of variational state substitutions per datapoint performed</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.variational.RandomSampledVarStates">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.variational.</span></span><span class="sig-name descname"><span class="pre">RandomSampledVarStates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S_new</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sparsity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">K_init_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/RandomSampledVarStates.html#RandomSampledVarStates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.RandomSampledVarStates" title="Link to this definition"></a></dt>
+<dd><p>A TVOVariationalStates implementation that performs random sampling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of datapoints</p></li>
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of latents</p></li>
+<li><p><strong>S</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of variational states</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – floating point precision to be used for log_joint values.
+Must be one of to.float32 or to.float64.</p></li>
+<li><p><strong>S_new</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of states to be sampled at every call to ~update</p></li>
+<li><p><strong>sparsity</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></span>) – average fraction of active units in sampled states.</p></li>
+<li><p><strong>K_init_file</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – Full path to H5 file providing initial states</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.variational.RandomSampledVarStates.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/RandomSampledVarStates.html#RandomSampledVarStates.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.RandomSampledVarStates.update" title="Link to this definition"></a></dt>
+<dd><p>See <a class="reference internal" href="#tvo.variational.TVOVariationalStates.update" title="tvo.variational.TVOVariationalStates.update"><code class="xref py py-func docutils literal notranslate"><span class="pre">tvo.variational.TVOVariationalStates.update()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.variational.TVOVariationalStates">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.variational.</span></span><span class="sig-name descname"><span class="pre">TVOVariationalStates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">K_init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/TVOVariationalStates.html#TVOVariationalStates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.TVOVariationalStates" title="Link to this definition"></a></dt>
+<dd><p>Abstract base class for TVO realizations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>conf</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code>]</span>) – dictionary with hyper-parameters. Required keys: N, H, S, dtype, device</p></li>
+<li><p><strong>K_init</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – if specified and if <cite>conf</cite> does specify <cite>K_init_file</cite>, self.K will be
+initialized with this Tensor of shape (N,S,H)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.variational.TVOVariationalStates.update">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/TVOVariationalStates.html#TVOVariationalStates.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.TVOVariationalStates.update" title="Link to this definition"></a></dt>
+<dd><p>Generate new variational states, update K and lpj with best samples and their lpj.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>idx</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – data point indices of batch w.r.t. K</p></li>
+<li><p><strong>batch</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Tensor</span></code></span>) – batch of data points</p></li>
+<li><p><strong>model</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Trainable</span></code></span>) – the model being used</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>average number of variational state substitutions per datapoint performed</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="tvo.variational.TVSVariationalStates">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">tvo.variational.</span></span><span class="sig-name descname"><span class="pre">TVSVariationalStates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">precision</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S_new_prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S_new_marg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">K_init_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/tvs.html#TVSVariationalStates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.TVSVariationalStates" title="Link to this definition"></a></dt>
+<dd><p>Truncated Variational Sampling class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>N</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of datapoints</p></li>
+<li><p><strong>H</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of latents</p></li>
+<li><p><strong>S</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of variational states</p></li>
+<li><p><strong>precision</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dtype</span></code></span>) – floating point precision to be used for log_joint values.
+Must be one of to.float32 or to.float64.</p></li>
+<li><p><strong>S_new_prior</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of states to be sampled from prior at every call to ~update</p></li>
+<li><p><strong>S_new_marg</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span>) – number of states to be sampled from approximated marginal                           p(s_h=1|vec{y}^{(n)}, Theta) at every call to ~update</p></li>
+<li><p><strong>K_init_file</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></span>) – Full path to H5 file providing initial states</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="tvo.variational.TVSVariationalStates.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/tvo/variational/tvs.html#TVSVariationalStates.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#tvo.variational.TVSVariationalStates.update" title="Link to this definition"></a></dt>
+<dd><p>See <a class="reference internal" href="#tvo.variational.TVOVariationalStates.update" title="tvo.variational.TVOVariationalStates.update"><code class="xref py py-func docutils literal notranslate"><span class="pre">tvo.variational.TVOVariationalStates.update()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tvo.models.html" class="btn btn-neutral float-left" title="tvo.models" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tvo.utils.html" class="btn btn-neutral float-right" title="tvo.utils" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

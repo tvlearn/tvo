@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tvo.exp._experiments &mdash; TVO 0.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=ec806d2c"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            TVO
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.html">tvo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.exp.html">tvo.exp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.models.html">tvo.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.variational.html">tvo.variational</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.html">tvo.utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.utils.parallel.html">tvo.utils.parallel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tvo.trainer.html">tvo.trainer</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">TVO</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">tvo.exp._experiments</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for tvo.exp._experiments</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># Copyright (C) 2019 Machine Learning Group of the University of Oldenburg.</span>
+<span class="c1"># Licensed under the Academic Free License version 3.0</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.data</span> <span class="kn">import</span> <span class="n">TVODataLoader</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.model_protocols</span> <span class="kn">import</span> <span class="n">Trainable</span>
+<span class="kn">from</span> <span class="nn">tvo.utils.parallel</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">pprint</span><span class="p">,</span>
+    <span class="n">init_processes</span><span class="p">,</span>
+    <span class="n">gather_from_processes</span><span class="p">,</span>
+    <span class="n">get_h5_dataset_to_processes</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">tvo.exp._utils</span> <span class="kn">import</span> <span class="n">make_var_states</span>
+<span class="kn">from</span> <span class="nn">tvo.utils</span> <span class="kn">import</span> <span class="n">get</span><span class="p">,</span> <span class="n">H5Logger</span>
+<span class="kn">from</span> <span class="nn">tvo.trainer</span> <span class="kn">import</span> <span class="n">Trainer</span>
+<span class="kn">from</span> <span class="nn">tvo.exp._EStepConfig</span> <span class="kn">import</span> <span class="n">EStepConfig</span>
+<span class="kn">from</span> <span class="nn">tvo.exp._ExpConfig</span> <span class="kn">import</span> <span class="n">ExpConfig</span>
+<span class="kn">from</span> <span class="nn">tvo.exp._EpochLog</span> <span class="kn">import</span> <span class="n">EpochLog</span>
+<span class="kn">from</span> <span class="nn">tvo.variational</span> <span class="kn">import</span> <span class="n">TVOVariationalStates</span>
+<span class="kn">import</span> <span class="nn">tvo</span>
+
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Generator</span>
+<span class="kn">import</span> <span class="nn">torch</span> <span class="k">as</span> <span class="nn">to</span>
+<span class="kn">import</span> <span class="nn">torch.distributed</span> <span class="k">as</span> <span class="nn">dist</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">munch</span> <span class="kn">import</span> <span class="n">Munch</span>
+
+
+<span class="k">class</span> <span class="nc">Experiment</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for all experiments.&quot;&quot;&quot;</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epochs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">EpochLog</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="k">pass</span>  <span class="c1"># pragma: no cover</span>
+
+
+<span class="k">class</span> <span class="nc">_TrainingAndOrValidation</span><span class="p">(</span><span class="n">Experiment</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">conf</span><span class="p">:</span> <span class="n">ExpConfig</span><span class="p">,</span>
+        <span class="n">estep_conf</span><span class="p">:</span> <span class="n">EStepConfig</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Trainable</span><span class="p">,</span>
+        <span class="n">train_dataset</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">test_dataset</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper class to avoid code repetition between Training and Testing.</span>
+
+<span class="sd">        It performs training and/or validation/testings depending on what input is provided.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">H</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">Trainable</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span> <span class="o">=</span> <span class="n">Munch</span><span class="p">(</span><span class="n">conf</span><span class="o">.</span><span class="n">as_dict</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">()</span><span class="o">.</span><span class="n">type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_estep_conf</span> <span class="o">=</span> <span class="n">Munch</span><span class="p">(</span><span class="n">estep_conf</span><span class="o">.</span><span class="n">as_dict</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_states</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">precision</span>
+        <span class="k">if</span> <span class="n">train_dataset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_dataloader</span><span class="p">(</span><span class="n">train_dataset</span><span class="p">,</span> <span class="n">conf</span><span class="p">)</span>
+            <span class="c1"># might differ between processes: last process might have smaller N and less states</span>
+            <span class="c1"># (but TVODataLoader+ShufflingSampler make sure the number of batches is the same)</span>
+            <span class="n">N</span> <span class="o">=</span> <span class="n">train_dataset</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_states</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span><span class="p">,</span> <span class="n">estep_conf</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">test_states</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">test_dataset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_dataloader</span><span class="p">(</span><span class="n">test_dataset</span><span class="p">,</span> <span class="n">conf</span><span class="p">)</span>
+            <span class="n">N</span> <span class="o">=</span> <span class="n">test_dataset</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test_states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_states</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_precision</span><span class="p">,</span> <span class="n">estep_conf</span><span class="p">)</span>
+
+        <span class="n">will_reconstruct</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">reco_epochs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">warmup_reco_epochs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trainer</span> <span class="o">=</span> <span class="n">Trainer</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_data</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_states</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test_data</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">test_states</span><span class="p">,</span>
+            <span class="n">rollback_if_F_decreases</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">rollback_if_F_decreases</span><span class="p">,</span>
+            <span class="n">will_reconstruct</span><span class="o">=</span><span class="n">will_reconstruct</span><span class="p">,</span>
+            <span class="n">eval_F_at_epoch_end</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">eval_F_at_epoch_end</span><span class="p">,</span>
+            <span class="n">data_transform</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">data_transform</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">H5Logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">blacklist</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">log_blacklist</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_make_dataloader</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">conf</span><span class="p">:</span> <span class="n">ExpConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TVODataLoader</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">to</span><span class="o">.</span><span class="n">uint8</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_precision</span><span class="p">)</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">tvo</span><span class="o">.</span><span class="n">get_device</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">TVODataLoader</span><span class="p">(</span>
+            <span class="n">dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">conf</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="n">conf</span><span class="o">.</span><span class="n">shuffle</span><span class="p">,</span> <span class="n">drop_last</span><span class="o">=</span><span class="n">conf</span><span class="o">.</span><span class="n">drop_last</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_make_states</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">H</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">precision</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">estep_conf</span><span class="p">:</span> <span class="n">EStepConfig</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TVOVariationalStates</span><span class="p">:</span>
+        <span class="n">states</span> <span class="o">=</span> <span class="n">make_var_states</span><span class="p">(</span><span class="n">estep_conf</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">H</span><span class="p">,</span> <span class="n">precision</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">states</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">estep_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_estep_conf</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epochs</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">EpochLog</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run training and/or testing.</span>
+
+<span class="sd">        :param epochs: Number of epochs to train for</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">trainer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trainer</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">logger</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log_confs</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+
+        <span class="c1"># warm-up E-steps</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">warmup_Esteps</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">pprint</span><span class="p">(</span><span class="s2">&quot;Warm-up E-steps&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">warmup_Esteps</span><span class="p">):</span>
+            <span class="n">compute_reconstruction</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">warmup_reco_epochs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">warmup_reco_epochs</span>
+            <span class="p">)</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">e_step</span><span class="p">(</span><span class="n">compute_reconstruction</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_log_epoch</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+
+        <span class="c1"># log initial free energies (after warm-up E-steps if any)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">warmup_Esteps</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">eval_free_energies</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log_epoch</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">EpochLog</span><span class="p">(</span><span class="n">epoch</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">d</span><span class="p">)</span>
+
+        <span class="c1"># EM steps</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+            <span class="n">start_t</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">compute_reconstruction</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">reco_epochs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">reco_epochs</span>
+            <span class="p">)</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">em_step</span><span class="p">(</span><span class="n">compute_reconstruction</span><span class="p">)</span>
+            <span class="n">epoch_runtime</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_t</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_log_epoch</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">EpochLog</span><span class="p">(</span><span class="n">e</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">epoch_runtime</span><span class="p">)</span>
+
+        <span class="c1"># remove leftover &quot;.old&quot; logfiles produced by the logger</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="k">if</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">leftover_logfile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">output</span> <span class="o">+</span> <span class="s2">&quot;.old&quot;</span>
+        <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">Path</span><span class="p">(</span><span class="n">leftover_logfile</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">leftover_logfile</span><span class="p">)</span>
+
+        <span class="c1"># put trainer into undefined state after the experiment is finished</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trainer</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">def</span> <span class="nf">_log_confs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logger</span><span class="p">:</span> <span class="n">H5Logger</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump experiment+estep configuration to screen and save it to output file.&quot;&quot;&quot;</span>
+        <span class="n">titles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Experiment&quot;</span><span class="p">,</span> <span class="s2">&quot;E-step&quot;</span><span class="p">]</span>
+        <span class="n">confs</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">estep_config</span><span class="p">]</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exp_config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">estep_config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">estep_config</span><span class="p">)</span>
+
+        <span class="n">model_conf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">config</span>  <span class="c1"># could raise</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">model_config</span><span class="o">=</span><span class="n">model_conf</span><span class="p">)</span>
+        <span class="n">confs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model_conf</span><span class="p">)</span>
+        <span class="n">titles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;Model&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">title</span><span class="p">,</span> <span class="n">conf</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">titles</span><span class="p">,</span> <span class="n">confs</span><span class="p">):</span>
+            <span class="n">pprint</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">title</span><span class="si">}</span><span class="s2"> configuration:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">conf</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">pprint</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="si">{</span><span class="n">k</span><span class="si">:</span><span class="s2">&lt;20</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_log_epoch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logger</span><span class="p">:</span> <span class="n">H5Logger</span><span class="p">,</span> <span class="n">epoch_results</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Log F, subs, model.theta, states.K and states.lpj to file, return printable log.</span>
+
+<span class="sd">        :param logger: the logger for this run</span>
+<span class="sd">        :param epoch_results: dictionary returned by Trainer.e_step or Trainer.em_step</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">data_kind</span> <span class="ow">in</span> <span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="s2">&quot;test&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">data_kind</span> <span class="o">+</span> <span class="s2">&quot;_F&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">epoch_results</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># log_kind is one of &quot;train&quot;, &quot;valid&quot; or &quot;test&quot;</span>
+            <span class="c1"># (while data_kind is one of &quot;train&quot; or &quot;test&quot;)</span>
+            <span class="n">log_kind</span> <span class="o">=</span> <span class="s2">&quot;valid&quot;</span> <span class="k">if</span> <span class="n">data_kind</span> <span class="o">==</span> <span class="s2">&quot;test&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">data_kind</span>
+
+            <span class="c1"># log F and subs to stdout and file</span>
+            <span class="n">F</span><span class="p">,</span> <span class="n">subs</span> <span class="o">=</span> <span class="n">get</span><span class="p">(</span><span class="n">epoch_results</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_kind</span><span class="si">}</span><span class="s2">_F&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_kind</span><span class="si">}</span><span class="s2">_subs&quot;</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="ow">not</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">F</span><span class="p">)</span> <span class="ow">or</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">F</span><span class="p">)),</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2"> free energy is invalid!&quot;</span>
+            <span class="n">F_and_subs_dict</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_F&quot;</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">F</span><span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_subs&quot;</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">subs</span><span class="p">)}</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="o">**</span><span class="n">F_and_subs_dict</span><span class="p">)</span>
+
+            <span class="c1"># log latest states and lpj to file</span>
+            <span class="n">states</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_kind</span><span class="si">}</span><span class="s2">_states&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_states&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">log_blacklist</span><span class="p">:</span>
+                <span class="n">K</span> <span class="o">=</span> <span class="n">gather_from_processes</span><span class="p">(</span><span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_states&quot;</span><span class="p">:</span> <span class="n">K</span><span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">K</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_lpj&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">log_blacklist</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_lpj&quot;</span><span class="p">:</span> <span class="n">gather_from_processes</span><span class="p">(</span><span class="n">states</span><span class="o">.</span><span class="n">lpj</span><span class="p">)})</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">keep_best_states</span><span class="p">:</span>
+                <span class="n">best_F_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;best_</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_F&quot;</span>
+                <span class="n">best_F</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="n">best_F_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">best_F</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">F</span> <span class="o">&gt;</span> <span class="n">best_F</span><span class="p">:</span>
+                    <span class="n">rank</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span> <span class="k">if</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span> <span class="k">else</span> <span class="mi">0</span>
+                    <span class="k">if</span> <span class="n">K</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">K</span> <span class="o">=</span> <span class="n">gather_from_processes</span><span class="p">(</span><span class="n">states</span><span class="o">.</span><span class="n">K</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">to</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>  <span class="c1"># to make mypy happy</span>
+                        <span class="n">best_states_dict</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="n">best_F_name</span><span class="p">:</span> <span class="n">to</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">F</span><span class="p">),</span>
+                            <span class="sa">f</span><span class="s2">&quot;best_</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_states&quot;</span><span class="p">:</span> <span class="n">K</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">clone</span><span class="p">(),</span>
+                        <span class="p">}</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="o">**</span><span class="n">best_states_dict</span><span class="p">)</span>
+                    <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_</span><span class="si">{</span><span class="n">best_F_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">F</span><span class="p">)</span>
+
+            <span class="c1"># log data reconstructions</span>
+            <span class="n">reco_dict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_reconstruction&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">log_blacklist</span>
+                <span class="ow">and</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_kind</span><span class="si">}</span><span class="s2">_rec&quot;</span> <span class="ow">in</span> <span class="n">epoch_results</span>
+            <span class="p">):</span>
+                <span class="n">reco_dict</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">log_kind</span><span class="si">}</span><span class="s2">_reconstruction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">gather_from_processes</span><span class="p">(</span>
+                    <span class="n">epoch_results</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_kind</span><span class="si">}</span><span class="s2">_rec&quot;</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="o">**</span><span class="n">reco_dict</span><span class="p">)</span>
+
+        <span class="n">log_theta_fn</span> <span class="o">=</span> <span class="n">logger</span><span class="o">.</span><span class="n">set</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conf</span><span class="o">.</span><span class="n">log_only_latest_theta</span> <span class="k">else</span> <span class="n">logger</span><span class="o">.</span><span class="n">append</span>
+        <span class="n">log_theta_fn</span><span class="p">(</span><span class="n">theta</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">theta</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="Training">
+<a class="viewcode-back" href="../../../tvo.exp.html#tvo.exp.Training">[docs]</a>
+<span class="k">class</span> <span class="nc">Training</span><span class="p">(</span><span class="n">_TrainingAndOrValidation</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">conf</span><span class="p">:</span> <span class="n">ExpConfig</span><span class="p">,</span>
+        <span class="n">estep_conf</span><span class="p">:</span> <span class="n">EStepConfig</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Trainable</span><span class="p">,</span>
+        <span class="n">train_data_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">val_data_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Train model on given dataset for the given number of epochs.</span>
+
+<span class="sd">        :param conf: Experiment configuration.</span>
+<span class="sd">        :param estep_conf: Instance of a class inheriting from EStepConfig.</span>
+<span class="sd">        :param model: model to train</span>
+<span class="sd">        :param train_data_file: Path to an HDF5 file containing the training dataset.</span>
+<span class="sd">                                Datasets with name &quot;train_data&quot; and &quot;data&quot; will be</span>
+<span class="sd">                                searched in the file, in this order.</span>
+<span class="sd">        :param val_data_file: Path to an HDF5 file containing the training dataset.</span>
+<span class="sd">                              Datasets with name &quot;val_data&quot; and &quot;data&quot; will be searched in the file,</span>
+<span class="sd">                              in this order.</span>
+
+<span class="sd">        On the validation dataset, Training only performs E-steps without updating</span>
+<span class="sd">        the model parameters.</span>
+
+<span class="sd">        .. _DataLoader docs: https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+            <span class="n">init_processes</span><span class="p">()</span>
+        <span class="n">train_dataset</span> <span class="o">=</span> <span class="n">get_h5_dataset_to_processes</span><span class="p">(</span><span class="n">train_data_file</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;train_data&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">))</span>
+        <span class="n">val_dataset</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">val_data_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">val_dataset</span> <span class="o">=</span> <span class="n">get_h5_dataset_to_processes</span><span class="p">(</span><span class="n">val_data_file</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;val_data&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">))</span>
+
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="s2">&quot;train_dataset&quot;</span><span class="p">,</span> <span class="n">train_data_file</span><span class="p">)</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="s2">&quot;val_dataset&quot;</span><span class="p">,</span> <span class="n">val_data_file</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="n">estep_conf</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">train_dataset</span><span class="p">,</span> <span class="n">val_dataset</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Testing">
+<a class="viewcode-back" href="../../../tvo.exp.html#tvo.exp.Testing">[docs]</a>
+<span class="k">class</span> <span class="nc">Testing</span><span class="p">(</span><span class="n">_TrainingAndOrValidation</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conf</span><span class="p">:</span> <span class="n">ExpConfig</span><span class="p">,</span> <span class="n">estep_conf</span><span class="p">:</span> <span class="n">EStepConfig</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">Trainable</span><span class="p">,</span> <span class="n">data_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Test given model on given dataset for the given number of epochs.</span>
+
+<span class="sd">        :param conf: Experiment configuration.</span>
+<span class="sd">        :param estep_conf: Instance of a class inheriting from EStepConfig.</span>
+<span class="sd">        :param model: model to test</span>
+<span class="sd">        :param data_file: Path to an HDF5 file containing the training dataset. Datasets with name</span>
+<span class="sd">                          &quot;test_data&quot; and &quot;data&quot; will be searched in the file, in this order.</span>
+
+<span class="sd">        Only E-steps are run. Model parameters are not updated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">tvo</span><span class="o">.</span><span class="n">get_run_policy</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;mpi&quot;</span><span class="p">:</span>
+            <span class="n">init_processes</span><span class="p">()</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">get_h5_dataset_to_processes</span><span class="p">(</span><span class="n">data_file</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;test_data&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">))</span>
+
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="s2">&quot;test_dataset&quot;</span><span class="p">,</span> <span class="n">data_file</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="n">estep_conf</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2019, Machine Learning Group of the University of Oldenburg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
