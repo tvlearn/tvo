@@ -30,7 +30,7 @@ def get_bars_gfs(
     """
     assert no_bars % 2 == 0, "no_gen_fields must be a multiple of two"
     R = no_bars // 2
-    D = R**2
+    D = R ** 2
     bg_amp = 0.0
 
     W = bg_amp * to.ones((R, R, no_bars), dtype=precision)

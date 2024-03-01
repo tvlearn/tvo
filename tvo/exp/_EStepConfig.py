@@ -119,7 +119,7 @@ class TVSConfig(EStepConfig):
 class FullEMConfig(EStepConfig):
     def __init__(self, n_latents: int):
         """Full EM configuration."""
-        super().__init__(2**n_latents)
+        super().__init__(2 ** n_latents)
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)

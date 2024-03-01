@@ -43,7 +43,7 @@ def setup(request):
         W_init = to.full((D, H), 1.0, dtype=precision, device=_device)
         sigma_init = to.tensor([1.0], dtype=precision, device=_device)
 
-        conf = {"D": D, "H": H, "S": 2**H, "Snew": 0, "batch_size": N, "precision": precision}
+        conf = {"D": D, "H": H, "S": 2 ** H, "Snew": 0, "batch_size": N, "precision": precision}
         m = BlackBoxBSC(H, D)
         m._theta["pi"][:] = pies_init
         m._theta["W"][:] = W_init.T
@@ -61,7 +61,7 @@ def setup(request):
                     0.0,
                     np.log(1.0) - (1.0 / 2),
                     np.log(1.0) - (1.0 / 2),
-                    2.0 * np.log(1.0) - (1.0 / 2) * 2.0**2,
+                    2.0 * np.log(1.0) - (1.0 / 2) * 2.0 ** 2,
                 ],
                 [-(1.0 / 2), np.log(1.0), np.log(1.0), 2.0 * np.log(1.0) - (1.0 / 2)],
             ],

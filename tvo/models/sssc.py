@@ -442,7 +442,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_sz.add_(to.sum(batch_xpt_sz, dim=0))  # (H,)
         self._my_sum_xpt_sz_xpt_szT.add_(batch_xpt_sz.t() @ batch_xpt_sz)  # (H, H)
         self._my_sum_xpt_szszT.add_(to.sum(batch_xpt_szszT, dim=0))  # (H, H)
-        self._my_sum_diag_yyT.add_(to.sum(batch**2, dim=0))  # (D,)
+        self._my_sum_diag_yyT.add_(to.sum(batch ** 2, dim=0))  # (D,)
         self._my_sum_y_szT.add_(batch.t() @ batch_xpt_sz)  # (D, H)
         self._my_N.add_(batch_size)  # (1,)
         if self._reformulated_psi_update:
