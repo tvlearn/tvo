@@ -21,8 +21,8 @@ def state_matrix(H: int, device: to.device = None):
     if device is None:
         device = tvo.get_device()
 
-    all_states = to.empty((2**H, H), dtype=to.uint8, device=device)
-    for state in range(2**H):
+    all_states = to.empty((2 ** H, H), dtype=to.uint8, device=device)
+    for state in range(2 ** H):
         bit_sequence = tuple(int(bit) for bit in f"{state:0{H}b}")
         all_states[state] = to.tensor(bit_sequence, dtype=to.uint8, device=device)
     return all_states
@@ -43,7 +43,7 @@ class FullEM(TVOVariationalStates):
         for c in required_keys:
             assert c in conf and conf[c] is not None
         self.config = conf
-        self.lpj = to.empty((N, 2**H), dtype=precision, device=tvo.get_device())
+        self.lpj = to.empty((N, 2 ** H), dtype=precision, device=tvo.get_device())
         self.precision = precision
         self.K = state_matrix(H)[None, :, :].expand(N, -1, -1)
 
