@@ -101,14 +101,33 @@ class LargeCorrelatedDataset(KSetPosteriorDataset):
 class TVODataset(KSetPosteriorDataset):
     def __init__(self, Xpath, Ksetpath, start=0, maxN=None) -> None:
         super().__init__()
+        end = None if maxN is None else start+maxN
 
         with h5py.File(Xpath, "r") as f:
-            self.X = torch.tensor(np.array(f["data"])[start:start+maxN])
+            self.X = torch.tensor(np.array(f["data"])[start:end], dtype=torch.get_default_dtype())
 
         with h5py.File(Ksetpath, "r") as f:
-            self.Kset = torch.tensor(np.array(f["train_states"])[start:start+maxN])
-            self.logPs = torch.tensor(np.array(f["train_lpj"])[start:start+maxN])
+            self.Kset = torch.tensor(np.array(f["train_states"])[start:end])
+            self.logPs = torch.tensor(np.array(f["train_lpj"])[start:end], dtype=torch.get_default_dtype())
 
+
+class XDataset(Dataset):
+    def __init__(self, Xpath, start=0, maxN=None) -> None:
+        super().__init__()
+        end = None if maxN is None else start+maxN
+
+        with h5py.File(Xpath, "r") as f:
+            self.X = torch.tensor(np.array(f["data"])[start:end], dtype=torch.get_default_dtype())
+
+    def __len__(self):
+        return self.X.shape[0]
+
+    def __getitem__(self, idx):
+        return self.X[idx], idx
+
+    def to(self, device):
+        self.X = self.X.to(device)
+        
 
 def compute_probabilities(log_p_joint):
     """ Returns vectors probabilities (normalized)

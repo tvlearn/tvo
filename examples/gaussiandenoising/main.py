@@ -62,7 +62,7 @@ def gaussian_denoising_example():  # noqa: C901
     txt_file = output_directory + "/terminal.txt"
     if comm_rank == 0:
         sys.stdout = stdout_logger(txt_file)  # type: ignore
-    pprint("Will write training output to {}.".format(training_file))
+    pprint("Will write training output to {}".format(training_file))
     pprint("Will write terminal output to {}".format(txt_file))
 
     # generate noisy image and extract image patches
@@ -130,6 +130,7 @@ def gaussian_denoising_example():  # noqa: C901
         n_generations=args.no_generations,
         parent_selection=args.selection,
         crossover=args.crossover,
+        #K_init_file="./out/24-05-08-16-12-40/training.h5",
     )
 
     # setup the experiment
@@ -147,6 +148,7 @@ def gaussian_denoising_example():  # noqa: C901
     # append the noisy image to the data logger
     if comm_rank == 0:
         logger.set_and_write(noisy_image=noisy)
+        logger.set_and_write(clean_image=clean)
     # define strategies to merge reconstructed patches
     merge_strategies = {"mean": mean_merger, "median": median_merger}
 

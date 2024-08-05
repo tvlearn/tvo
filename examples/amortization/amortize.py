@@ -8,6 +8,11 @@
 # --N_start 10030 \
 # --N_size 10
 
+#python amortize.py \
+# --Xfile ../gaussian-denoising/out/24-07-31-16-48-59/image_patches.h5 \
+# --Ksetfile ../gaussian-denoising/out/24-07-31-16-48-59/training.h5 
+
+
 import os
 from datetime import datetime
 import numpy as np
@@ -19,6 +24,8 @@ from models.amortizedbernoulli import AmortizedBernoulli, compute_probabilities,
 from models.variationalparams import FullCovarGaussianVariationalParams, AmortizedGaussianVariationalParams
 from utils.training import train
 from utils.plotting import plot_epoch_log
+
+torch.autograd.set_detect_anomaly(True)
 
 
 class FloatPrecision(Enum):
@@ -45,7 +52,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--N_size", type=int, help="Training data slice size", default=None)
     arg_parser.add_argument("--epochs_mean", type=int, help="Number of epochs to train only mean activation", default=1000)
     arg_parser.add_argument("--epochs_full", type=int, help="Number of epochs to train full model", default=1000)
-    arg_parser.add_argument("--batch", type=int, help="Training batch size", default=32)
+    arg_parser.add_argument("--batch_size", type=int, help="Training batch size", default=32)
     arg_parser.add_argument("--N_IS", type=int, help="Number of samples for importance sampler estimator", default=128)
     arg_parser.add_argument("--lr", type=float, help="Learning rate", default=1e-2)
     arg_parser.add_argument("--t_start", type=float, help="Learning start temperature", default=1.0)
@@ -70,19 +77,21 @@ if __name__ == "__main__":
     dataset = TVODataset(Xpath=cmd_args.Xfile, Ksetpath=cmd_args.Ksetfile, start=cmd_args.N_start, maxN=cmd_args.N_size)
     print("Loaded Kset shape: ", dataset.Kset.shape)
     dataset.to(device)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cmd_args.batch)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cmd_args.batch_size)
     N, D = dataset.X.shape
     H = dataset.Kset.shape[-1]
 
     model = AmortizedBernoulli(nsamples=cmd_args.N_IS, 
-                               variationalparams=FullCovarGaussianVariationalParams(N, D, H)).to(device)
+                               #variationalparams=FullCovarGaussianVariationalParams(N, D, H)
+                               variationalparams=AmortizedGaussianVariationalParams(N, D, H)
+                               ).to(device)
    
     log_path = cmd_args.outdir
     if not os.path.exists(log_path):
         os.makedirs(log_path)
     
     def on_epoch(X, Kset, logPs, mean_loss, res):
-        if epochs_done + epoch % 100 == 0:
+        if (epochs_done + epoch) % 100 == 0:
             plot_epoch_log(X, Kset, logPs, mean_loss, res, epochs_done + epoch, log_path)
 
     # Optimize mean only

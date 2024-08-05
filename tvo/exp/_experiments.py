@@ -266,7 +266,9 @@ class Training(_TrainingAndOrValidation):
         """
         if tvo.get_run_policy() == "mpi":
             init_processes()
-        train_dataset = get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
+        train_dataset = None
+        if train_data_file is not None:
+            train_dataset = get_h5_dataset_to_processes(train_data_file, ("train_data", "data"))
         val_dataset = None
         if val_data_file is not None:
             val_dataset = get_h5_dataset_to_processes(val_data_file, ("val_data", "data"))

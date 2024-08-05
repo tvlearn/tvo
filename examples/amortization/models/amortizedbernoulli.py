@@ -67,10 +67,15 @@ def batch_sample_covar(x, weights=None):
         return torch.stack([sample_covar(x[i], weights[i]) for i in range(x.shape[0])])
 
 
+class SamplerModule(Module):
+    def sample_q(self, X, indexes=None, nsamples=1000):
+        raise NotImplementedError()
+
+
 Objective = Enum("Objective", ["CROSSENTROPY", "KLDIVERGENCE", "MEANKLDIVERGENCE"])
 
 
-class AmortizedBernoulli(Module):
+class AmortizedBernoulli(SamplerModule):
     def __init__(self, nsamples=10, variationalparams=None) -> None:
         super().__init__()
         self.nsamples = nsamples
@@ -236,6 +241,7 @@ class AmortizedBernoulli(Module):
             # Compute cross-entropy        
             r_s = (marginal_p.unsqueeze(-2) * Kset + (1-marginal_p.unsqueeze(-2)) * (1-Kset)).prod(-1)  # prob. of Kset under factorized marginal distribution
             p_s = compute_probabilities(log_p)  # prob. of Kset
+            #breakpoint()
             q_s = r_s / self.nsamples * (torch.exp(log_q_s - relaxed_log_p).sum(0))
             crossH_pq = -(p_s * torch.log(q_s)).sum(-1)
             

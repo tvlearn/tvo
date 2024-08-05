@@ -11,7 +11,7 @@ def train(model, dataloader, optimizer, on_finish=None):
         losses.append(loss.item())
         loss.backward()
         optimizer.step()
-        print("Batch {} | loss: {}".format(batch_idx, loss))
+        print("Batch {:4d} | loss: {:9.4f}".format(batch_idx, loss))
     
     if on_finish is not None:
         on_finish(X, Kset, logPs, np.array(losses).mean(), res)

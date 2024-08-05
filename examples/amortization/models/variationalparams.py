@@ -203,6 +203,7 @@ class AmortizedGaussianVariationalParams(VariationalParams):
                 nn.Linear(nnSize[1], nnSize[2]), 
                 nn.ReLU6(),
                 nn.Linear(nnSize[2], nnSize[3]), 
+                nn.Softplus(),
                 )
         
         # NN for low-rank covar
@@ -217,8 +218,8 @@ class AmortizedGaussianVariationalParams(VariationalParams):
 
     def forward(self, X, indexes):
         mu = self.nnMeans(X)
-        V = self.nnLowRankCovar(X).reshape((X.shape[0], self.H, -1))
-        Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed(self.nnDiagCovars(X)**2)
+        V = 1e-6 * self.nnLowRankCovar(X).reshape((X.shape[0], self.H, -1))
+        Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed(self.nnDiagCovars(X))
         L = cholesky_jitter(Sigma)
         return mu, L, Sigma
 

@@ -157,3 +157,26 @@ class RandomSamplingConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
+
+
+class AmortizedSamplingConfig(EStepConfig):
+    def __init__(
+        self, n_states: int, n_samples: int, K_init_file: str = None
+    ):
+        """Configuration object for amortized sampling.
+
+        :param n_states: Number of variational states per datapoint to keep in memory.
+        :param n_samples: Number of new variational states to randomly draw.
+        :param sparsity: average fraction of active units in sampled states.
+        :param K_init_file: Full path to H5 file providing initial states
+        """
+        assert n_states > 0, f"n_states must be positive integer ({n_states})"
+        assert n_samples > 0, f"n_samples must be positive integer ({n_samples})"
+
+        self.n_samples = n_samples
+        self.K_init_file = K_init_file
+
+        super().__init__(n_states)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
