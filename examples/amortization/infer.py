@@ -21,10 +21,6 @@ from tvutil.prepost import OverlappingPatches, MultiDimOverlappingPatches, mean_
 from utils.viz import Visualizer
 from utils.utils import eval_fn
 from models.amortizedbernoulli import SamplerModule
-#from models.amortizedbernoulli import AmortizedBernoulli, compute_probabilities, Objective, binarize
-#from models.variationalparams import FullCovarGaussianVariationalParams, AmortizedGaussianVariationalParams
-#from utils.training import train
-#from utils.plotting import plot_epoch_log
 
 
 class FloatPrecision(Enum):
@@ -194,7 +190,6 @@ if __name__ == "__main__":
 
         if to_log is not None:
             logger.append_and_write(**to_log)
-        barrier()
 
         # visualize epoch
         if comm_rank == 0:
