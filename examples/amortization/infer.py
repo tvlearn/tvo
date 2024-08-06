@@ -1,11 +1,10 @@
 # Perform amortized TVO inference and store ELBO history w.r.t. samples.
 
-# python infer.py 
-# --model ../gaussian-denoising/out/24-07-31-16-48-59/training.h5
-
 # python infer.py --model ../gaussiandenoising/out/24-07-31-16-48-59/training.h5 
 # --sampler ./out/24.08.02-15:06:10/trained_sampler.pt 
 # --Xfile ../gaussiandenoising/out/24-07-31-16-48-59/image_patches.h5
+# --epochs 10 --CPU
+
 
 import os
 from datetime import datetime
@@ -19,7 +18,6 @@ from tvo.models import BSC
 from tvo.exp import EVOConfig, AmortizedSamplingConfig, ExpConfig, Training
 from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape, gather_from_processes
 from tvutil.prepost import OverlappingPatches, MultiDimOverlappingPatches, mean_merger, median_merger
-from utils.datasets import XDataset
 from utils.viz import Visualizer
 from utils.utils import eval_fn
 from models.amortizedbernoulli import SamplerModule
@@ -88,7 +86,6 @@ if __name__ == "__main__":
 
     eval("torch.set_default_dtype(torch.{})".format(cmd_args.precision))
     device = torch.device("cuda" if torch.cuda.is_available() and not cmd_args.CPU else "cpu") 
-    torch.set_default_device(device)
     print("Using PyTorch device/precision: {}/{}".format(torch.get_default_device(), torch.get_default_dtype()))
     tvo._set_device(device)
 
@@ -105,12 +102,6 @@ if __name__ == "__main__":
     sampler = torch.load(cmd_args.sampler)
     assert isinstance(sampler, SamplerModule)
     sampler.to(device)
-
-    # Load X data 
-    assert cmd_args.Xfile is not None
-    dataset = XDataset(Xpath=cmd_args.Xfile, start=cmd_args.N_start, maxN=cmd_args.N_size)
-    print("Loaded X dataset shape: ", dataset.X.shape)
-    dataset.to(device)
 
     # Load noisy image and extract image patches
     clean = load_var(cmd_args.model, "clean_image")
