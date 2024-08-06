@@ -3,6 +3,7 @@ from .fullem import FullEM, FullEMSingleCauseModels
 from .RandomSampledVarStates import RandomSampledVarStates
 from .evo import EVOVariationalStates
 from .tvs import TVSVariationalStates
+from .amortized import AmortizedTVOStates
 
 __all__ = [
     "TVOVariationalStates",
@@ -11,4 +12,5 @@ __all__ = [
     "EVOVariationalStates",
     "TVSVariationalStates",
     "FullEMSingleCauseModels",
+    "AmortizedTVOStates",
 ]

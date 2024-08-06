@@ -15,32 +15,24 @@ class AmortizedTVOStates(TVOVariationalStates):
         N: int,
         H: int,
         S: int,
+        S_new: int,
         precision: to.dtype,
-        S_new_prior: int,
-        S_new_marg: int,
-        K_init_file: str = None,
     ):
         """Amortized TVO sampling class.
 
         :param N: number of datapoints
         :param H: number of latents
         :param S: number of variational states
+        :param S_new: number of states to be sampled at every call to ~update
         :param precision: floating point precision to be used for log_joint values.
                           Must be one of to.float32 or to.float64.
-        :param S_new_prior: number of states to be sampled from prior at every call to ~update
-        :param S_new_marg: number of states to be sampled from approximated marginal\
-                           p(s_h=1|vec{y}^{(n)}, Theta) at every call to ~update
-        :param K_init_file: Full path to H5 file providing initial states
         """
         conf = {
             "N": N,
             "H": H,
             "S": S,
-            "S_new_prior": S_new_prior,
-            "S_new_marg": S_new_marg,
-            "S_new": S_new_prior + S_new_marg,
+            "S_new": S_new,
             "precision": precision,
-            "K_init_file": K_init_file,
         }
         super().__init__(conf)
         self._posterior_sampler = None  # amortized posterior sampler
@@ -72,7 +64,8 @@ class AmortizedTVOStates(TVOVariationalStates):
         K, lpj = self.K, self.lpj
         lpj[idx] = lpj_fn(batch, K[idx])
 
-        new_K = self._posterior_sampler(batch, self.config["N_posterior_samples"])
+        new_K = self._posterior_sampler.sample_q(batch, nsamples=self.config["S_new"])
+        new_K = new_K.permute(1, 0, 2).to(self.K.dtype)
         new_lpj = lpj_fn(batch, new_K)
 
         set_redundant_lpj_to_low(new_K, new_lpj, K[idx])

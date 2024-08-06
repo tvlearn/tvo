@@ -16,7 +16,7 @@ from enum import Enum
 import h5py
 import tvo
 from tvo.models import BSC
-from tvo.exp import EVOConfig, ExpConfig, Training
+from tvo.exp import EVOConfig, AmortizedSamplingConfig, ExpConfig, Training
 from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape, gather_from_processes
 from tvutil.prepost import OverlappingPatches, MultiDimOverlappingPatches, mean_merger, median_merger
 from utils.datasets import XDataset
@@ -28,6 +28,22 @@ from models.amortizedbernoulli import SamplerModule
 #from utils.training import train
 #from utils.plotting import plot_epoch_log
 
+
+class FloatPrecision(Enum):
+    float16 = "float16"  # torch.float16
+    float32 = "float32"  # torch.float32
+    float64 = "float64"  # torch.float64
+
+    def __str__(self):
+        return str(self.value)
+
+    @staticmethod
+    def from_string(s):
+        try:
+            return FloatPrecision[s]
+        except KeyError:
+            raise ValueError()
+        
 
 def load_group_as_dict(hdf5filename, groupname):
     res = {}
@@ -62,6 +78,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--batch", type=int, help="Batch size", default=32)
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=128)
     arg_parser.add_argument("--CPU", action="store_true")
+    arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')))
 
     cmd_args = arg_parser.parse_args()
@@ -69,6 +86,7 @@ if __name__ == "__main__":
     for var in vars(cmd_args):
         print("  {}: {}". format(var, vars(cmd_args)[var]))
 
+    eval("torch.set_default_dtype(torch.{})".format(cmd_args.precision))
     device = torch.device("cuda" if torch.cuda.is_available() and not cmd_args.CPU else "cpu") 
     torch.set_default_device(device)
     print("Using PyTorch device/precision: {}/{}".format(torch.get_default_device(), torch.get_default_dtype()))
@@ -86,6 +104,7 @@ if __name__ == "__main__":
     assert cmd_args.sampler is not None
     sampler = torch.load(cmd_args.sampler)
     assert isinstance(sampler, SamplerModule)
+    sampler.to(device)
 
     # Load X data 
     assert cmd_args.Xfile is not None
@@ -123,6 +142,10 @@ if __name__ == "__main__":
         parent_selection=estep_config_dict["parent_selection"].decode("utf-8"),
         crossover=estep_config_dict["crossover"],
     )
+    estep_conf = AmortizedSamplingConfig(
+        n_states=estep_config_dict["n_states"],
+        n_samples=cmd_args.N_samples,
+    )
 
     # Setup the experiment
     exp_config = ExpConfig(
@@ -135,6 +158,7 @@ if __name__ == "__main__":
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, 
                    train_data_file=None, val_data_file=cmd_args.Xfile)
     logger, trainer = exp.logger, exp.trainer
+    exp.test_states.set_posterior_sampler(sampler)
 
     # initialize visualizer
     print("Initializing visualizer")

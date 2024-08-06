@@ -11,6 +11,7 @@ from tvo.variational import (
     FullEMSingleCauseModels,
     TVSVariationalStates,
     RandomSampledVarStates,
+    AmortizedTVOStates,
 )
 from tvo.exp._EStepConfig import (
     FullEMConfig,
@@ -19,6 +20,7 @@ from tvo.exp._EStepConfig import (
     FullEMSingleCauseConfig,
     TVSConfig,
     RandomSamplingConfig,
+    AmortizedSamplingConfig,
 )
 
 
@@ -53,6 +55,8 @@ def make_var_states(
         return RandomSampledVarStates(
             N, H, conf.n_states, precision, conf.n_samples, conf.sparsity, conf.K_init_file
         )
+    elif isinstance(conf, AmortizedSamplingConfig):
+        return AmortizedTVOStates(N=N, H=H, S=conf.n_states, S_new=conf.n_samples, precision=precision)
     else:  # pragma: no cover
         raise NotImplementedError()
 
