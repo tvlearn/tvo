@@ -21,7 +21,11 @@ import argparse
 from enum import Enum
 from utils.datasets import ToyDatasetH2Minimal, LargeCorrelatedDataset, TVODataset
 from models.amortizedbernoulli import AmortizedBernoulli, compute_probabilities, Objective, binarize
-from models.variationalparams import FullCovarGaussianVariationalParams, AmortizedGaussianVariationalParams
+from models.variationalparams import (
+    FullCovarGaussianVariationalParams, 
+    AmortizedGaussianVariationalParams,
+    AmortizedResNetVariationalParams, 
+    AmortizedResNetLowRankVariationalParams)
 from utils.training import train
 from utils.plotting import plot_epoch_log
 
@@ -59,7 +63,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=1.0)
     arg_parser.add_argument("--CPU", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
-    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')))
+    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-amortize"))
 
     cmd_args = arg_parser.parse_args()
     print("Parameters:")
@@ -71,19 +75,19 @@ if __name__ == "__main__":
 
     eval("torch.set_default_dtype(torch.{})".format(cmd_args.precision))
     device = torch.device("cuda" if torch.cuda.is_available() and not cmd_args.CPU else "cpu") 
-    torch.set_default_device(device)
-    print("Using PyTorch device/precision: {}/{}".format(torch.get_default_device(), torch.get_default_dtype()))
+    #torch.set_default_device(device)
+    print("Using PyTorch device/precision: {}/{}".format(device, torch.get_default_dtype()))
     
     dataset = TVODataset(Xpath=cmd_args.Xfile, Ksetpath=cmd_args.Ksetfile, start=cmd_args.N_start, maxN=cmd_args.N_size)
     print("Loaded Kset shape: ", dataset.Kset.shape)
     dataset.to(device)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cmd_args.batch_size)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cmd_args.batch_size, shuffle=True)
     N, D = dataset.X.shape
     H = dataset.Kset.shape[-1]
 
     model = AmortizedBernoulli(nsamples=cmd_args.N_IS, 
                                #variationalparams=FullCovarGaussianVariationalParams(N, D, H)
-                               variationalparams=AmortizedGaussianVariationalParams(N, D, H)
+                               variationalparams=AmortizedResNetLowRankVariationalParams(N, D, H)
                                ).to(device)
    
     log_path = cmd_args.outdir
@@ -91,7 +95,7 @@ if __name__ == "__main__":
         os.makedirs(log_path)
     
     def on_epoch(X, Kset, logPs, mean_loss, res):
-        if (epochs_done + epoch) % 100 == 0:
+        if (epochs_done + epoch) % 1 == 0:
             plot_epoch_log(X, Kset, logPs, mean_loss, res, epochs_done + epoch, log_path)
 
     # Optimize mean only

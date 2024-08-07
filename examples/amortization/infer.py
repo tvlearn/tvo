@@ -73,7 +73,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=128)
     arg_parser.add_argument("--CPU", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
-    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')))
+    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-infer"))
 
     cmd_args = arg_parser.parse_args()
     print("Parameters:")
@@ -82,7 +82,8 @@ if __name__ == "__main__":
 
     eval("torch.set_default_dtype(torch.{})".format(cmd_args.precision))
     device = torch.device("cuda" if torch.cuda.is_available() and not cmd_args.CPU else "cpu") 
-    print("Using PyTorch device/precision: {}/{}".format(torch.get_default_device(), torch.get_default_dtype()))
+    #torch.set_default_device(device)
+    print("Using PyTorch device/precision: {}/{}".format(device, torch.get_default_dtype()))
     tvo._set_device(device)
 
     os.makedirs(cmd_args.outdir, exist_ok=True)

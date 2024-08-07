@@ -7,7 +7,7 @@ from models.amortizedbernoulli import compute_probabilities, binarize
 
 
 def plot_epoch_log(X, Kset, logPs, mean_loss, res, epoch, log_path):
-    for n in range(min(10, X.shape[0])):
+    for n in np.arange(0, X.shape[0], int(X.shape[0]/10)):
     
         fig = plt.figure(figsize=(10, 7), layout="constrained")
         gs = GridSpec(5, 3, figure=fig)
