@@ -89,7 +89,7 @@ class FullCovarGaussianVariationalParams(VariationalParams):
     def __init__(self, N, D, H) -> None:
         super().__init__(N, D, H)
         # posterior mean
-        self.mu = Parameter(torch.zeros(size=(self.N, self.H)))
+        self.mu = Parameter(torch.normal(0, 1, size=[self.N, self.H]))
         # posterior covariance lower triangular parameters
         self.Sigma_param = Parameter(torch.eye(self.H).reshape(1, self.H, self.H).repeat(self.N, 1, 1))
         
@@ -116,7 +116,7 @@ class DiagCovarGaussianVariationalParams(VariationalParams):
     def __init__(self, N, D, H) -> None:
         super().__init__(N, D, H)
         # posterior mean
-        self.mu = Parameter(torch.zeros(size=(self.N, self.H)))
+        self.mu = Parameter(torch.normal(0, 1, size=(self.N, self.H)))
         # posterior covariance lower triangular parameters
         self.Sigma_param = Parameter(torch.ones(size=(self.N, self.H)))
         
@@ -138,8 +138,11 @@ class DiagCovarGaussianVariationalParams(VariationalParams):
             self.Sigma_param[indexesto] = other.Sigma_param[indexesfrom]
     
 
+class AmortizedVariationalParams(VariationalParams):
+    pass
 
-class AmortizedDiagCovarGaussianVariationalParams(VariationalParams):
+
+class AmortizedDiagCovarGaussianVariationalParams(AmortizedVariationalParams):
     def __init__(self, N, D, H, rank=5) -> None:
         super().__init__(N, D, H)
         self.rank = rank
@@ -181,7 +184,7 @@ class AmortizedDiagCovarGaussianVariationalParams(VariationalParams):
     
 
 
-class AmortizedGaussianVariationalParams(VariationalParams):
+class AmortizedGaussianVariationalParams(AmortizedVariationalParams):
     def __init__(self, N, D, H, rank=5) -> None:
         super().__init__(N, D, H)
         self.rank = rank
@@ -203,7 +206,6 @@ class AmortizedGaussianVariationalParams(VariationalParams):
                 nn.Linear(nnSize[1], nnSize[2]), 
                 nn.ReLU6(),
                 nn.Linear(nnSize[2], nnSize[3]), 
-                nn.Softplus(),
                 )
         
         # NN for low-rank covar
@@ -218,8 +220,167 @@ class AmortizedGaussianVariationalParams(VariationalParams):
 
     def forward(self, X, indexes):
         mu = self.nnMeans(X)
-        V = 1e-6 * self.nnLowRankCovar(X).reshape((X.shape[0], self.H, -1))
-        Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed(self.nnDiagCovars(X))
+        V = self.nnLowRankCovar(X).reshape((X.shape[0], self.H, -1))
+        Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed(self.nnDiagCovars(X)**2)
+        L = cholesky_jitter(Sigma)
+        return mu, L, Sigma
+
+
+
+class ResBlock(nn.Module):
+    def __init__(self, auto_block=None, channels=None, mid_channels=None):
+        nn.Module.__init__(self)
+
+        self.auto_block = auto_block
+        if self.auto_block is None:
+            assert (channels is not None) and (mid_channels is not None)
+            self.auto_block = nn.Sequential(
+                nn.ReLU(),
+                nn.Conv2d(channels, mid_channels, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(mid_channels, channels, kernel_size=1, stride=1, padding=0),
+            )
+
+    def forward(self, x: torch.tensor) -> torch.Tensor:
+        return x + self.auto_block(x)
+    
+
+class AmortizedResNetVariationalParams(AmortizedVariationalParams):
+    def __init__(self, N, D, H, minsigma=1e-3) -> None:
+        super().__init__(N, D, H)
+        self.minsigma = minsigma
+        self.Dsqrt = int(math.sqrt(D))
+        
+        self.nn_common = nn.Sequential(
+            nn.Linear(D, 2*D),
+            ResBlock(nn.Sequential(
+                nn.ReLU(),
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+            )),
+            ResBlock(nn.Sequential(
+                nn.ReLU(),
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+            )),
+        )
+
+        self.nn_mean = nn.Linear(2*D, H)
+        self.nn_covar_param = nn.Linear(2*D, H)
+
+        
+    def forward(self, X, indexes):
+        common = self.nn_common(X)
+        mu = 0.01 * self.nn_mean(common)
+        L = torch.nn.Softplus()(self.nn_covar_param(common)) + self.minsigma
+        Sigma = L**2
+        return mu, L, Sigma
+    
+
+class AmortizedResNetTwoHeadsVariationalParams(AmortizedVariationalParams):
+    def __init__(self, N, D, H, minsigma=1e-3) -> None:
+        super().__init__(N, D, H)
+        self.minsigma = minsigma
+        self.Dsqrt = int(math.sqrt(D))
+        
+        self.nn_common = nn.Sequential(
+            nn.Linear(D, 2*D),
+            nn.ReLU(),
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+        )
+
+        self.nn_mean = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+            nn.Linear(2*D, H),
+        )
+
+        self.nn_covar_param = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+            nn.Linear(2*D, H),
+        )
+
+        
+    def forward(self, X, indexes):
+        common = self.nn_common(X)
+        mu = self.nn_mean(common)
+        L = torch.nn.Softplus()(self.nn_covar_param(common)) + self.minsigma
+        Sigma = L**2
+        return mu, L, Sigma
+        
+
+class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
+    def __init__(self, N, D, H, rank=5, minsigma=1e-3) -> None:
+        super().__init__(N, D, H)
+        self.rank = rank
+        self.minsigma = minsigma
+        
+        self.nn_common = nn.Sequential(
+            nn.Linear(D, 2*D),
+            nn.ReLU(),
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+        )
+
+        self.nn_mean = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+            nn.Linear(2*D, H),
+        )
+
+        self.nn_diag_covar = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+            nn.Linear(2*D, H),
+        )
+
+        self.nn_low_rank_param = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(2*D, 3*D),
+                nn.ReLU(),
+                nn.Linear(3*D, 2*D),
+                nn.ReLU(),
+            )),
+            nn.Linear(2*D, rank*H),
+        )
+
+        #self.nn_mean = nn.Linear(2*D, H)
+        #self.nn_diag_covar = nn.Linear(2*D, H)
+
+        
+    def forward(self, X, indexes):
+        common = self.nn_common(X)
+        mu = 0.01 * self.nn_mean(common)
+        V = 0.01 * self.nn_low_rank_param(common).reshape((X.shape[0], self.H, -1))
+        Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed((self.nn_diag_covar(common)+self.minsigma)**2)
         L = cholesky_jitter(Sigma)
         return mu, L, Sigma
 
