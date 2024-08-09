@@ -326,10 +326,11 @@ class AmortizedResNetTwoHeadsVariationalParams(AmortizedVariationalParams):
         
 
 class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
-    def __init__(self, N, D, H, rank=5, minsigma=1e-3) -> None:
+    def __init__(self, N, D, H, rank=5, minsigma=1e-3, scale=0.01) -> None:
         super().__init__(N, D, H)
         self.rank = rank
         self.minsigma = minsigma
+        self.scale = scale
         
         self.nn_common = nn.Sequential(
             nn.Linear(D, 2*D),
@@ -340,6 +341,7 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
                 nn.Linear(3*D, 2*D),
                 nn.ReLU(),
             )),
+            nn.BatchNorm1d(2*D),
         )
 
         self.nn_mean = nn.Sequential(
@@ -349,6 +351,7 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
                 nn.Linear(3*D, 2*D),
                 nn.ReLU(),
             )),
+            nn.BatchNorm1d(2*D),
             nn.Linear(2*D, H),
         )
 
@@ -359,6 +362,7 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
                 nn.Linear(3*D, 2*D),
                 nn.ReLU(),
             )),
+            nn.BatchNorm1d(2*D),
             nn.Linear(2*D, H),
         )
 
@@ -369,17 +373,16 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
                 nn.Linear(3*D, 2*D),
                 nn.ReLU(),
             )),
+            nn.BatchNorm1d(2*D),
             nn.Linear(2*D, rank*H),
         )
 
-        #self.nn_mean = nn.Linear(2*D, H)
-        #self.nn_diag_covar = nn.Linear(2*D, H)
-
         
     def forward(self, X, indexes):
+
         common = self.nn_common(X)
-        mu = 0.01 * self.nn_mean(common)
-        V = 0.01 * self.nn_low_rank_param(common).reshape((X.shape[0], self.H, -1))
+        mu = self.scale * self.nn_mean(common)
+        V = self.scale * self.nn_low_rank_param(common).reshape((X.shape[0], self.H, -1))
         Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed((self.nn_diag_covar(common)+self.minsigma)**2)
         L = cholesky_jitter(Sigma)
         return mu, L, Sigma

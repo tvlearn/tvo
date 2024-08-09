@@ -99,6 +99,7 @@ if __name__ == "__main__":
     sampler = torch.load(cmd_args.sampler)
     assert isinstance(sampler, SamplerModule)
     sampler.to(device)
+    sampler.eval()
 
     # Load noisy image and extract image patches
     clean = load_var(cmd_args.model, "clean_image")

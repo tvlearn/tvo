@@ -61,7 +61,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--lr", type=float, help="Learning rate", default=1e-2)
     arg_parser.add_argument("--t_start", type=float, help="Learning start temperature", default=1.0)
     arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=1.0)
-    arg_parser.add_argument("--CPU", action="store_true")
+    arg_parser.add_argument("--CPU", help="Force CPU compute", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-amortize"))
 
@@ -89,6 +89,7 @@ if __name__ == "__main__":
                                #variationalparams=FullCovarGaussianVariationalParams(N, D, H)
                                variationalparams=AmortizedResNetLowRankVariationalParams(N, D, H)
                                ).to(device)
+    model.train()
    
     log_path = cmd_args.outdir
     if not os.path.exists(log_path):
@@ -121,7 +122,8 @@ if __name__ == "__main__":
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
         print("Opt all. Epoch {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(cmd_args.epochs_mean + epoch, model.temperature, loss[-1]))
-    
+
+    model.eval()
     samples = model.sample_q(dataset.X, nsamples=10)
     print("Samples shape: ", samples.shape)
 
