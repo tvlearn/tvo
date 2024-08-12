@@ -26,26 +26,12 @@ from models.variationalparams import (
     AmortizedGaussianVariationalParams,
     AmortizedResNetVariationalParams, 
     AmortizedResNetLowRankVariationalParams)
+from utils.common import FloatPrecision
 from utils.training import train
 from utils.plotting import plot_epoch_log
 
+
 torch.autograd.set_detect_anomaly(True)
-
-
-class FloatPrecision(Enum):
-    float16 = "float16"  # torch.float16
-    float32 = "float32"  # torch.float32
-    float64 = "float64"  # torch.float64
-
-    def __str__(self):
-        return str(self.value)
-
-    @staticmethod
-    def from_string(s):
-        try:
-            return FloatPrecision[s]
-        except KeyError:
-            raise ValueError()
 
 
 if __name__ == "__main__":
@@ -73,7 +59,7 @@ if __name__ == "__main__":
     assert cmd_args.Xfile is not None
     assert cmd_args.Ksetfile is not None
 
-    eval("torch.set_default_dtype(torch.{})".format(cmd_args.precision))
+    torch.set_default_dtype(cmd_args.precision.torch_dtype())
     device = torch.device("cuda" if torch.cuda.is_available() and not cmd_args.CPU else "cpu") 
     #torch.set_default_device(device)
     print("Using PyTorch device/precision: {}/{}".format(device, torch.get_default_dtype()))

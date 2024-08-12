@@ -11,43 +11,18 @@ from datetime import datetime
 import numpy as np
 import torch
 import argparse
-from enum import Enum
 import h5py
 import tvo
 from tvo.models import BSC
 from tvo.exp import EVOConfig, AmortizedSamplingConfig, ExpConfig, Training
 from tvo.utils.parallel import pprint, broadcast, barrier, bcast_shape, gather_from_processes
 from tvutil.prepost import OverlappingPatches, MultiDimOverlappingPatches, mean_merger, median_merger
+from utils.common import FloatPrecision
 from utils.viz import Visualizer
 from utils.utils import eval_fn
 from models.amortizedbernoulli import SamplerModule
 
 
-class FloatPrecision(Enum):
-    float16 = "float16"  # torch.float16
-    float32 = "float32"  # torch.float32
-    float64 = "float64"  # torch.float64
-
-    def __str__(self):
-        return str(self.value)
-
-    @staticmethod
-    def from_string(s):
-        try:
-            return FloatPrecision[s]
-        except KeyError:
-            raise ValueError()
-        
-    def torch_dtype(self):
-        if self.value == FloatPrecision.float16.value:
-            return torch.float16
-        elif self.value == FloatPrecision.float32.value:
-            return torch.float32
-        elif self.value == FloatPrecision.float64.value:
-            return torch.float64
-        else:
-            raise ValueError()
-        
 
 def load_group_as_dict(hdf5filename, groupname):
     res = {}
