@@ -2,6 +2,10 @@
 import math
 import torch
 
+
+SIGMA = 1e-7
+
+
 def check_none(x, message):
     if torch.any(torch.isnan(x)) \
             or torch.any(torch.isinf(x)) \
@@ -57,6 +61,7 @@ class RandomFlowSequence(torch.nn.Module):
     def sample(self, size):
         x, lp = self.source.sample(size)
         for transform in self.sequence:
+            x_old, lp_old = x, lp
             x, lp = transform(x, lp)
             check_none(x, transform.__class__.__name__ + " sample x")
             check_none(lp, transform.__class__.__name__ + " sample lp")
@@ -65,11 +70,13 @@ class RandomFlowSequence(torch.nn.Module):
 
     def log_p(self, x):
         for transform in reversed([m for m in self.sequence]):
+            x_old = x
             x = transform.inverse(x)
             check_none(x, transform.__class__.__name__ + " inverse x")
             
         lp = self.source.log_p(x)
         for transform in self.sequence:
+            x_old, lp_old = x, lp
             x, lp = transform(x, lp)
             check_none(x, transform.__class__.__name__ + " log_p x")
             check_none(lp, transform.__class__.__name__ + " log_p lp")
@@ -159,15 +166,23 @@ class CopulaTransform(FlowTransform):
         assert self.diagcovars is not None
         logdet = (-0.5*math.log(2*math.pi) -0.5*torch.log(self.diagcovars) -0.5*(1/self.diagcovars)*(x**2)).sum(-1)
         fx = 0.5 * (1 + torch.erf(x/torch.sqrt(2*self.diagcovars))) 
-        check_none(lp, "Copula lp")
-        check_none(x, "Copula x")
-        check_none(logdet, "Copula logdet")
-        check_none(fx, "Copula fx")
-        check_none(lp - logdet, "Copula lp - logdet")
+        check_none(lp, "Copula.forward lp")
+        check_none(x, "Copula.forward x")
+        check_none(logdet, "Copula.forward logdet")
+        check_none(fx, "Copula.forward fx")
+        check_none(lp - logdet, "Copula.forward lp - logdet")
+        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
+        assert torch.all(fx >= SIGMA)
+        assert torch.all(fx <= 1-SIGMA)
         return fx, lp - logdet
 
     def inverse(self, fx):
-        return torch.erfinv(2*fx-1) * torch.sqrt(2*self.diagcovars)
+        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
+        assert torch.all(fx >= SIGMA)
+        assert torch.all(fx <= 1-SIGMA)
+        x = torch.erfinv(2*fx-1) * torch.sqrt(2*self.diagcovars)
+        check_none(x, "Copula.inverse x")        
+        return x
 
 
 class ElementwiseLinearTransform(FlowTransform):
@@ -260,14 +275,26 @@ class CollapsedBernoulliLogisticRelaxation(FlowTransform):
         self.invt = 1/t  # inverse temperature
 
     def forward(self, x, lp):
+        x = torch.clamp(x, SIGMA, 1-SIGMA)
+        assert torch.all(x >= SIGMA)
+        assert torch.all(x <= 1-SIGMA)
         g = (1-x)/x * torch.exp(-self.mu)
         fx = 1 / (g**self.invt + 1)
+        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
+        assert torch.all(fx >= SIGMA)
+        assert torch.all(fx <= 1-SIGMA)
         logdet = (torch.log(self.invt * g**(self.invt-1)) - self.mu - 2*torch.log(x) + 2*torch.log(fx)).sum(-1)
         #logdet = (torch.log(self.invt) + (self.invt-1) * torch.log(g) - self.mu - 2*torch.log(x) + 2*torch.log(fx)).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
+        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
+        assert torch.all(fx >= SIGMA)
+        assert torch.all(fx <= 1-SIGMA)
         x = 1 / ((1 / fx - 1)**self.t / torch.exp(-self.mu) + 1)
+        x = torch.clamp(x, SIGMA, 1-SIGMA)
+        assert torch.all(x >= SIGMA)
+        assert torch.all(x <= 1-SIGMA)
         return x
 
 

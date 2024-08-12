@@ -67,6 +67,15 @@ def batch_sample_covar(x, weights=None):
         return torch.stack([sample_covar(x[i], weights[i]) for i in range(x.shape[0])])
 
 
+def stable_entropy(log_f):
+    """ Computes entropy from unnormalized log-probability (energy)
+        :param log_f    : [N, K]    K energy values (batch of N distributions)
+    """
+    log_f = log_f - log_f.max(dim=-1, keepdim=True)[0]
+    Z = torch.exp(log_f).sum(-1)
+    H = torch.log(Z) - 1/Z * (torch.exp(log_f) * log_f).sum(-1) 
+    return H
+
 class SamplerModule(Module):
     def sample_q(self, X, indexes=None, nsamples=1000):
         raise NotImplementedError()
@@ -171,22 +180,22 @@ class AmortizedBernoulli(SamplerModule):
         return res
 
 
-    def importance_sampling_objective(self, X, Kset, log_p, marginal_p=None, indexes=None):
+    def importance_sampling_objective(self, X, Kset, log_f, marginal_p=None, indexes=None):
         """ Returns cross-entropy H(p_K | q(X)) and KL-divergence(p_K || q(X))
             :param X            : [N, D]    N data points
             :param Kset         : [N, K, H] truncated binary posterior sets
-            :param log_p        : [N, K]    log-joint probability of (X, Kset) 
+            :param log_f        : [N, K]    log-joint probability of (X, Kset) 
             :param marginal_p   : [N, H]    marginal probability of bits
             :param indexes      : [N]       data points indexes
         """
         N, K, H = Kset.shape
         assert Kset.shape[0] == X.shape[0]
-        assert Kset.shape[:2] == log_p.shape
+        assert Kset.shape[:2] == log_f.shape
 
         device = X.device
 
         if marginal_p is None:
-            marginal_p = compute_marginal(Kset, log_p)
+            marginal_p = compute_marginal(Kset, log_f)
             marginal_p = torch.clamp(marginal_p, min=0.01, max=0.99)
         
         if self.objective_type == Objective.MEANKLDIVERGENCE:
@@ -203,7 +212,7 @@ class AmortizedBernoulli(SamplerModule):
             q_s = stable_logistic(mu)
             # Compute cross-entropy        
             crossH_pq = - (marginal_p * torch.log(q_s) + (1-marginal_p) * torch.log(1-q_s)).sum(-1)
-            p_s = compute_probabilities(log_p)  # prob. of Kset
+            p_s = compute_probabilities(log_f)  # prob. of Kset
             H_marginal_p = - (marginal_p * torch.log(marginal_p) + (1-marginal_p)*torch.log(1-marginal_p)).sum(-1)
             KL_pq = crossH_pq - H_marginal_p
             res = {}
@@ -234,18 +243,18 @@ class AmortizedBernoulli(SamplerModule):
                     LTLinearTransform(LT=L), 
                     CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
                     CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
+                    ElementwiseLinearTransform(1.0001, -0.00005),  # for stability
                     ])
-            reflow_samples, log_q_s = q_distribution.log_p(relaxed_Kset_samples.permute(0, 2, 1, 3))
-            log_q_s = log_q_s.permute(0, 2, 1)
+            reflow_samples, log_q_s_samples = q_distribution.log_p(relaxed_Kset_samples.permute(0, 2, 1, 3))
+            log_q_s_samples = log_q_s_samples.permute(0, 2, 1)
             
             # Compute cross-entropy        
             r_s = (marginal_p.unsqueeze(-2) * Kset + (1-marginal_p.unsqueeze(-2)) * (1-Kset)).prod(-1)  # prob. of Kset under factorized marginal distribution
-            p_s = compute_probabilities(log_p)  # prob. of Kset
-            #breakpoint()
-            q_s = r_s / self.nsamples * (torch.exp(log_q_s - relaxed_log_p).sum(0))
+            p_s = compute_probabilities(log_f)  # prob. of Kset
+            q_s = r_s / self.nsamples * (torch.exp(log_q_s_samples - relaxed_log_p).sum(0))
             crossH_pq = -(p_s * torch.log(q_s)).sum(-1)
             
-            H_p = - (p_s * torch.log(p_s)).sum(-1)
+            H_p = stable_entropy(log_f)
             KL_pq = crossH_pq - H_p
             
             res = {}
@@ -258,12 +267,14 @@ class AmortizedBernoulli(SamplerModule):
                 res["objective"] = res["KL_pq"]
             else:
                 raise NotImplementedError()
-        
+            if torch.isnan(res["objective"]):
+                assert not torch.isnan(res["objective"])
+
         if True:  # debug variables
             # Compute data mean and covariance
             res["p_samples"] = torch.stack([k[torch.multinomial(p, num_samples=self.nsamples, replacement=True)] for k, p in zip(Kset, p_s)], dim=1)
-            res["p_mean"] = sample_mean(Kset, weights=compute_probabilities(log_p), dim=1)
-            res["p_covar"] = batch_sample_covar(Kset, weights=compute_probabilities(log_p))
+            res["p_mean"] = sample_mean(Kset, weights=compute_probabilities(log_f), dim=1)
+            res["p_covar"] = batch_sample_covar(Kset, weights=compute_probabilities(log_f))
         
             # Compute sample mean and covariance
             q_samples, q_samples_log_p = q_distribution.sample(size=(self.nsamples, N))

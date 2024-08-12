@@ -38,6 +38,16 @@ class FloatPrecision(Enum):
         except KeyError:
             raise ValueError()
         
+    def torch_dtype(self):
+        if self.value == FloatPrecision.float16.value:
+            return torch.float16
+        elif self.value == FloatPrecision.float32.value:
+            return torch.float32
+        elif self.value == FloatPrecision.float64.value:
+            return torch.float64
+        else:
+            raise ValueError()
+        
 
 def load_group_as_dict(hdf5filename, groupname):
     res = {}
@@ -118,7 +128,7 @@ if __name__ == "__main__":
             W_init=torch.Tensor(theta["W"]),
             sigma2_init=torch.Tensor(theta["sigma2"]),
             pies_init=torch.Tensor(theta["pies"]),
-            precision= torch.float32 if model_config_dict["precision"] == "torch.float32" else torch.float64,
+            precision=cmd_args.precision.torch_dtype(),
             #device=torch.get_default_device(),
         )
 
