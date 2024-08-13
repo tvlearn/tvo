@@ -82,6 +82,7 @@ if __name__ == "__main__":
         os.makedirs(log_path)
     
     def on_epoch(X, Kset, logPs, mean_loss, res):
+        return 
         if (epochs_done + epoch) % 1 == 0:
             plot_epoch_log(X, Kset, logPs, mean_loss, res, epochs_done + epoch, log_path)
 
@@ -95,7 +96,9 @@ if __name__ == "__main__":
         model.temperature = temperature[epoch]
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
-        print("Opt mean. Epoch {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch, model.temperature, loss[-1]))
+        print("Optimizing mean | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch, model.temperature, loss[-1]))
+
+    torch.save(model, os.path.join(log_path, "trained_sampler_mean.pt"))
     
     # Optimize full model (mean and covariance parameters)
     temperature = np.concatenate([np.linspace(cmd_args.t_start, cmd_args.t_end, cmd_args.epochs_full)])
@@ -107,11 +110,7 @@ if __name__ == "__main__":
         model.temperature = temperature[epoch]
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
-        print("Opt all. Epoch {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(cmd_args.epochs_mean + epoch, model.temperature, loss[-1]))
-
-    model.eval()
-    samples = model.sample_q(dataset.X, nsamples=10)
-    print("Samples shape: ", samples.shape)
+        print("Optimizing all | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(cmd_args.epochs_mean + epoch, model.temperature, loss[-1]))
 
     torch.save(model, os.path.join(log_path, "trained_sampler.pt"))
     
