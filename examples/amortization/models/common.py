@@ -1,9 +1,9 @@
 #import numpy as np
 import math
 import torch
+import numpy as np
 
-
-SIGMA = 1e-7
+EPS = np.finfo("float32").eps  # The difference between 1.0 and the next smallest representable float larger than 1.0
 
 
 def check_none(x, message):
@@ -171,15 +171,11 @@ class CopulaTransform(FlowTransform):
         check_none(logdet, "Copula.forward logdet")
         check_none(fx, "Copula.forward fx")
         check_none(lp - logdet, "Copula.forward lp - logdet")
-        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
-        assert torch.all(fx >= SIGMA)
-        assert torch.all(fx <= 1-SIGMA)
+        fx = torch.clamp(fx, EPS, 1-EPS)
         return fx, lp - logdet
 
     def inverse(self, fx):
-        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
-        assert torch.all(fx >= SIGMA)
-        assert torch.all(fx <= 1-SIGMA)
+        fx = torch.clamp(fx, EPS, 1-EPS)
         x = torch.erfinv(2*fx-1) * torch.sqrt(2*self.diagcovars)
         check_none(x, "Copula.inverse x")        
         return x
@@ -275,26 +271,18 @@ class CollapsedBernoulliLogisticRelaxation(FlowTransform):
         self.invt = 1/t  # inverse temperature
 
     def forward(self, x, lp):
-        x = torch.clamp(x, SIGMA, 1-SIGMA)
-        assert torch.all(x >= SIGMA)
-        assert torch.all(x <= 1-SIGMA)
+        x = torch.clamp(x, EPS, 1-EPS)
         g = (1-x)/x * torch.exp(-self.mu)
         fx = 1 / (g**self.invt + 1)
-        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
-        assert torch.all(fx >= SIGMA)
-        assert torch.all(fx <= 1-SIGMA)
+        fx = torch.clamp(fx, EPS, 1-EPS)
         logdet = (torch.log(self.invt * g**(self.invt-1)) - self.mu - 2*torch.log(x) + 2*torch.log(fx)).sum(-1)
         #logdet = (torch.log(self.invt) + (self.invt-1) * torch.log(g) - self.mu - 2*torch.log(x) + 2*torch.log(fx)).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
-        fx = torch.clamp(fx, SIGMA, 1-SIGMA)
-        assert torch.all(fx >= SIGMA)
-        assert torch.all(fx <= 1-SIGMA)
+        fx = torch.clamp(fx, EPS, 1-EPS)
         x = 1 / ((1 / fx - 1)**self.t / torch.exp(-self.mu) + 1)
-        x = torch.clamp(x, SIGMA, 1-SIGMA)
-        assert torch.all(x >= SIGMA)
-        assert torch.all(x <= 1-SIGMA)
+        x = torch.clamp(x, EPS, 1-EPS)
         return x
 
 
