@@ -326,7 +326,7 @@ class AmortizedResNetTwoHeadsVariationalParams(AmortizedVariationalParams):
         
 
 class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
-    def __init__(self, N, D, H, rank=5, minsigma=1.0, scale=0.01) -> None:
+    def __init__(self, N, D, H, rank=5, minsigma=0.0, scale=0.01) -> None:
         super().__init__(N, D, H)
         self.rank = rank
         self.minsigma = minsigma
