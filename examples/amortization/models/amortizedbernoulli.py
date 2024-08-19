@@ -93,7 +93,7 @@ class AmortizedBernoulli(SamplerModule):
         self.objective_type = Objective.KLDIVERGENCE
 
 
-    def forward(self, X, Kset, log_p, marginal_p=None, indexes=None):
+    def forward(self, X, Kset, log_f, marginal_p=None, indexes=None):
         """ Returns cross-entropy H(p_K | q(X)) and KL-divergence(p_K || q(X))
             :param X            : [N, D]    N data points
             :param Kset         : [N, K, H] truncated binary posterior sets
@@ -101,10 +101,10 @@ class AmortizedBernoulli(SamplerModule):
             :param marginal_p   : [N, H]    marginal probability of bits
             :param indexes      : [N]       data points indexes
         """
-        return self.importance_sampling_objective(X, Kset, log_p, marginal_p, indexes)
+        return self.importance_sampling_objective(X, Kset, log_f, marginal_p, indexes)
     
 
-    def naive_relaxed_objective(self, X, Kset, log_p, marginal_p=None, indexes=None):
+    def naive_relaxed_objective(self, X, Kset, log_f, marginal_p=None, indexes=None):
         """ Returns relaxed cross-entropy H(p_K | q(X))
             :param X            : [N, D]    N data points
             :param Kset         : [N, K, H] truncated binary posterior sets
@@ -114,12 +114,12 @@ class AmortizedBernoulli(SamplerModule):
         """
         N, K, H = Kset.shape
         assert Kset.shape[0] == X.shape[0]
-        assert Kset.shape[:2] == log_p.shape
+        assert Kset.shape[:2] == log_f.shape
 
         device = X.device
 
         if marginal_p is None:
-            marginal_p = compute_marginal(Kset, log_p)
+            marginal_p = compute_marginal(Kset, log_f)
             marginal_p = torch.clamp(marginal_p, min=0.001, max=0.999)
         
         # Create training samples of relaxed Kset
@@ -146,7 +146,7 @@ class AmortizedBernoulli(SamplerModule):
         log_q_s = log_q_s.permute(0, 2, 1)
         
         # Compute cross-entropy
-        p_s = compute_probabilities(log_p)
+        p_s = compute_probabilities(log_f)
         crossH_pq = -torch.sum(p_s * log_q_s) / self.nsamples
         H_p = - torch.sum(p_s * torch.log(p_s))
         KL_pq = crossH_pq - H_p
@@ -164,8 +164,8 @@ class AmortizedBernoulli(SamplerModule):
         
         if True:  # debug variables
             # Compute data mean and covariance
-            res["p_mean"] = sample_mean(Kset, weights=compute_probabilities(log_p), dim=1)
-            res["p_covar"] = batch_sample_covar(Kset, weights=compute_probabilities(log_p))
+            res["p_mean"] = sample_mean(Kset, weights=compute_probabilities(log_f), dim=1)
+            res["p_covar"] = batch_sample_covar(Kset, weights=compute_probabilities(log_f))
         
             # Compute sample mean and covariance
             q_samples, q_samples_log_p = q_distribution.sample(size=(self.nsamples, 1))
@@ -205,7 +205,6 @@ class AmortizedBernoulli(SamplerModule):
             q_distribution = RandomFlowSequence(
                 source=UniformSource(D=H, device=device), 
                 sequence=[
-                    ElementwiseLinearTransform(0.9999, 0.00005),  # for stability
                     CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
                     ])
             
@@ -227,12 +226,7 @@ class AmortizedBernoulli(SamplerModule):
                                             Kset=Kset, 
                                             device=device), 
                 sequence=[
-                    ElementwiseLinearTransform(0.9999, 0.00005),  # for stability
                     CollapsedBernoulliLogisticRelaxation(mu=relaxed_mu, t=self.temperature), 
-                    #InverseLogisticTransform(), 
-                    #ElementwiseLinearTransform(b=relaxed_mu),
-                    #AnnealingTransform(self.temperature), 
-                    #LogisticTransform()
                     ]).sample(size=(self.nsamples,))
             
             # Compute logQ of amortized posterior samples
@@ -243,7 +237,6 @@ class AmortizedBernoulli(SamplerModule):
                     LTLinearTransform(LT=L), 
                     CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
                     CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
-                    ElementwiseLinearTransform(1.0001, -0.00005),  # for stability
                     ])
             reflow_samples, log_q_s_samples = q_distribution.log_p(relaxed_Kset_samples.permute(0, 2, 1, 3))
             log_q_s_samples = log_q_s_samples.permute(0, 2, 1)
