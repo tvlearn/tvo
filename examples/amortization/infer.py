@@ -7,6 +7,7 @@
 
 
 import os
+import sys
 from datetime import datetime
 import numpy as np
 import torch
@@ -20,6 +21,7 @@ from tvutil.prepost import OverlappingPatches, MultiDimOverlappingPatches, mean_
 from utils.common import FloatPrecision
 from utils.viz import Visualizer
 from utils.utils import eval_fn
+from utils.utils import stdout_logger
 from models.amortizedbernoulli import SamplerModule
 
 
@@ -71,7 +73,9 @@ if __name__ == "__main__":
     print("Using PyTorch device/precision: {}/{}".format(device, torch.get_default_dtype()))
     tvo._set_device(device)
 
-    os.makedirs(cmd_args.outdir, exist_ok=True)
+    log_path = cmd_args.outdir
+    os.makedirs(log_path, exist_ok=True)
+    sys.stdout = stdout_logger(os.path.join(log_path, "terminal.txt"))
 
     # Load BSC model parameters
     theta = load_group_as_dict(cmd_args.model, "theta")
@@ -124,7 +128,7 @@ if __name__ == "__main__":
     # Setup the experiment
     exp_config = ExpConfig(
         batch_size=int(exp_config_dict["batch_size"]),
-        output=os.path.join(cmd_args.outdir, "inference.h5"),
+        output=os.path.join(log_path, "inference.h5"),
         reco_epochs=exp_config_dict["reco_epochs"],
         log_blacklist=[],
         log_only_latest_theta=True,
@@ -138,7 +142,7 @@ if __name__ == "__main__":
     print("Initializing visualizer")
     visualizer = Visualizer(
             viz_every=1,
-            output_directory=cmd_args.outdir,
+            output_directory=log_path,
             clean_image=clean,
             noisy_image=noisy,
             patch_size=(patch_height, patch_width),

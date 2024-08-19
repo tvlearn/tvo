@@ -12,8 +12,8 @@
 # --Xfile ../gaussian-denoising/out/24-07-31-16-48-59/image_patches.h5 \
 # --Ksetfile ../gaussian-denoising/out/24-07-31-16-48-59/training.h5 
 
-
 import os
+import sys
 from datetime import datetime
 import numpy as np
 import torch
@@ -29,6 +29,7 @@ from models.variationalparams import (
 from utils.common import FloatPrecision
 from utils.training import train
 from utils.plotting import plot_epoch_log
+from utils.utils import stdout_logger
 
 
 torch.autograd.set_detect_anomaly(True)
@@ -52,6 +53,9 @@ if __name__ == "__main__":
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-amortize"))
 
     cmd_args = arg_parser.parse_args()
+    log_path = cmd_args.outdir
+    os.makedirs(log_path, exist_ok=True)
+    sys.stdout = stdout_logger(os.path.join(log_path, "terminal.txt"))
     print("Parameters:")
     for var in vars(cmd_args):
         print("  {}: {}". format(var, vars(cmd_args)[var]))
@@ -77,10 +81,6 @@ if __name__ == "__main__":
                                ).to(device)
     model.train()
    
-    log_path = cmd_args.outdir
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
-    
     def on_epoch(X, Kset, logPs, mean_loss, res):
         return 
         if (epochs_done + epoch) % 1 == 0:
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         model.temperature = temperature[epoch]
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
-        print("Optimizing all | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(cmd_args.epochs_mean + epoch, model.temperature, loss[-1]))
+        print("Optimizing all  | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(cmd_args.epochs_mean + epoch, model.temperature, loss[-1]))
 
     torch.save(model, os.path.join(log_path, "trained_sampler.pt"))
     
