@@ -55,7 +55,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--Xfile", type=str, help="X dataset file, HDF5", default=None)
     arg_parser.add_argument("--epochs", type=int, help="Number of epochs to run the sampler", default=10)
     arg_parser.add_argument("--batch", type=int, help="Batch size", default=32)
-    arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=128)
+    arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=100)
     arg_parser.add_argument("--CPU", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-infer"))
@@ -182,3 +182,7 @@ if __name__ == "__main__":
                 )
 
     print("Finished")
+
+    #from torch.profiler import profile, record_function, ProfilerActivity
+    #with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+    #print(prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=100, max_name_column_width=200))
