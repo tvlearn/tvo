@@ -31,7 +31,7 @@ def load_group_as_dict(hdf5filename, groupname):
     with h5py.File(hdf5filename, "r") as f:
         group = f[groupname]
         for k in group.keys():
-            v = group[k]#[:]
+            v = group[k]
             if v.shape == ():
                 res[k] = v[()]
             elif v.shape == (1,):
@@ -53,8 +53,6 @@ if __name__ == "__main__":
     arg_parser.add_argument("--model", type=str, help="BSC model parameters file, *.HDF5", default=None)
     arg_parser.add_argument("--sampler", type=str, help="Posterior sampler file, *.pt", default=None)
     arg_parser.add_argument("--Xfile", type=str, help="X dataset file, HDF5", default=None)
-    arg_parser.add_argument("--N_start", type=int, help="Data slice start", default=0)
-    arg_parser.add_argument("--N_size", type=int, help="Data slice size", default=None)
     arg_parser.add_argument("--epochs", type=int, help="Number of epochs to run the sampler", default=10)
     arg_parser.add_argument("--batch", type=int, help="Batch size", default=32)
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=128)
@@ -85,9 +83,8 @@ if __name__ == "__main__":
 
     # Load posterior sampler object from a *.pt file
     assert cmd_args.sampler is not None
-    sampler = torch.load(cmd_args.sampler)
+    sampler = torch.load(cmd_args.sampler, map_location=device)
     assert isinstance(sampler, SamplerModule)
-    sampler.to(device)
     sampler.eval()
 
     # Load noisy image and extract image patches
@@ -108,18 +105,9 @@ if __name__ == "__main__":
             sigma2_init=torch.Tensor(theta["sigma2"]),
             pies_init=torch.Tensor(theta["pies"]),
             precision=cmd_args.precision.torch_dtype(),
-            #device=torch.get_default_device(),
         )
 
-    # Construct EVO configuration
-    estep_conf = EVOConfig(
-        n_states=estep_config_dict["n_states"],
-        n_parents=estep_config_dict["n_parents"],
-        n_children=estep_config_dict["n_children"],
-        n_generations=estep_config_dict["n_generations"],
-        parent_selection=estep_config_dict["parent_selection"].decode("utf-8"),
-        crossover=estep_config_dict["crossover"],
-    )
+    # Construct TVO configuration
     estep_conf = AmortizedSamplingConfig(
         n_states=estep_config_dict["n_states"],
         n_samples=cmd_args.N_samples,
@@ -127,7 +115,7 @@ if __name__ == "__main__":
 
     # Setup the experiment
     exp_config = ExpConfig(
-        batch_size=int(exp_config_dict["batch_size"]),
+        batch_size=cmd_args.batch,
         output=os.path.join(log_path, "inference.h5"),
         reco_epochs=exp_config_dict["reco_epochs"],
         log_blacklist=[],
@@ -154,42 +142,43 @@ if __name__ == "__main__":
     # run epochs
     comm_rank = 0
     merge_strategies = {"mean": mean_merger, "median": median_merger}
-    for epoch, summary in enumerate(exp.run(cmd_args.epochs)):
-        summary.print()
+    with torch.inference_mode():
+        for epoch, summary in enumerate(exp.run(cmd_args.epochs)):
+            summary.print()
 
-        # merge reconstructed image patches and generate reconstructed image
-        gather = epoch in (exp_config_dict["reco_epochs"] + 1)
-        assert hasattr(trainer, "test_reconstruction")
-        rec_patches = gather_from_processes(trainer.test_reconstruction) if gather else None
-        merge = gather and comm_rank == 0
-        imgs = {
-            k: ovp.set_and_merge(rec_patches.t(), merge_method=v) if merge else None
-            for k, v in merge_strategies.items()
-        }
-
-        # assess reconstruction quality in terms of PSNR
-        psnrs = {k: eval_fn(clean, v) if merge else None for k, v in imgs.items()}
-
-        to_log = (
-            {
-                **{f"reco_image_{k}": v for k, v in imgs.items()},
-                **{f"psnr_{k}": v for k, v in psnrs.items()},
+            # merge reconstructed image patches and generate reconstructed image
+            gather = epoch in (exp_config_dict["reco_epochs"] + 1)
+            assert hasattr(trainer, "test_reconstruction")
+            rec_patches = gather_from_processes(trainer.test_reconstruction) if gather else None
+            merge = gather and comm_rank == 0
+            imgs = {
+                k: ovp.set_and_merge(rec_patches.t(), merge_method=v) if merge else None
+                for k, v in merge_strategies.items()
             }
-            if merge
-            else None
-        )
 
-        if to_log is not None:
-            logger.append_and_write(**to_log)
+            # assess reconstruction quality in terms of PSNR
+            psnrs = {k: eval_fn(clean, v) if merge else None for k, v in imgs.items()}
 
-        # visualize epoch
-        if comm_rank == 0:
-            gfs = model.theta["W"]
-            visualizer.process_epoch(
-                epoch=epoch,
-                pies=model.theta["pies"],
-                gfs=gfs,
-                rec=imgs["mean"] if merge else None,
+            to_log = (
+                {
+                    **{f"reco_image_{k}": v for k, v in imgs.items()},
+                    **{f"psnr_{k}": v for k, v in psnrs.items()},
+                }
+                if merge
+                else None
             )
+
+            if to_log is not None:
+                logger.append_and_write(**to_log)
+
+            # visualize epoch
+            if comm_rank == 0:
+                gfs = model.theta["W"]
+                visualizer.process_epoch(
+                    epoch=epoch,
+                    pies=model.theta["pies"],
+                    gfs=gfs,
+                    rec=imgs["mean"] if merge else None,
+                )
 
     print("Finished")
