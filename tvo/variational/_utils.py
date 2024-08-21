@@ -43,6 +43,19 @@ def _set_redundant_lpj_to_low_GPU_fast(new_states: to.Tensor, new_lpj: to.Tensor
     mask = _redundant_mask_fast(old_and_new)
     new_lpj[mask[:, old_states.shape[1]:]] = -1e20
 
+def _set_redundant_lpj_to_low_fastest(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+    """Find redundant states in new_states w.r.t. old_states and set
+       corresponding lpg to low.
+
+    :param new_states: set of new variational states (batch_size, newS, H)
+    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
+    :param old_states: (batch_size, S, H)
+    """
+    old_new_sim =  to.all(old_states.unsqueeze(-3) == new_states.unsqueeze(-2), dim=-1)
+    new_new_sim =  to.all(new_states.unsqueeze(-3) == new_states.unsqueeze(-2), dim=-1)
+    redundant = to.tril(new_new_sim.to(to.int)).sum(dim=-1) + old_new_sim.to(to.int).sum(dim=-1)  > 1
+    new_lpj[redundant] = -1e20
+
 
 def _unique_ind_fast(x: to.Tensor) -> to.Tensor:
     """Find indices of unique rows in tensor. Prioritizes the first instance.
@@ -136,10 +149,13 @@ def _set_redundant_lpj_to_low_GPU(new_states: to.Tensor, new_lpj: to.Tensor, old
 # set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
 # function that runs on numpy arrays, when running on GPU, we stick to torch tensors
 def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+    _set_redundant_lpj_to_low_fastest(new_states, new_lpj, old_states)
+    return
+
     if tvo.get_device().type == "cpu":
         set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
     else:
-        _set_redundant_lpj_to_low_GPU_fast(new_states, new_lpj, old_states)
+        _set_redundant_lpj_to_low_fastest(new_states, new_lpj, old_states)
 
 
 def generate_unique_states(
