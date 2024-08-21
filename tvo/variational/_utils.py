@@ -155,7 +155,7 @@ def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_stat
     if tvo.get_device().type == "cpu":
         set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
     else:
-        _set_redundant_lpj_to_low_fastest(new_states, new_lpj, old_states)
+        _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
 
 
 def generate_unique_states(
