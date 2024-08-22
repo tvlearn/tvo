@@ -205,7 +205,11 @@ class AmortizedBernoulli(SamplerModule):
             q_distribution = RandomFlowSequence(
                 source=UniformSource(D=H, device=device), 
                 sequence=[
-                    CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
+                    InverseLogisticTransform(),
+                    ElementwiseLinearTransform(b=mu),
+                    AnnealingTransform(t=self.temperature),
+                    LogisticTransform(),
+                    #CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
                     ])
             
             q_s = stable_logistic(mu)
@@ -226,7 +230,11 @@ class AmortizedBernoulli(SamplerModule):
                                             Kset=Kset, 
                                             device=device), 
                 sequence=[
-                    CollapsedBernoulliLogisticRelaxation(mu=relaxed_mu, t=self.temperature), 
+                    InverseLogisticTransform(),
+                    ElementwiseLinearTransform(b=relaxed_mu),
+                    AnnealingTransform(t=self.temperature),
+                    LogisticTransform(),
+                    #CollapsedBernoulliLogisticRelaxation(mu=relaxed_mu, t=self.temperature), 
                     ]).sample(size=(self.nsamples,))
             
             # Compute logQ of amortized posterior samples
@@ -236,7 +244,11 @@ class AmortizedBernoulli(SamplerModule):
                 sequence=[
                     LTLinearTransform(LT=L), 
                     CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
-                    CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
+                    InverseLogisticTransform(),
+                    ElementwiseLinearTransform(b=mu),
+                    AnnealingTransform(t=self.temperature),
+                    LogisticTransform(),
+                    #CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
                     ])
             reflow_samples, log_q_s_samples = q_distribution.log_p(relaxed_Kset_samples.permute(0, 2, 1, 3))
             log_q_s_samples = log_q_s_samples.permute(0, 2, 1)
@@ -244,8 +256,8 @@ class AmortizedBernoulli(SamplerModule):
             # Compute cross-entropy        
             r_s = (marginal_p.unsqueeze(-2) * Kset + (1-marginal_p.unsqueeze(-2)) * (1-Kset)).prod(-1)  # prob. of Kset under factorized marginal distribution
             p_s = compute_probabilities(log_f)  # prob. of Kset
-            q_s = r_s / self.nsamples * (torch.exp(log_q_s_samples - relaxed_log_p).sum(0))
-            crossH_pq = -(p_s * torch.log(q_s)).sum(-1)
+            q_s = r_s  * torch.exp(log_q_s_samples - relaxed_log_p).mean(0)
+            crossH_pq = -(p_s * torch.log(torch.clamp(q_s, EPS, None))).sum(-1)
             
             H_p = stable_entropy(log_f)
             KL_pq = crossH_pq - H_p
@@ -303,7 +315,11 @@ class AmortizedBernoulli(SamplerModule):
             sequence=[
                 LTLinearTransform(LT=L), 
                 CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
-                CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
+                InverseLogisticTransform(),
+                ElementwiseLinearTransform(b=mu),
+                AnnealingTransform(t=self.temperature),
+                LogisticTransform(),
+                #CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
                 ])
         
         q_samples, q_samples_log_p = q_distribution.sample(size=(nsamples, 1))

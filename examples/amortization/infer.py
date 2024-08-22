@@ -54,26 +54,28 @@ if __name__ == "__main__":
     arg_parser.add_argument("--sampler", type=str, help="Posterior sampler file, *.pt", default=None)
     arg_parser.add_argument("--Xfile", type=str, help="X dataset file, HDF5", default=None)
     arg_parser.add_argument("--epochs", type=int, help="Number of epochs to run the sampler", default=10)
-    arg_parser.add_argument("--batch", type=int, help="Batch size", default=32)
+    arg_parser.add_argument("--batch", type=int, help="Batch size", default=128)
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=100)
     arg_parser.add_argument("--CPU", action="store_true")
-    arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
+    arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-infer"))
 
     cmd_args = arg_parser.parse_args()
+    log_path = cmd_args.outdir
+    os.makedirs(log_path, exist_ok=True)
+    sys.stdout = stdout_logger(os.path.join(log_path, "terminal.txt"))
     print("Parameters:")
     for var in vars(cmd_args):
         print("  {}: {}". format(var, vars(cmd_args)[var]))
 
+    assert cmd_args.model is not None
+    assert cmd_args.sampler is not None
+    assert cmd_args.Xfile is not None
+    
     eval("torch.set_default_dtype(torch.{})".format(cmd_args.precision))
     device = torch.device("cuda" if torch.cuda.is_available() and not cmd_args.CPU else "cpu") 
-    #torch.set_default_device(device)
     print("Using PyTorch device/precision: {}/{}".format(device, torch.get_default_dtype()))
     tvo._set_device(device)
-
-    log_path = cmd_args.outdir
-    os.makedirs(log_path, exist_ok=True)
-    sys.stdout = stdout_logger(os.path.join(log_path, "terminal.txt"))
 
     # Load BSC model parameters
     theta = load_group_as_dict(cmd_args.model, "theta")
@@ -82,7 +84,6 @@ if __name__ == "__main__":
     exp_config_dict = load_group_as_dict(cmd_args.model, "exp_config")
 
     # Load posterior sampler object from a *.pt file
-    assert cmd_args.sampler is not None
     sampler = torch.load(cmd_args.sampler, map_location=device)
     assert isinstance(sampler, SamplerModule)
     sampler.eval()

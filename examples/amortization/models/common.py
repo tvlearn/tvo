@@ -196,7 +196,7 @@ class ElementwiseLinearTransform(FlowTransform):
         return fx, lp - logdet
 
     def inverse(self, fx):
-        return (fx-self.b) / self.a
+        return (fx-self.b) * (1 / self.a)
 
 
 class ScaleTransform(FlowTransform):
@@ -227,21 +227,31 @@ class AnnealingTransform(ScaleTransform):
         return 1 / self.scale
 
 
+def _stable_logistic(x):
+    return 1 / (1 + torch.exp(-x))
+    fx = torch.where(x>0, 1 / (1 + torch.exp(-x)),
+                          torch.exp(x) / (1 + torch.exp(x)))
+    return fx
+
+
+def _stable_inv_logistic(x):
+    x = torch.clamp(x, EPS, 1-EPS)
+    fx = torch.log(x/(1-x))
+    return fx
+
+
 class LogisticTransform(FlowTransform):
     def __init__(self) -> None:
         super().__init__()
         
     def forward(self, x, lp):
-        fx = 1 / (torch.exp(-x) + 1)
+        fx = _stable_logistic(x)
         logdet = (-x - 2*torch.log(torch.exp(-x) + 1)).sum(-1)  
         # logdet = (-x + 2*torch.log(fx)).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
-        sigma = 1e-9
-        fx = fx*(1-sigma) + (1-fx)*sigma  # makes the function stable
-        x = torch.log(fx/(1-fx))
-        return x
+        return _stable_inv_logistic(fx)
 
 
 class InverseLogisticTransform(FlowTransform):
@@ -249,15 +259,12 @@ class InverseLogisticTransform(FlowTransform):
         super().__init__()
         
     def forward(self, x, lp):
-        sigma = 1e-9
-        x = x*(1-sigma) + (1-x)*sigma  # makes the function stable
-        fx = torch.log(x/(1-x))
-        logdet = -torch.log(x-x**2).sum(-1)
+        fx = _stable_inv_logistic(x)
+        logdet = -torch.log(torch.clamp(x-x**2, EPS, 1-EPS)).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
-        x = 1 / (torch.exp(-fx) + 1)
-        return x
+        return _stable_logistic(fx)
 
 
 class CollapsedBernoulliLogisticRelaxation(FlowTransform):
@@ -281,7 +288,7 @@ class CollapsedBernoulliLogisticRelaxation(FlowTransform):
     
     def inverse(self, fx):
         fx = torch.clamp(fx, EPS, 1-EPS)
-        x = 1 / ((1 / fx - 1)**self.t / torch.exp(-self.mu) + 1)
+        x = 1 / ((1 / fx - 1)**self.t * torch.exp(self.mu) + 1)
         x = torch.clamp(x, EPS, 1-EPS)
         return x
 
@@ -316,3 +323,12 @@ if __name__ == "__main__":
     print("log-prob error: {}".format(err))
     assert err < 1e-3
     
+if __name__ == "__main__":
+    x = torch.tensor([-EPS, 0, EPS, 0.5, 1-EPS, 1, 1+EPS], dtype=torch.float32)
+    print(x)
+    print(torch.log(x))
+    inv_logistic_x = _stable_inv_logistic(x)
+    print(inv_logistic_x)
+    print(1e30*inv_logistic_x)
+    x_star = _stable_logistic(1e30*inv_logistic_x)
+    print(x_star)

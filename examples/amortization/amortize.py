@@ -32,7 +32,11 @@ from utils.plotting import plot_epoch_log
 from utils.utils import stdout_logger
 
 
-torch.autograd.set_detect_anomaly(True)
+if False:
+    print("------------------------------------------------")
+    print("WARNING! torch.autograd.set_detect_anomaly(True)")
+    print("------------------------------------------------")
+    torch.autograd.set_detect_anomaly(True)
 
 
 if __name__ == "__main__":
@@ -45,11 +49,12 @@ if __name__ == "__main__":
     arg_parser.add_argument("--epochs_full", type=int, help="Number of epochs to train full model", default=10)
     arg_parser.add_argument("--batch_size", type=int, help="Training batch size", default=32)
     arg_parser.add_argument("--N_IS", type=int, help="Number of samples for importance sampler estimator", default=128)
-    arg_parser.add_argument("--lr", type=float, help="Learning rate", default=1e-2)
+    arg_parser.add_argument("--lr_mean", type=float, help="Learning rate for mean optimization", default=1e-2)
+    arg_parser.add_argument("--lr_full", type=float, help="Learning rate for full optimization", default=1e-2)
     arg_parser.add_argument("--t_start", type=float, help="Learning start temperature", default=1.0)
     arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=1.0)
     arg_parser.add_argument("--CPU", help="Force CPU compute", action="store_true")
-    arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float64)
+    arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-amortize"))
 
     cmd_args = arg_parser.parse_args()
@@ -89,7 +94,7 @@ if __name__ == "__main__":
     # Optimize mean only
     temperature = np.concatenate([np.linspace(cmd_args.t_start, cmd_args.t_end, cmd_args.epochs_mean)])
     model.objective_type = Objective.MEANKLDIVERGENCE
-    optimizer = torch.optim.Adam(model.parameters(), lr=cmd_args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cmd_args.lr_mean)
     loss = []
     epochs_done = 0
     for epoch in range(temperature.size):
@@ -103,7 +108,7 @@ if __name__ == "__main__":
     # Optimize full model (mean and covariance parameters)
     temperature = np.concatenate([np.linspace(cmd_args.t_start, cmd_args.t_end, cmd_args.epochs_full)])
     model.objective_type = Objective.KLDIVERGENCE
-    optimizer = torch.optim.Adam(model.parameters(), lr=cmd_args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cmd_args.lr_full)
     loss = []
     epochs_done = cmd_args.epochs_mean
     for epoch in range(temperature.size):
@@ -114,3 +119,7 @@ if __name__ == "__main__":
 
     torch.save(model, os.path.join(log_path, "trained_sampler.pt"))
     
+    
+    #from torch.profiler import profile, record_function, ProfilerActivity
+    #with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], with_stack=True, experimental_config=torch._C._profiler._ExperimentalConfig(verbose=True)) as prof:
+    #print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cuda_time_total", row_limit=30, max_name_column_width=200))
