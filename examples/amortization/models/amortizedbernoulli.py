@@ -91,6 +91,7 @@ class AmortizedBernoulli(SamplerModule):
         self.variationalparams = variationalparams
         self.temperature = 1.0
         self.objective_type = Objective.KLDIVERGENCE
+        self.debug_mode = False
 
 
     def forward(self, X, Kset, log_f, marginal_p=None, indexes=None):
@@ -275,7 +276,7 @@ class AmortizedBernoulli(SamplerModule):
             if torch.isnan(res["objective"]):
                 assert not torch.isnan(res["objective"])
 
-        if True:  # debug variables
+        if self.debug_mode:  # compute debug variables
             # Compute data mean and covariance
             res["p_samples"] = torch.stack([k[torch.multinomial(p, num_samples=self.nsamples, replacement=True)] for k, p in zip(Kset, p_s)], dim=1)
             res["p_mean"] = sample_mean(Kset, weights=compute_probabilities(log_f), dim=1)
@@ -289,14 +290,8 @@ class AmortizedBernoulli(SamplerModule):
             res["q_covar"] = batch_sample_covar(binarize(q_samples.permute(1, 0, 2)))
         
             # relaxed_Kset_samples: [nsamples, N:Xdatapoints, K:Ksize, H:Nbits]
-            #res["relaxed_Kset_samples"] = relaxed_Kset_samples
+            res["relaxed_Kset_samples"] = relaxed_Kset_samples
 
-            if False:
-                print(" relaxed_mu: ", relaxed_mu)
-                print(" mu:         ", mu)
-                print(" p_mean:     ", res["p_mean"])
-                print(" q_mean:     ", res["q_mean"])
-        
         return res
     
 
