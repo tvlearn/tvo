@@ -2,15 +2,7 @@
 # train an amortizing pytorch module mapping, 
 # save the mapping as a "*.pt" file.
 
-# python amortize.py \
-# --Xfile ../../../relaxed-bernoulli-datasets/House12/sigma25/image_patches.h5 \
-# --Ksetfile ../../../relaxed-bernoulli-datasets/House12/sigma25/training.h5 \
-# --N_start 10030 \
-# --N_size 10
 
-#python amortize.py \
-# --Xfile ../gaussian-denoising/out/24-07-31-16-48-59/image_patches.h5 \
-# --Ksetfile ../gaussian-denoising/out/24-07-31-16-48-59/training.h5 
 
 import os
 import sys
@@ -45,14 +37,14 @@ if __name__ == "__main__":
     arg_parser.add_argument("--Ksetfile", type=str, help="Kset dataset file, HDF5 (truncated posterior sets file)", default=None)
     arg_parser.add_argument("--N_start", type=int, help="Training data slice start", default=0)
     arg_parser.add_argument("--N_size", type=int, help="Training data slice size", default=None)
-    arg_parser.add_argument("--epochs_mean", type=int, help="Number of epochs to train only mean activation", default=10)
-    arg_parser.add_argument("--epochs_full", type=int, help="Number of epochs to train full model", default=10)
+    arg_parser.add_argument("--epochs_mean", type=int, help="Number of epochs to train only mean activation", default=100)
+    arg_parser.add_argument("--epochs_full", type=int, help="Number of epochs to train full model", default=100)
     arg_parser.add_argument("--batch_size", type=int, help="Training batch size", default=32)
-    arg_parser.add_argument("--N_IS", type=int, help="Number of samples for importance sampler estimator", default=128)
-    arg_parser.add_argument("--lr_mean", type=float, help="Learning rate for mean optimization", default=1e-2)
-    arg_parser.add_argument("--lr_full", type=float, help="Learning rate for full optimization", default=1e-2)
-    arg_parser.add_argument("--t_start", type=float, help="Learning start temperature", default=1.0)
-    arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=1.0)
+    arg_parser.add_argument("--N_IS", type=int, help="Number of samples for importance sampler estimator", default=32)
+    arg_parser.add_argument("--lr_mean", type=float, help="Learning rate for mean optimization", default=1e-3)
+    arg_parser.add_argument("--lr_full", type=float, help="Learning rate for full optimization", default=1e-3)
+    arg_parser.add_argument("--t_start", type=float, help="Learning start temperature", default=2.0)
+    arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=2.0)
     arg_parser.add_argument("--CPU", help="Force CPU compute", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-amortize"))
@@ -101,7 +93,7 @@ if __name__ == "__main__":
         model.temperature = temperature[epoch]
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
-        print("Optimizing mean | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch, model.temperature, loss[-1]))
+        print("Optimizing mean | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch+1, model.temperature, loss[-1]))
 
     torch.save(model, os.path.join(log_path, "trained_sampler_mean.pt"))
     
@@ -115,7 +107,7 @@ if __name__ == "__main__":
         model.temperature = temperature[epoch]
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
-        print("Optimizing all  | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(cmd_args.epochs_mean + epoch, model.temperature, loss[-1]))
+        print("Optimizing all  | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch+1, model.temperature, loss[-1]))
 
     torch.save(model, os.path.join(log_path, "trained_sampler.pt"))
     
