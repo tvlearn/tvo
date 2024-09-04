@@ -29,11 +29,6 @@ def KL_Gaussian_Gaussian(mu_q, sigmasqr_q, mu_p, sigmasqr_p):
     return 0.5*(torch.log(sigmasqr_p / sigmasqr_q) + (sigmasqr_q + (mu_q-mu_p)**2) / sigmasqr_p - 1)
 
 
-def stable_logistic(x):
-    res = 1 / (1+torch.exp(-x))
-    return res
-
-
 class RandomSource(torch.nn.Module):
 
     def sample(self, size):
@@ -227,14 +222,15 @@ class AnnealingTransform(ScaleTransform):
         return 1 / self.scale
 
 
-def _stable_logistic(x):
-    return 1 / (1 + torch.exp(-x))
+def stable_logistic(x):
+    # This is much more numerically stable than simple
+    # return 1 / (1 + torch.exp(-x))
     fx = torch.where(x>0, 1 / (1 + torch.exp(-x)),
                           torch.exp(x) / (1 + torch.exp(x)))
     return fx
 
 
-def _stable_inv_logistic(x):
+def stable_inv_logistic(x):
     x = torch.clamp(x, EPS, 1-EPS)
     fx = torch.log(x/(1-x))
     return fx
@@ -245,13 +241,13 @@ class LogisticTransform(FlowTransform):
         super().__init__()
         
     def forward(self, x, lp):
-        fx = _stable_logistic(x)
+        fx = stable_logistic(x)
         logdet = (-x - 2*torch.log(torch.exp(-x) + 1)).sum(-1)  
         # logdet = (-x + 2*torch.log(fx)).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
-        return _stable_inv_logistic(fx)
+        return stable_inv_logistic(fx)
 
 
 class InverseLogisticTransform(FlowTransform):
@@ -259,12 +255,12 @@ class InverseLogisticTransform(FlowTransform):
         super().__init__()
         
     def forward(self, x, lp):
-        fx = _stable_inv_logistic(x)
+        fx = stable_inv_logistic(x)
         logdet = -torch.log(torch.clamp(x-x**2, EPS, 1-EPS)).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
-        return _stable_logistic(fx)
+        return stable_logistic(fx)
 
 
 class CollapsedBernoulliLogisticRelaxation(FlowTransform):
@@ -327,8 +323,8 @@ if __name__ == "__main__":
     x = torch.tensor([-EPS, 0, EPS, 0.5, 1-EPS, 1, 1+EPS], dtype=torch.float32)
     print(x)
     print(torch.log(x))
-    inv_logistic_x = _stable_inv_logistic(x)
+    inv_logistic_x = stable_inv_logistic(x)
     print(inv_logistic_x)
     print(1e30*inv_logistic_x)
-    x_star = _stable_logistic(1e30*inv_logistic_x)
+    x_star = stable_logistic(1e30*inv_logistic_x)
     print(x_star)
