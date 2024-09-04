@@ -19,7 +19,7 @@ source ~/miniconda3/bin/activate
 conda activate tvo-env
 
 # get the path of the last generated training data 
-export TVODATADIR=$(ls -d ../gaussiandenoising/out/* | tail -n 1)
+export TVODATADIR=$(ls -d ../gaussian-denoising/out/* | tail -n 1)
 
 # run the model training script
 python amortize.py \
@@ -36,7 +36,7 @@ python amortize.py \
   --lr_full 0.001
 
 
-export TVODATADIR=$(ls -d ../gaussiandenoising/out/* | tail -n 1)
+export TVODATADIR=$(ls -d ../gaussian-denoising/out/* | tail -n 1)
 export SAMPLERDIR=$(ls -d ./out/*-amortize | tail -n 1)
 
 python infer.py \
