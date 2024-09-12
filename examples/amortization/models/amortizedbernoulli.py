@@ -91,6 +91,7 @@ class AmortizedBernoulli(SamplerModule):
         self.variationalparams = variationalparams
         self.temperature = 1.0
         self.objective_type = Objective.KLDIVERGENCE
+        self.debug_mode = False
 
 
     def forward(self, X, Kset, log_f, marginal_p=None, indexes=None):
@@ -196,28 +197,20 @@ class AmortizedBernoulli(SamplerModule):
 
         if marginal_p is None:
             marginal_p = compute_marginal(Kset, log_f)
-            marginal_p = torch.clamp(marginal_p, min=0.01, max=0.99)
+            marginal_p = torch.clamp(marginal_p, min=0.001, max=0.999)
+        
+        mu, L, Sigma = self.variationalparams(X, indexes)
         
         if self.objective_type == Objective.MEANKLDIVERGENCE:
             # Here we use only mu to compute bits probabilities of q. Ignore correlations
-            mu, L, Sigma = self.variationalparams(X, indexes)
-            
-            q_distribution = RandomFlowSequence(
-                source=UniformSource(D=H, device=device), 
-                sequence=[
-                    InverseLogisticTransform(),
-                    ElementwiseLinearTransform(b=mu),
-                    AnnealingTransform(t=self.temperature),
-                    LogisticTransform(),
-                    #CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
-                    ])
-            
             q_s = stable_logistic(mu)
+
             # Compute cross-entropy        
             crossH_pq = - (marginal_p * torch.log(q_s) + (1-marginal_p) * torch.log(1-q_s)).sum(-1)
             p_s = compute_probabilities(log_f)  # prob. of Kset
             H_marginal_p = - (marginal_p * torch.log(marginal_p) + (1-marginal_p)*torch.log(1-marginal_p)).sum(-1)
             KL_pq = crossH_pq - H_marginal_p
+
             res = {}
             res["crossH_pq"] = crossH_pq.mean()
             res["KL_pq"] = KL_pq.mean()
@@ -238,7 +231,6 @@ class AmortizedBernoulli(SamplerModule):
                     ]).sample(size=(self.nsamples,))
             
             # Compute logQ of amortized posterior samples
-            mu, L, Sigma = self.variationalparams(X, indexes)
             q_distribution = RandomFlowSequence(
                 source=GaussianSource(D=H, device=device), 
                 sequence=[
@@ -275,7 +267,7 @@ class AmortizedBernoulli(SamplerModule):
             if torch.isnan(res["objective"]):
                 assert not torch.isnan(res["objective"])
 
-        if True:  # debug variables
+        if self.debug_mode:  # compute debug variables
             # Compute data mean and covariance
             res["p_samples"] = torch.stack([k[torch.multinomial(p, num_samples=self.nsamples, replacement=True)] for k, p in zip(Kset, p_s)], dim=1)
             res["p_mean"] = sample_mean(Kset, weights=compute_probabilities(log_f), dim=1)
@@ -289,14 +281,8 @@ class AmortizedBernoulli(SamplerModule):
             res["q_covar"] = batch_sample_covar(binarize(q_samples.permute(1, 0, 2)))
         
             # relaxed_Kset_samples: [nsamples, N:Xdatapoints, K:Ksize, H:Nbits]
-            #res["relaxed_Kset_samples"] = relaxed_Kset_samples
+            res["relaxed_Kset_samples"] = relaxed_Kset_samples
 
-            if False:
-                print(" relaxed_mu: ", relaxed_mu)
-                print(" mu:         ", mu)
-                print(" p_mean:     ", res["p_mean"])
-                print(" q_mean:     ", res["q_mean"])
-        
         return res
     
 

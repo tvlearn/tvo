@@ -46,14 +46,34 @@ def _set_redundant_lpj_to_low_GPU_fast(new_states: to.Tensor, new_lpj: to.Tensor
 def _set_redundant_lpj_to_low_fastest(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
     """Find redundant states in new_states w.r.t. old_states and set
        corresponding lpg to low.
+       # Author: Dmytro Velychko
 
     :param new_states: set of new variational states (batch_size, newS, H)
     :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
     :param old_states: (batch_size, S, H)
     """
-    old_new_sim =  to.all(old_states.unsqueeze(-3) == new_states.unsqueeze(-2), dim=-1)
-    new_new_sim =  to.all(new_states.unsqueeze(-3) == new_states.unsqueeze(-2), dim=-1)
-    redundant = to.tril(new_new_sim.to(to.int)).sum(dim=-1) + old_new_sim.to(to.int).sum(dim=-1)  > 1
+    def similar_reference(a, b):
+        # Reference implementation.
+        # Works fine on CPU and CUDA.
+        return to.all(a.unsqueeze(-2) == b.unsqueeze(-3), dim=-1).to(to.int)
+
+    def similar_bmm(a, b):
+        # Runs fast by exploiting matrix multiplications.
+        # This code uses float32 because:
+        #   1) it can precisely represent integers,
+        #   2) runs fast on both CPU and CUDA.
+        a = a.to(to.float32)
+        bt = b.permute([0, 2, 1]).to(to.float32)
+        abt = to.bmm(a, bt)
+        a_bits = a.sum(dim=-1, keepdims=True)
+        b_bits = bt.sum(dim=-2, keepdims=True)
+        return to.logical_and(abt == a_bits, abt == b_bits).to(dtype=to.int)
+
+    new_old_sim = similar_bmm(new_states, old_states)
+    new_new_sim = similar_bmm(new_states, new_states)
+    #assert to.all(new_old_sim == similar_reference(new_states, old_states))
+    #assert to.all(new_new_sim == similar_reference(new_states, new_states))
+    redundant = to.tril(new_new_sim).sum(dim=-1) + new_old_sim.sum(dim=-1)  > 1
     new_lpj[redundant] = -1e20
 
 
