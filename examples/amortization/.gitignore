@@ -1,1 +1,5 @@
 out
+tvo 
+results
+slurm
+submit2slurm_infer.sh
