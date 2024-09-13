@@ -175,9 +175,11 @@ class AmortizedDiagCovarGaussianVariationalParams(AmortizedVariationalParams):
         
         
 
-    def forward(self, X, indexes):
+    def forward(self, X, indexes, onlymean=False):
         shared = self.nnShared(X)
         mu = self.nnMeans(shared)
+        if onlymean:
+            return mu, None, None
         L = self.nnDiagCovars(shared) + 0.001
         Sigma = L**2
         return mu, L, Sigma
@@ -218,8 +220,10 @@ class AmortizedGaussianVariationalParams(AmortizedVariationalParams):
                 )
         
 
-    def forward(self, X, indexes):
+    def forward(self, X, indexes, onlymean=False):
         mu = self.nnMeans(X)
+        if onlymean:
+            return mu, None, None
         V = self.nnLowRankCovar(X).reshape((X.shape[0], self.H, -1))
         Sigma = torch.bmm(V, V.transpose(-1, -2)) + torch.diag_embed(self.nnDiagCovars(X)**2)
         L = cholesky_jitter(Sigma)
@@ -271,9 +275,11 @@ class AmortizedResNetVariationalParams(AmortizedVariationalParams):
         self.nn_covar_param = nn.Linear(2*D, H)
 
         
-    def forward(self, X, indexes):
+    def forward(self, X, indexes, onlymean=False):
         common = self.nn_common(X)
         mu = 0.01 * self.nn_mean(common)
+        if onlymean:
+            return mu, None, None
         L = torch.nn.Softplus()(self.nn_covar_param(common)) + self.minsigma
         Sigma = L**2
         return mu, L, Sigma
@@ -317,9 +323,11 @@ class AmortizedResNetTwoHeadsVariationalParams(AmortizedVariationalParams):
         )
 
         
-    def forward(self, X, indexes):
+    def forward(self, X, indexes, onlymean=False):
         common = self.nn_common(X)
         mu = self.nn_mean(common)
+        if onlymean:
+            return mu, None, None
         L = torch.nn.Softplus()(self.nn_covar_param(common)) + self.minsigma
         Sigma = L**2
         return mu, L, Sigma
@@ -379,10 +387,11 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
         )
 
         
-    def forward(self, X, indexes):
-
+    def forward(self, X, indexes, onlymean=False):
         common = self.nn_common(X)
         mu = self.scale * self.nn_mean(common)
+        if onlymean:
+            return mu, None, None
         V = self.scale * self.nn_low_rank_param(common).reshape((X.shape[0], self.H, -1))
         Sigma = torch.bmm(V, V.transpose(-1, -2)) + \
             torch.diag_embed((self.nn_diag_covar(common)+self.minsigma))

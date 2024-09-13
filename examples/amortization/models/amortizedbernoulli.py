@@ -200,12 +200,12 @@ class AmortizedBernoulli(SamplerModule):
             marginal_p = compute_marginal(Kset, log_f)
             marginal_p = torch.clamp(marginal_p, min=0.001, max=0.999)
         
-        mu, L, Sigma = self.variationalparams(X, indexes)
         
         if self.objective_type == Objective.MEANKLDIVERGENCE:
+            mu, _, _ = self.variationalparams(X, indexes, onlymean=True)
             # Here we use only mu to compute bits probabilities of q. Ignore correlations
-            q_s = stable_logistic(mu)
-
+            q_s = stable_logistic(mu, clamp=True)
+            
             # Compute cross-entropy        
             crossH_pq = - (marginal_p * torch.log(q_s) + (1-marginal_p) * torch.log(1-q_s)).sum(-1)
             p_s = compute_probabilities(log_f)  # prob. of Kset
@@ -217,6 +217,7 @@ class AmortizedBernoulli(SamplerModule):
             res["KL_pq"] = KL_pq.mean()
             res["objective"] = res["KL_pq"]
         else:
+            mu, L, Sigma = self.variationalparams(X, indexes)
             # Create training samples of relaxed Kset from the auxiliary density (product of marginals)
             relaxed_mu = torch.log((marginal_p)/(1-marginal_p)).unsqueeze(-2)  # inverse logistic of marginal
             relaxed_Kset_samples, relaxed_log_p = RandomFlowSequence(
