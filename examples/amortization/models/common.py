@@ -222,11 +222,13 @@ class AnnealingTransform(ScaleTransform):
         return 1 / self.scale
 
 
-def stable_logistic(x):
+def stable_logistic(x, clamp=False):
     # This is much more numerically stable than simple
     # return 1 / (1 + torch.exp(-x))
     fx = torch.where(x>0, 1 / (1 + torch.exp(-x)),
                           torch.exp(x) / (1 + torch.exp(x)))
+    if clamp:
+        fx = torch.clamp(fx, EPS, 1-EPS)
     return fx
 
 
