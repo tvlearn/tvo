@@ -6,20 +6,21 @@ from torch.nn import Module, Parameter
 from .common import *
 
 
-def compute_probabilities(log_p_joint):
+def compute_probabilities(log_f_joint):
     """ Returns vectors probabilities (normalized)
         :param log_f        : [N, K]    log-joint probability of (X, Kset) 
     """
-    Ps = log_p_joint.exp() / (log_p_joint.exp().sum(-1).unsqueeze(-1))
+    f_joint = (log_f_joint - log_f_joint.max(dim=-1, keepdim=True)[0]).exp()
+    Ps = f_joint / (f_joint.sum(-1 , keepdim=True))
     return Ps
 
 
-def compute_marginal(Kset, log_p_joint):
+def compute_marginal(Kset, log_f_joint):
     """ Returns bits marginal probability
         :param Kset         : [N, K, H] truncated binary posterior sets
         :param log_p_joint  : [N, K]    log-joint probability of (X, Kset) 
     """
-    Ps = compute_probabilities(log_p_joint)
+    Ps = compute_probabilities(log_f_joint)
     marginal = Kset * Ps[..., None]
     marginal = marginal.sum(-2)
     return marginal
