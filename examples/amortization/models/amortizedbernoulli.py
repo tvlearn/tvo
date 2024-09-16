@@ -77,6 +77,26 @@ def stable_entropy(log_f):
     H = torch.log(Z) - 1/Z * (torch.exp(log_f) * log_f).sum(-1) 
     return H
 
+
+def stable_cross_entropy(p, logit_q):
+    """ Computes cross-entropy between p(.) and logistic(logit_q(.))
+        :param  p           : tensor of p-probabilities
+        :param  logit_q     : tensor of logits of q-probabilities
+    """
+    # Simple reference implementation:
+    #   q_s = stable_logistic(logit_q, clamp=True)
+    #   crossH_pq = - (p * torch.log(q_s) + (1-p) * torch.log(1-q_s))
+    
+    log_q = torch.where(logit_q > 0, 
+                        -torch.log(torch.exp(-logit_q) + 1),
+                        logit_q - torch.log(torch.exp(logit_q) + 1))
+    log_not_q = torch.where(logit_q < 0, 
+                        -torch.log(torch.exp(logit_q) + 1),
+                        -logit_q - torch.log(torch.exp(-logit_q) + 1))
+    crossH_pq = - (p * log_q + (1-p) * log_not_q)
+    return crossH_pq
+
+
 class SamplerModule(Module):
     def sample_q(self, X, indexes=None, nsamples=1000):
         raise NotImplementedError()
@@ -200,14 +220,12 @@ class AmortizedBernoulli(SamplerModule):
             marginal_p = compute_marginal(Kset, log_f)
             marginal_p = torch.clamp(marginal_p, min=0.001, max=0.999)
         
-        
         if self.objective_type == Objective.MEANKLDIVERGENCE:
-            mu, _, _ = self.variationalparams(X, indexes, onlymean=True)
             # Here we use only mu to compute bits probabilities of q. Ignore correlations
-            q_s = stable_logistic(mu, clamp=True)
+            mu, _, _ = self.variationalparams(X, indexes, onlymean=True)
             
             # Compute cross-entropy        
-            crossH_pq = - (marginal_p * torch.log(q_s) + (1-marginal_p) * torch.log(1-q_s)).sum(-1)
+            crossH_pq = stable_cross_entropy(p=marginal_p, logit_q=mu).sum(-1)
             p_s = compute_probabilities(log_f)  # prob. of Kset
             H_marginal_p = - (marginal_p * torch.log(marginal_p) + (1-marginal_p)*torch.log(1-marginal_p)).sum(-1)
             KL_pq = crossH_pq - H_marginal_p
@@ -217,7 +235,9 @@ class AmortizedBernoulli(SamplerModule):
             res["KL_pq"] = KL_pq.mean()
             res["objective"] = res["KL_pq"]
         else:
+            # Here we learn both means and correlations of the variational parameters
             mu, L, Sigma = self.variationalparams(X, indexes)
+
             # Create training samples of relaxed Kset from the auxiliary density (product of marginals)
             relaxed_mu = torch.log((marginal_p)/(1-marginal_p)).unsqueeze(-2)  # inverse logistic of marginal
             relaxed_Kset_samples, relaxed_log_p = RandomFlowSequence(
