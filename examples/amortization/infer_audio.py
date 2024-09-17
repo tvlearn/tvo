@@ -59,7 +59,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=100)
     arg_parser.add_argument("--CPU", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
-    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-infer"))
+    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H.%M.%S')+"-infer"))
 
     cmd_args = arg_parser.parse_args()
     log_path = cmd_args.outdir
@@ -166,7 +166,7 @@ if __name__ == "__main__":
             summary.print()
 
             # merge reconstructed image patches and generate reconstructed image
-            gather = ((epoch + 1) % cmd_args.reco_epochs) == 0
+            gather = ((epoch) % cmd_args.reco_epochs) == 0
             assert hasattr(trainer, "test_reconstruction")
             rec_patches = gather_from_processes(trainer.test_reconstruction) if gather else None
             merge = gather and comm_rank == 0
@@ -208,8 +208,8 @@ if __name__ == "__main__":
                     for k, v in metrics.items()
                 )
 
-                wav_file_mean = f"{cmd_args.outdir}/reco-mean-epoch({epoch+1})-snr({snr_mean_str})-pesq({pesq_mean_str})-psnr({psnr_mean_str}).wav"
-                wav_file_median = f"{cmd_args.outdir}/reco-median-epoch({epoch+1})-snr({snr_median_str})-pesq({pesq_median_str})-psnr({psnr_median_str}).wav"
+                wav_file_mean = f"{cmd_args.outdir}/reco-mean-epoch({epoch})-snr({snr_mean_str})-pesq({pesq_mean_str})-psnr({psnr_mean_str}).wav"
+                wav_file_median = f"{cmd_args.outdir}/reco-median-epoch({epoch})-snr({snr_median_str})-pesq({pesq_median_str})-psnr({psnr_median_str}).wav"
 
                 reco_audio_mean = recos['mean'].squeeze(0).detach().cpu().numpy()
                 reco_audio_median = recos['median'].squeeze(0).detach().cpu().numpy()
