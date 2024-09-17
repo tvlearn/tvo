@@ -134,7 +134,7 @@ if __name__ == "__main__":
         b_init=[torch.Tensor(theta[key]) for key in theta.keys() if 'b_' in key and key[2].isnumeric()],
         sigma2_init=torch.Tensor(theta["sigma2"]),
         pi_init=torch.Tensor(theta["pies"]),
-        precision=torch.float64,
+        precision=cmd_args.precision.torch_dtype(),
     )
 
     # Construct TVO configuration
@@ -166,7 +166,7 @@ if __name__ == "__main__":
             summary.print()
 
             # merge reconstructed image patches and generate reconstructed image
-            gather = ((epoch - 1) % cmd_args.reco_epochs) == 0
+            gather = ((epoch + 1) % cmd_args.reco_epochs) == 0
             assert hasattr(trainer, "test_reconstruction")
             rec_patches = gather_from_processes(trainer.test_reconstruction) if gather else None
             merge = gather and comm_rank == 0
@@ -195,21 +195,21 @@ if __name__ == "__main__":
             # Save reconstructed audio if merge
             if merge:
 
-                psnr_mean_str, psnr_median_str = {
-                    f"{metrics[k][0]:.2f}".replace(".", "_")
+                psnr_mean_str, psnr_median_str = (
+                    f"{metrics[k][0]:.2f}"#.replace(".", "_")
                     for k, v in metrics.items()
-                }
-                snr_mean_str, snr_median_str = {
-                    f"{metrics[k][1]:.2f}".replace("-", "m").replace(".", "_")
+                )
+                snr_mean_str, snr_median_str = (
+                    f"{metrics[k][1]:.2f}"#.replace("-", "m").replace(".", "_")
                     for k, v in metrics.items()
-                }
-                pesq_mean_str, pesq_median_str = {
-                    f"{metrics[k][2]:.2f}".replace(".", "_") 
+                )
+                pesq_mean_str, pesq_median_str = (
+                    f"{metrics[k][2]:.2f}"#.replace(".", "_") 
                     for k, v in metrics.items()
-                }
+                )
 
-                wav_file_mean = f"{cmd_args.outdir}/reco-mean-epoch{epoch-1}-snr{snr_mean_str}-pesq{pesq_mean_str}-psnr{psnr_mean_str}.wav"
-                wav_file_median = f"{cmd_args.outdir}/reco-median-epoch{epoch-1}-snr{snr_median_str}-pesq{pesq_median_str}-psnr{psnr_median_str}.wav"
+                wav_file_mean = f"{cmd_args.outdir}/reco-mean-epoch({epoch+1})-snr({snr_mean_str})-pesq({pesq_mean_str})-psnr({psnr_mean_str}).wav"
+                wav_file_median = f"{cmd_args.outdir}/reco-median-epoch({epoch+1})-snr({snr_median_str})-pesq({pesq_median_str})-psnr({psnr_median_str}).wav"
 
                 reco_audio_mean = recos['mean'].squeeze(0).detach().cpu().numpy()
                 reco_audio_median = recos['median'].squeeze(0).detach().cpu().numpy()
