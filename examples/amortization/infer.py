@@ -58,7 +58,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=100)
     arg_parser.add_argument("--CPU", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
-    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-infer"))
+    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H.%M.%S')+"-infer"))
 
     cmd_args = arg_parser.parse_args()
     log_path = cmd_args.outdir

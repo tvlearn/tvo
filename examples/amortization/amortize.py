@@ -47,7 +47,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=2.0)
     arg_parser.add_argument("--CPU", help="Force CPU compute", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
-    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-amortize"))
+    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H.%M.%S')+"-amortize"))
 
     cmd_args = arg_parser.parse_args()
     log_path = cmd_args.outdir
