@@ -152,7 +152,7 @@ if __name__ == "__main__":
         log_only_latest_theta=True,
     )
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, 
-                   train_data_file=None, val_data_file=cmd_args.Xfile)
+                   train_data_file=None, val_data_file=data_file)
     logger, trainer = exp.logger, exp.trainer
     exp.test_states.set_posterior_sampler(sampler)
 
