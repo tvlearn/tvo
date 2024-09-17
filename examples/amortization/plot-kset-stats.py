@@ -34,7 +34,7 @@ if __name__ == "__main__":
                 help="Kset dataset file, HDF5 (truncated posterior sets file)")
     arg_parser.add_argument("--N_start", type=int, help="Training data slice start", default=0)
     arg_parser.add_argument("--N_size", type=int, help="Training data slice size", default=None)
-    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H:%M:%S')+"-plots"))
+    arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H.%M.%S')+"-plots"))
     cmd_args = arg_parser.parse_args()
     log_path = cmd_args.outdir
     os.makedirs(log_path, exist_ok=True)
