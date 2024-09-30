@@ -3,8 +3,14 @@ from tqdm import tqdm
 
 def train(model, dataloader, optimizer, on_finish=None):
     model.train()
+    model_device = next(model.parameters()).device
     losses = []
     for batch_idx, (X, Kset, logPs, idx) in enumerate(tqdm(dataloader)):
+        if X.device != model_device:
+            X = X.to(model_device)
+            Kset = Kset.to(model_device)
+            logPs = logPs.to(model_device)
+
         optimizer.zero_grad()
         res = model(X, Kset, logPs, indexes=idx)
         loss = res["objective"]
