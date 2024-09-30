@@ -5,8 +5,12 @@ import torch
 from torch.utils.data import Dataset
 
 
-
 class KSetPosteriorDataset(Dataset):
+    def to(self, device):
+        raise NotImplementedError("Subclasses of KSetPosteriorDataset should implement to(device).")
+
+
+class InMemoryKSetPosteriorDataset(KSetPosteriorDataset):
     def __init__(self) -> None:
         super().__init__()
         self.X = None  # [N, D]
@@ -25,7 +29,7 @@ class KSetPosteriorDataset(Dataset):
         self.logPs = self.logPs.to(device)
 
 
-class ToyDatasetH1(KSetPosteriorDataset):
+class ToyDatasetH1(InMemoryKSetPosteriorDataset):
     def __init__(self) -> None:
         super().__init__()
         self.X = torch.Tensor([[1, 2, 3, 4], 
@@ -42,7 +46,7 @@ class ToyDatasetH1(KSetPosteriorDataset):
                                    ]).log()
 
 
-class ToyDatasetH2(KSetPosteriorDataset):
+class ToyDatasetH2(InMemoryKSetPosteriorDataset):
     def __init__(self) -> None:
         super().__init__()
         self.X = torch.Tensor([[1, 2, 3, 4], 
@@ -66,7 +70,7 @@ class ToyDatasetH2(KSetPosteriorDataset):
                                    ]).log()
         
 
-class ToyDatasetH2Minimal(KSetPosteriorDataset):
+class ToyDatasetH2Minimal(InMemoryKSetPosteriorDataset):
     def __init__(self) -> None:
         super().__init__()
         self.X = torch.Tensor([[1, 2, 3, 4]])
@@ -77,7 +81,7 @@ class ToyDatasetH2Minimal(KSetPosteriorDataset):
         self.logPs = torch.Tensor([[0.001, 0.1, 0.8, 0.001]]).log()
 
 
-class LargeCorrelatedDataset(KSetPosteriorDataset):
+class LargeCorrelatedDataset(InMemoryKSetPosteriorDataset):
     def __init__(self, Hcorr=10, Huncorr=10, K=100) -> None:
         super().__init__()
         N = 1
@@ -98,7 +102,9 @@ class LargeCorrelatedDataset(KSetPosteriorDataset):
         self.logPs = torch.Tensor(np.ones(shape=(N, K)))
 
 
-class TVODataset(KSetPosteriorDataset):
+class TVODataset(InMemoryKSetPosteriorDataset):
+    """ Loads full TVO data from HDF5 files into RAM.
+    """
     def __init__(self, Xpath, Ksetpath, start=0, maxN=None) -> None:
         super().__init__()
         end = None if maxN is None else start+maxN
@@ -109,6 +115,46 @@ class TVODataset(KSetPosteriorDataset):
         with h5py.File(Ksetpath, "r") as f:
             self.Kset = torch.tensor(np.array(f["train_states"])[start:end])
             self.logPs = torch.tensor(np.array(f["train_lpj"])[start:end], dtype=torch.get_default_dtype())
+
+
+class LargeTVODataset(KSetPosteriorDataset):
+    """ Loads TVO data from HDF5 files on demand.
+    """
+    def __init__(self, Xpath, Ksetpath, start=0, maxN=None) -> None:
+        super().__init__()
+        
+        self.f_x = h5py.File(Xpath, "r")
+        self.X = self.f_x["data"]
+        
+        self.f_Kset = h5py.File(Ksetpath, "r")
+        self.Kset = self.f_Kset["train_states"]
+        self.logPs = self.f_Kset["train_lpj"]
+        
+        N = self.X.shape[0]
+        assert self.Kset.shape[0] == N
+        assert self.logPs.shape[0] == N
+        self.start = start
+        self.end = N if maxN is None else min(start+maxN, start+N)
+        self.device = torch.get_default_device()
+        
+    def __len__(self):
+        return self.end - self.start
+
+    def __getitem__(self, idx):
+        return (torch.tensor(self.X[self.start+idx], dtype=torch.get_default_dtype(), device=self.device),
+                torch.tensor(self.Kset[self.start+idx], device=self.device),
+                torch.tensor(self.logPs[self.start+idx], dtype=torch.get_default_dtype(), device=self.device), 
+                idx)
+
+    def to(self, device):
+        self.device = device
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        del self.X
+        del self.Kset
+        del self.logPs
+        self.f_x.close()
+        self.f_Kset.close()
 
 
 class XDataset(Dataset):

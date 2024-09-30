@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import argparse
 from enum import Enum
-from utils.datasets import ToyDatasetH2Minimal, LargeCorrelatedDataset, TVODataset
+from utils.datasets import ToyDatasetH2Minimal, LargeCorrelatedDataset, TVODataset, LargeTVODataset
 from models.amortizedbernoulli import AmortizedBernoulli, compute_probabilities, Objective, binarize
 from models.variationalparams import (
     FullCovarGaussianVariationalParams, 
