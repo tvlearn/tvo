@@ -98,6 +98,10 @@ def stable_cross_entropy(p, logit_q):
 
 
 class SamplerModule(Module):
+
+    def get_device(self):
+        return next(self.parameters()).device
+
     def sample_q(self, X, indexes=None, nsamples=1000):
         raise NotImplementedError()
 
@@ -138,7 +142,7 @@ class AmortizedBernoulli(SamplerModule):
         assert Kset.shape[0] == X.shape[0]
         assert Kset.shape[:2] == log_f.shape
 
-        device = X.device
+        device = self.get_device()
 
         if marginal_p is None:
             marginal_p = compute_marginal(Kset, log_f)
@@ -214,7 +218,7 @@ class AmortizedBernoulli(SamplerModule):
         assert Kset.shape[0] == X.shape[0]
         assert Kset.shape[:2] == log_f.shape
 
-        device = X.device
+        device = self.get_device()
 
         if marginal_p is None:
             marginal_p = compute_marginal(Kset, log_f)
@@ -318,8 +322,10 @@ class AmortizedBernoulli(SamplerModule):
         mu, L, Sigma = self.variationalparams(X, indexes)
         N, H = mu.shape
 
+        device = self.get_device()
+
         q_distribution = RandomFlowSequence(
-            source=GaussianSource(D=H, device=X.device), 
+            source=GaussianSource(D=H, device=device), 
             sequence=[
                 LTLinearTransform(LT=L), 
                 CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
