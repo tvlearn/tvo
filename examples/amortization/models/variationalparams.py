@@ -339,39 +339,40 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
         self.rank = rank
         self.minsigma = minsigma
         self.scale = scale
+        dim = [D, 5*D, 5*D]
         
         self.nn_common = nn.Sequential(
-            nn.Linear(D, 2*D),
+            nn.Linear(D, dim[1]),
             nn.ReLU(),
             ResBlock(nn.Sequential(
-                nn.Linear(2*D, 3*D),
+                nn.Linear(dim[1], dim[2]),
                 nn.ReLU(),
-                nn.Linear(3*D, 2*D),
+                nn.Linear(dim[2], dim[1]),
                 nn.ReLU(),
             )),
-            nn.BatchNorm1d(2*D),
+            nn.BatchNorm1d(dim[1]),
         )
 
         self.nn_mean = nn.Sequential(
             ResBlock(nn.Sequential(
-                nn.Linear(2*D, 3*D),
+                nn.Linear(dim[1], dim[2]),
                 nn.ReLU(),
-                nn.Linear(3*D, 2*D),
+                nn.Linear(dim[2], dim[1]),
                 nn.ReLU(),
             )),
-            nn.BatchNorm1d(2*D),
-            nn.Linear(2*D, H),
+            nn.BatchNorm1d(dim[1]),
+            nn.Linear(dim[1], H),
         )
 
         self.nn_diag_covar = nn.Sequential(
             ResBlock(nn.Sequential(
-                nn.Linear(2*D, 3*D),
+                nn.Linear(dim[1], dim[2]),
                 nn.ReLU(),
-                nn.Linear(3*D, 2*D),
+                nn.Linear(dim[2], dim[1]),
                 nn.ReLU(),
             )),
-            nn.BatchNorm1d(2*D),
-            nn.Linear(2*D, H),
+            nn.BatchNorm1d(dim[1]),
+            nn.Linear(dim[1], H),
             nn.Softplus(),
         )
 
@@ -382,8 +383,8 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
                 nn.Linear(3*D, 2*D),
                 nn.ReLU(),
             )),
-            nn.BatchNorm1d(2*D),
-            nn.Linear(2*D, rank*H),
+            nn.BatchNorm1d(dim[1]),
+            nn.Linear(dim[1], rank*H),
         )
 
         
