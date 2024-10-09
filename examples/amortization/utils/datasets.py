@@ -117,7 +117,7 @@ class TVODataset(InMemoryKSetPosteriorDataset):
             self.logPs = torch.tensor(np.array(f["train_lpj"])[start:end], dtype=torch.get_default_dtype())
 
 
-class LargeTVODataset(KSetPosteriorDataset):
+class StreamingTVODataset(KSetPosteriorDataset):
     """ Loads TVO data from HDF5 files on demand.
     """
     def __init__(self, Xpath, Ksetpath, start=0, maxN=None) -> None:

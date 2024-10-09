@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import argparse
 from enum import Enum
-from utils.datasets import ToyDatasetH2Minimal, LargeCorrelatedDataset, TVODataset, LargeTVODataset
+from utils.datasets import ToyDatasetH2Minimal, LargeCorrelatedDataset, TVODataset, StreamingTVODataset
 from models.amortizedbernoulli import AmortizedBernoulli, compute_probabilities, Objective, binarize
 from models.variationalparams import (
     FullCovarGaussianVariationalParams, 
@@ -37,6 +37,9 @@ if __name__ == "__main__":
     arg_parser.add_argument("--Ksetfile", type=str, help="Kset dataset file, HDF5 (truncated posterior sets file)", default=None)
     arg_parser.add_argument("--N_start", type=int, help="Training data slice start", default=0)
     arg_parser.add_argument("--N_size", type=int, help="Training data slice size", default=None)
+    arg_parser.add_argument("--streaming", help="Force stream-loading of data (for large datasets)", action="store_true")
+    arg_parser.add_argument("--to_device", help="Force moving dataset to compute device", action="store_true")
+    arg_parser.add_argument("--shuffle", help="Shuffle data for training", action="store_true")
     arg_parser.add_argument("--epochs_mean", type=int, help="Number of epochs to train only mean activation", default=100)
     arg_parser.add_argument("--epochs_full", type=int, help="Number of epochs to train full model", default=100)
     arg_parser.add_argument("--batch_size", type=int, help="Training batch size", default=32)
@@ -47,6 +50,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--t_end", type=float, help="Learning end temperature", default=2.0)
     arg_parser.add_argument("--CPU", help="Force CPU compute", action="store_true")
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
+    arg_parser.add_argument("--save_every", type=int, help="Save every i-th epoch", default=10)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H.%M.%S')+"-amortize"))
 
     cmd_args = arg_parser.parse_args()
@@ -65,10 +69,17 @@ if __name__ == "__main__":
     #torch.set_default_device(device)
     print("Using PyTorch device/precision: {}/{}".format(device, torch.get_default_dtype()))
     
-    dataset = TVODataset(Xpath=cmd_args.Xfile, Ksetpath=cmd_args.Ksetfile, start=cmd_args.N_start, maxN=cmd_args.N_size)
+    if cmd_args.streaming:
+        dataset = StreamingTVODataset(Xpath=cmd_args.Xfile, 
+                            Ksetpath=cmd_args.Ksetfile, 
+                            start=cmd_args.N_start, maxN=cmd_args.N_size)
+    else:
+        dataset = TVODataset(Xpath=cmd_args.Xfile, Ksetpath=cmd_args.Ksetfile, 
+                             start=cmd_args.N_start, maxN=cmd_args.N_size)
     print("Loaded Kset shape: ", dataset.Kset.shape)
-    dataset.to(device)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cmd_args.batch_size, shuffle=True)
+    if cmd_args.to_device:
+        dataset.to(device)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cmd_args.batch_size, shuffle=cmd_args.shuffle)
     N, D = dataset.X.shape
     H = dataset.Kset.shape[-1]
 
@@ -94,6 +105,8 @@ if __name__ == "__main__":
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
         print("Optimizing mean | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch+1, model.temperature, loss[-1]))
+        if (epoch+1) % cmd_args.save_every == 0:
+            torch.save(model, os.path.join(log_path, "trained_sampler_mean_epoch_{}.pt".format(epoch+1)))
 
     torch.save(model, os.path.join(log_path, "trained_sampler_mean.pt"))
     
@@ -108,6 +121,9 @@ if __name__ == "__main__":
         epochloss = train(model, dataloader, optimizer, on_epoch)
         loss.append(np.array(epochloss).mean())
         print("Optimizing all  | Epoch: {:4d} | t: {:9.4f} | Loss: {:9.4f}".format(epoch+1, model.temperature, loss[-1]))
+        if (epoch+1) % cmd_args.save_every == 0:
+            torch.save(model, os.path.join(log_path, "trained_sampler_epoch_{}.pt".format(epoch+1)))
+
 
     torch.save(model, os.path.join(log_path, "trained_sampler.pt"))
     

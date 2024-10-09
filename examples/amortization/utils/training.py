@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 from tqdm import tqdm
 
@@ -7,9 +8,10 @@ def train(model, dataloader, optimizer, on_finish=None):
     losses = []
     for batch_idx, (X, Kset, logPs, idx) in enumerate(tqdm(dataloader)):
         if X.device != model_device:
-            X = X.to(model_device)
-            Kset = Kset.to(model_device)
-            logPs = logPs.to(model_device)
+            X = X.to(model_device, non_blocking=True)
+            Kset = Kset.to(model_device, non_blocking=True)
+            logPs = logPs.to(model_device, non_blocking=True)
+            torch.cuda.synchronize()
 
         optimizer.zero_grad()
         res = model(X, Kset, logPs, indexes=idx)
