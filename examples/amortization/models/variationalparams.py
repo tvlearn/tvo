@@ -378,9 +378,9 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
 
         self.nn_low_rank_param = nn.Sequential(
             ResBlock(nn.Sequential(
-                nn.Linear(2*D, 3*D),
+                nn.Linear(dim[1], dim[2]),
                 nn.ReLU(),
-                nn.Linear(3*D, 2*D),
+                nn.Linear(dim[2], dim[1]),
                 nn.ReLU(),
             )),
             nn.BatchNorm1d(dim[1]),
