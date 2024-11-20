@@ -399,3 +399,124 @@ class AmortizedResNetLowRankVariationalParams(AmortizedVariationalParams):
         L = cholesky_jitter(Sigma)
         return mu, L, Sigma
 
+
+class Storage(nn.Module):
+    stored = {}
+
+    def __init__(self, name):
+        nn.Module.__init__(self)
+        self.name = name
+
+    def forward(self, x: torch.tensor) -> torch.Tensor:
+        Storage.stored[self.name] = x
+        return x
+    
+    @classmethod
+    def clear(cls):
+        cls.stored.clear()
+
+
+
+class AmortizedAudioResNetLowRankVariationalParams(AmortizedVariationalParams):
+    def __init__(self, N, D, H, rank=5, minsigma=0.0, scale=0.01) -> None:
+        super().__init__(N, D, H)
+        self.rank = rank
+        self.minsigma = minsigma
+        self.scale = scale
+        dim = [D, 3*D, 5*D]
+        
+        # Declare all NN parameters
+
+        self.nn_common_linear = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(D, D),
+                nn.ReLU(),
+                Storage("linear-1"),
+                nn.Linear(D, D),
+            )),
+            ResBlock(nn.Sequential(
+                nn.Linear(D, D),
+                nn.ReLU(),
+                Storage("linear-2"),
+                nn.Linear(D, D),
+            )),
+        )
+
+        self.nn_common_conv = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Conv1d(1, 512, kernel_size=int(D/2)),  # 1 -> 512 channels
+                nn.ReLU(),
+                Storage("conv-1"),
+                nn.ConvTranspose1d(512, 1, kernel_size=int(D/2)),  # 512 -> 1 channels
+            )),
+            ResBlock(nn.Sequential(
+                nn.Conv1d(1, 512, kernel_size=int(D/4)),  # 1 -> 512 channels
+                nn.ReLU(),
+                Storage("conv-2"),
+                nn.ConvTranspose1d(512, 1, kernel_size=int(D/4)),  # 512 -> 1 channels
+            )),
+        )
+
+        self.nn_reduce1 = nn.Sequential(
+            nn.Linear(D, int(D/2)),
+        )
+
+        self.nn_reduce2 = nn.Sequential(
+            nn.Linear(D, int(D/2)),
+        )
+
+        self.nn_mean = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(dim[1], dim[2]),
+                nn.ReLU(),
+                nn.Linear(dim[2], dim[1]),
+                nn.ReLU(),
+            )),
+            nn.Linear(dim[1], H),
+        )
+
+        self.nn_diag_covar = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(dim[1], dim[2]),
+                nn.ReLU(),
+                nn.Linear(dim[2], dim[1]),
+                nn.ReLU(),
+            )),
+            nn.BatchNorm1d(dim[1]),
+            nn.Linear(dim[1], H),
+            nn.Softplus(),
+        )
+
+        self.nn_low_rank_param = nn.Sequential(
+            ResBlock(nn.Sequential(
+                nn.Linear(dim[1], dim[2]),
+                nn.ReLU(),
+                nn.Linear(dim[2], dim[1]),
+                nn.ReLU(),
+            )),
+            nn.BatchNorm1d(dim[1]),
+            nn.Linear(dim[1], rank*H),
+        )
+
+        
+    def forward(self, X, indexes, onlymean=False):
+        Storage.clear()
+        x_common = self.nn_common_linear(X)
+        linear1 = Storage.stored["linear-1"]
+        linear2 = Storage.stored["linear-2"]
+        x_reduce1 = self.nn_reduce1(linear1)
+        x_reduce2 = self.nn_reduce2(linear2)
+        common = torch.concat([linear1, linear2, x_common], dim=-1)
+        
+        #X_1D = X.unsqueeze(-2)
+        #common = self.nn_common(X_1D)
+
+        mu = self.scale * self.nn_mean(common)
+        if onlymean:
+            return mu, None, None
+        V = self.scale * self.nn_low_rank_param(common).reshape((X.shape[0], self.H, -1))
+        Sigma = torch.bmm(V, V.transpose(-1, -2)) + \
+            torch.diag_embed((self.nn_diag_covar(common)+self.minsigma))
+        L = cholesky_jitter(Sigma)
+        return mu, L, Sigma
+
