@@ -244,8 +244,8 @@ class LogisticTransform(FlowTransform):
         
     def forward(self, x, lp):
         fx = stable_logistic(x)
-        logdet = (-x - 2*torch.log(torch.exp(-x) + 1)).sum(-1)  
-        # logdet = (-x + 2*torch.log(fx)).sum(-1)
+        #logdet = (-x - 2*torch.log(torch.exp(-x) + 1)).sum(-1)  
+        logdet = (-x + 2*torch.log(torch.clamp(fx, EPS, 1))).sum(-1)
         return fx, lp - logdet
     
     def inverse(self, fx):
