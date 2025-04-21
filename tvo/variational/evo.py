@@ -114,6 +114,34 @@ class EVOVariationalStates(TVOVariationalStates):
             new_states.to(device=K.device), new_lpj.to(device=lpj.device), idx, K, lpj, sort_by_lpj
         )
 
+    def update_from_samples(self, idx: to.Tensor, batch: to.Tensor, model: Trainable, samples: to.Tensor) -> int:
+        """ Update the states by drawing candidates from the (amortized) posterior sampler.
+
+        :param idx: data point indices of batch w.r.t. K
+        :param batch: batch of data points
+        :param model: the model being used
+        :param samples: probably good new states
+
+        :returns: average number of variational state substitutions per datapoint performed
+        """
+        
+        if isinstance(model, Optimized):
+            lpj_fn = model.log_pseudo_joint
+            sort_by_lpj = model.sorted_by_lpj
+        else:
+            lpj_fn = model.log_joint
+            sort_by_lpj = {}
+
+        #batch_size, H = batch.shape[0], K.shape[2]
+        K, lpj = self.K, self.lpj
+        lpj[idx] = lpj_fn(batch, K[idx])
+
+        new_K = samples
+        new_lpj = lpj_fn(batch, new_K)
+
+        set_redundant_lpj_to_low(new_K, new_lpj, K[idx])
+        return update_states_for_batch(new_K, new_lpj, idx, K, lpj, sort_by_lpj=sort_by_lpj)
+
 
 def evolve_states(
     lpj: Tensor,

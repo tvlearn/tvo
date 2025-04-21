@@ -6,6 +6,7 @@ from ._EStepConfig import (
     FullEMConfig,
     FullEMSingleCauseConfig,
     AmortizedSamplingConfig,
+    AmortizedEVOConfig,
 )
 from ._ExpConfig import ExpConfig
 from ._EpochLog import EpochLog
@@ -21,4 +22,5 @@ __all__ = [
     "ExpConfig",
     "EpochLog",
     "AmortizedSamplingConfig",
+    "AmortizedEVOConfig",
 ]

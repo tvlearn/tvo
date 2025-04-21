@@ -23,6 +23,7 @@ class Trainer:
         will_reconstruct: bool = False,
         eval_F_at_epoch_end: bool = False,
         data_transform: Callable[[to.Tensor], to.Tensor] = None,
+        posterior_sampler = None,
     ):
         """Train and/or test a given model.
 
@@ -84,6 +85,7 @@ class Trainer:
                 self.test_reconstruction = test_data.dataset.tensors[1].clone()
         self._to_rollback = rollback_if_F_decreases
         self.data_transform = data_transform if data_transform is not None else lambda x: x
+        self.posterior_sampler = posterior_sampler
 
     @staticmethod
     def _do_e_step(
@@ -231,26 +233,57 @@ class Trainer:
         subs = to.tensor(0)
         if isinstance(model, Optimized):
             model.init_epoch()
+
         for idx, batch in train_data:
             batch = self.data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
+
+            # Evolutionary K-set update (E-step)
             with to.no_grad():
                 subs += train_states.update(idx, batch, model)
+
+            # Amortized sampling
+            if self.posterior_sampler is not None:
+                self.posterior_sampler.train_batch(indexes=idx,
+                                                   X=batch,
+                                                   Kset=train_states.K[idx],
+                                                   log_f=train_states.lpj[idx])
+
+                samples = self.posterior_sampler.sample_q(X=batch, nsamples=train_states.config["n_amortized_samples"])
+                samples = samples.permute(1, 0, 2).to(train_states.K.dtype)
+                n_updated = train_states.update_from_samples(idx, batch, model, samples)
+                #print("\tUpdated: ", n_updated)
+
+            # Denoising
+            with to.no_grad():
                 if train_reconstruction is not None:
                     assert isinstance(model, Reconstructor)
                     train_reconstruction[idx] = model.data_estimator(
                         idx, batch, train_states
                     )  # full data estimation
+            
+            # Inpainting
             if to.isnan(batch).any():
                 missing_data_mask = to.isnan(batch)
                 batch[missing_data_mask] = train_reconstruction[idx][missing_data_mask]
                 train_reconstruction[idx] = batch
+
+            # Batch-wise params update (partial M-step), compute free energy
             batch_F = model.update_param_batch(idx, batch, train_states)
             if not self.eval_F_at_epoch_end:
                 if batch_F is None:
                     batch_F = model.free_energy(idx, batch, train_states)
                 F += batch_F
+        
+        # Train the amortized sampler
+        if self.posterior_sampler is not None:
+            self.posterior_sampler.train_dataset(dataloader=train_data, 
+                                                 datatransformer=self.data_transform,
+                                                 Kset=train_states.K,
+                                                 log_f=train_states.lpj)
+
+        # Full data-wise params update (M-step)
         self._update_parameters_with_rollback()
         return F, subs, train_reconstruction
 

@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.nn import Module, Parameter
 from .common import *
+from tqdm import tqdm
 
 
 def compute_probabilities(log_f_joint):
@@ -102,6 +103,16 @@ class SamplerModule(Module):
     def get_device(self):
         return next(self.parameters()).device
 
+    def forward(self, X, Kset, log_f, marginal_p=None, indexes=None):
+        raise NotImplementedError()
+
+    def train_batch(self, indexes, X, Kset, log_f):
+        # Can be skipped
+        pass
+
+    def train_dataset(self, dataloader, datatransformer, Kset, log_f):
+        raise NotImplementedError()
+
     def sample_q(self, X, indexes=None, nsamples=1000):
         raise NotImplementedError()
 
@@ -109,7 +120,54 @@ class SamplerModule(Module):
 Objective = Enum("Objective", ["CROSSENTROPY", "KLDIVERGENCE", "MEANKLDIVERGENCE"])
 
 
-class AmortizedBernoulli(SamplerModule):
+class MeanCovarianceSamplerModule(SamplerModule):
+    def __init__(self) -> None:
+        super().__init__()
+        self.objective_type = Objective.KLDIVERGENCE
+
+
+    def _train_epoch(self, dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None):
+        self.train()
+        model_device = next(self.parameters()).device
+        losses = []
+        for batch_idx, (indexes, X) in enumerate(tqdm(dataloader)):
+            X = datatransformer(X)
+            optimizer.zero_grad()
+            res = self(X, Kset[indexes], log_f[indexes], indexes=indexes)
+            loss = res["objective"]
+            losses.append(loss.item())
+            loss.backward()
+            optimizer.step()
+            #print("Batch {:4d} | loss: {:9.4f}".format(batch_idx, loss))
+        
+        if on_finish is not None:
+            on_finish(X, Kset, log_f, np.array(losses).mean(), res)
+
+        return losses
+
+
+    def train_dataset(self, dataloader, datatransformer, Kset, log_f):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        epoch_loss = []
+        
+        self.objective_type = Objective.MEANKLDIVERGENCE
+        for epoch in range(10):
+            losses = self._train_epoch(dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None)
+            epoch_loss.append(np.array(losses).mean())
+            print("Optimizing mean | Epoch: {:4d} | <loss>: {:9.4f}".format(epoch+1, epoch_loss[-1]))
+            if epoch > 1 and epoch_loss[-1] > epoch_loss[-2]:
+                break
+
+        self.objective_type = Objective.KLDIVERGENCE
+        for epoch in range(0):
+            losses = self._train_epoch(dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None)
+            epoch_loss.append(np.array(losses).mean())
+            print("Optimizing full | Epoch: {:4d} | <loss>: {:9.4f}".format(epoch+1, epoch_loss[-1]))
+        
+
+
+
+class AmortizedBernoulli(MeanCovarianceSamplerModule):
     def __init__(self, nsamples=10, variationalparams=None) -> None:
         super().__init__()
         self.nsamples = nsamples

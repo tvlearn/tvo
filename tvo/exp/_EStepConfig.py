@@ -180,3 +180,26 @@ class AmortizedSamplingConfig(EStepConfig):
 
     def as_dict(self) -> Dict[str, Any]:
         return vars(self)
+    
+
+class AmortizedEVOConfig(EVOConfig):
+     def __init__(
+        self,
+        n_states: int,
+        n_parents: int,
+        n_generations: int,
+        parent_selection: str = "fitness",
+        crossover: bool = True,
+        n_children: int = None,
+        mutation: str = "uniform",
+        bitflip_frequency: float = None,
+        K_init_file: str = None,
+        n_amortized_samples: int = 64,
+    ):
+        assert n_amortized_samples > 0, f"n_samples must be positive integer ({n_amortized_samples})"
+
+        self.n_amortized_samples = n_amortized_samples
+
+        super().__init__(n_states, n_parents, n_generations, parent_selection, 
+                         crossover, n_children, mutation, bitflip_frequency, 
+                         K_init_file)
