@@ -231,6 +231,7 @@ class Trainer:
         assert train_data is not None and train_states is not None  # to make mypy happy
         F = to.tensor(0.0, device=tvo.get_device())
         subs = to.tensor(0)
+        n_updated = 0
         if isinstance(model, Optimized):
             model.init_epoch()
 
@@ -252,9 +253,8 @@ class Trainer:
 
                 samples = self.posterior_sampler.sample_q(X=batch, nsamples=train_states.config["n_amortized_samples"])
                 samples = samples.permute(1, 0, 2).to(train_states.K.dtype)
-                n_updated = train_states.update_from_samples(idx, batch, model, samples)
-                #print("\tUpdated: ", n_updated)
-
+                n_updated += train_states.update_from_samples(idx, batch, model, samples)
+                
             # Denoising
             with to.no_grad():
                 if train_reconstruction is not None:
@@ -276,6 +276,9 @@ class Trainer:
                     batch_F = model.free_energy(idx, batch, train_states)
                 F += batch_F
         
+        if self.posterior_sampler is not None:
+            print("\tUpdated by posterior sampler: ", n_updated)
+
         # Train the amortized sampler
         if self.posterior_sampler is not None:
             self.posterior_sampler.train_dataset(dataloader=train_data, 

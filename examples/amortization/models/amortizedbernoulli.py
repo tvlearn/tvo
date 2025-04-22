@@ -147,6 +147,7 @@ class MeanCovarianceSamplerModule(SamplerModule):
 
 
     def train_dataset(self, dataloader, datatransformer, Kset, log_f):
+        self.train()
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         epoch_loss = []
         
@@ -377,6 +378,7 @@ class AmortizedBernoulli(MeanCovarianceSamplerModule):
             :param nsamples     : int       number of samples
             :returns samples    : [M, N, H]
         """
+        self.eval()
         mu, L, Sigma = self.variationalparams(X, indexes)
         N, H = mu.shape
 
