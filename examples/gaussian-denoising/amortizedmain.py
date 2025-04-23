@@ -228,6 +228,7 @@ def gaussian_denoising_example():  # noqa: C901
                 gfs=gfs,
                 rec=imgs["mean"] if merge else None,
             )
+            to.save(trainer.posterior_sampler.state_dict(), output_directory+"/sampler.state")
         barrier()
 
     barrier()
