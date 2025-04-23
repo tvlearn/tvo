@@ -118,12 +118,14 @@ class SamplerModule(Module):
 
 
 Objective = Enum("Objective", ["CROSSENTROPY", "KLDIVERGENCE", "MEANKLDIVERGENCE"])
+SamplerType = Enum("Sampler", ["MEAN_ONLY", "MEAN_COVAR"])
 
 
 class MeanCovarianceSamplerModule(SamplerModule):
     def __init__(self) -> None:
         super().__init__()
         self.objective_type = Objective.KLDIVERGENCE
+        self.sampler_type = SamplerType.MEAN_COVAR
 
 
     def _train_epoch(self, dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None):
@@ -379,22 +381,35 @@ class AmortizedBernoulli(MeanCovarianceSamplerModule):
             :returns samples    : [M, N, H]
         """
         self.eval()
-        mu, L, Sigma = self.variationalparams(X, indexes)
-        N, H = mu.shape
-
         device = self.get_device()
 
-        q_distribution = RandomFlowSequence(
-            source=GaussianSource(D=H, device=device), 
-            sequence=[
-                LTLinearTransform(LT=L), 
-                CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
-                InverseLogisticTransform(),
-                ElementwiseLinearTransform(b=mu),
-                AnnealingTransform(t=self.temperature),
-                LogisticTransform(),
-                #CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
-                ])
+        if self.sampler_type == SamplerType.MEAN_ONLY:
+            mu, _, _ = self.variationalparams(X, indexes, onlymean=True)
+            N, H = mu.shape
+
+            q_distribution = RandomFlowSequence(
+                source=UniformSource(D=H, device=device), 
+                sequence=[
+                    InverseLogisticTransform(),
+                    ElementwiseLinearTransform(b=mu),
+                    AnnealingTransform(t=self.temperature),
+                    LogisticTransform(),
+                    ])
+        else:        
+            mu, L, Sigma = self.variationalparams(X, indexes)
+            N, H = mu.shape
+
+            q_distribution = RandomFlowSequence(
+                source=GaussianSource(D=H, device=device), 
+                sequence=[
+                    LTLinearTransform(LT=L), 
+                    CopulaTransform(torch.diagonal(Sigma, dim1=-1, dim2=-2)), 
+                    InverseLogisticTransform(),
+                    ElementwiseLinearTransform(b=mu),
+                    AnnealingTransform(t=self.temperature),
+                    LogisticTransform(),
+                    #CollapsedBernoulliLogisticRelaxation(mu=mu, t=self.temperature), 
+                    ])
         
         q_samples, q_samples_log_p = q_distribution.sample(size=(nsamples, 1))
 

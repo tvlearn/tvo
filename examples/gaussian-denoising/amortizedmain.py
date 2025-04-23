@@ -19,7 +19,7 @@ from tvo.utils.model_protocols import Reconstructor
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from amortization.models.amortizedbernoulli import AmortizedBernoulli
+from amortization.models.amortizedbernoulli import AmortizedBernoulli, SamplerType
 from amortization.models.variationalparams import AmortizedResNetLowRankVariationalParams
 
 from tvutil.prepost import (
@@ -163,6 +163,7 @@ def gaussian_denoising_example():  # noqa: C901
     # Amortized posterior sampler
     variationalparams = AmortizedResNetLowRankVariationalParams(N=0, D=D, H=args.H)
     posterior_sampler = AmortizedBernoulli(variationalparams=variationalparams).to(DEVICE)
+    posterior_sampler.sampler_type = SamplerType.MEAN_ONLY
     trainer.posterior_sampler = posterior_sampler 
 
     # initialize visualizer

@@ -6,7 +6,7 @@ import tvo
 from tvo.utils.model_protocols import Trainable, Optimized, Reconstructor
 from tvo.variational import TVOVariationalStates
 from tvo.utils.data import TVODataLoader
-from tvo.utils.parallel import all_reduce
+from tvo.utils.parallel import all_reduce, pprint
 from typing import Dict, Any, Sequence, Union, Callable
 import torch as to
 
@@ -277,7 +277,8 @@ class Trainer:
                 F += batch_F
         
         if self.posterior_sampler is not None:
-            print("\tUpdated by posterior sampler: ", n_updated)
+            pprint("\tUpdated by posterior sampler (count): ", n_updated)
+            pprint(f"\tUpdated by posterior sampler (fraction): {n_updated / self.N_train:<6.2f}")
 
         # Train the amortized sampler
         if self.posterior_sampler is not None:
