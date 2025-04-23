@@ -207,9 +207,9 @@ class Visualizer(object):
             output_directory,
             "_epoch{:04d}".format(epoch) if self._gif_framerate is not None else "",
         )
+        plt.savefig(png_file[:-3]+"pdf", dpi=600)
         plt.savefig(png_file)
         print("\tWrote " + png_file)
-        plt.savefig(png_file[:-3]+"pdf")
         
     def _write_gif(self, framerate: str):
         output_directory = self._output_directory
