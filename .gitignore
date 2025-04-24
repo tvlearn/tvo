@@ -18,3 +18,4 @@ build/*
 tvo.egg-info
 *.egg
 **/out/
+**/out-saved/
