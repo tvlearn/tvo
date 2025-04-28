@@ -126,6 +126,7 @@ if __name__ == "__main__":
 
 
     torch.save(model, os.path.join(log_path, "trained_sampler.pt"))
+    torch.save(model.state_dict(), os.path.join(log_path, "trained_sampler.state"))
     
     
     #from torch.profiler import profile, record_function, ProfilerActivity
