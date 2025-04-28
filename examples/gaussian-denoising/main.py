@@ -137,7 +137,7 @@ def gaussian_denoising_example():  # noqa: C901
     merge_every = args.merge_every if args.merge_every is not None else args.viz_every
     reco_epochs = get_epochs_from_every(every=merge_every, total=args.no_epochs)
     exp_config = ExpConfig(
-        batch_size=32,
+        batch_size=128,
         output=training_file,
         reco_epochs=reco_epochs,
         log_blacklist=[],

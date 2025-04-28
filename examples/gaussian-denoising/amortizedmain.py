@@ -7,6 +7,7 @@ import sys
 import time
 import datetime
 import torch as to
+import h5py
 
 import tvo
 from tvo.exp import EVOConfig, AmortizedEVOConfig, ExpConfig, Training
@@ -46,15 +47,27 @@ PRECISION = to.float32
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
 
+def load_group_as_dict(hdf5filename, groupname):
+    res = {}
+    with h5py.File(hdf5filename, "r") as f:
+        group = f[groupname]
+        for k in group.keys():
+            v = group[k]
+            if v.shape == ():
+                res[k] = v[()]
+            elif v.shape == (1,):
+                res[k] = v[:] 
+            else:
+                res[k] = v[:]
+    return res
+
+
 def gaussian_denoising_example():  # noqa: C901
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
     # get hyperparameters
     args = get_args()
-    pprint("Argument list:")
-    for k in sorted(vars(args), key=lambda s: s.lower()):
-        pprint("{: <25} : {}".format(k, vars(args)[k]))
 
     # determine directories to save output
     timestamp = datetime.datetime.fromtimestamp(time.time()).strftime("%y-%m-%d-%H-%M-%S")
@@ -72,15 +85,34 @@ def gaussian_denoising_example():  # noqa: C901
     pprint("Will write training output to {}".format(training_file))
     pprint("Will write terminal output to {}".format(txt_file))
 
+    pprint("Argument list:")
+    for k in sorted(vars(args), key=lambda s: s.lower()):
+        pprint("\t{: <25} : {}".format(k, vars(args)[k]))
+
     # generate noisy image and extract image patches
     patch_width = args.patch_width if args.patch_width is not None else args.patch_height
     if comm_rank == 0:
         clean = get_image(args.clean_image, args.rescale).to(**dtype_device_kwargs)
+
+        # Define training image mask with NaNs
+        n_vert_stripes = args.n_vert_stripes
+        if n_vert_stripes > 1:
+            vert_stripe_size = int(clean.shape[1] / n_vert_stripes)
+            for j in range(0, n_vert_stripes, 2):
+                clean[:, j*vert_stripe_size:(j+1)*vert_stripe_size] = to.nan
+
         isrgb = clean.dim() == 3 and clean.shape[2] == 3
         noisy = clean + args.noise_level * to.randn(clean.shape).to(**dtype_device_kwargs)
         print("Added white Gaussian noise with σ={}".format(args.noise_level))
         OVP = MultiDimOverlappingPatches if isrgb else OverlappingPatches
         ovp = OVP(noisy, args.patch_height, patch_width, patch_shift=1)
+        
+        if n_vert_stripes > 1:
+            # Workaround to use only valid patches. Causes inability to restore the image
+            ind_valid = to.logical_not(to.any(to.isnan(ovp._patches), dim=(0)))
+            ovp._patches = ovp._patches[:, ind_valid]
+            ovp._no_pixels_to_synthesize = 0
+        
         train_data = ovp.get().t()
         store_as_h5({"data": train_data}, data_file)
     else:
@@ -103,6 +135,14 @@ def gaussian_denoising_example():  # noqa: C901
             if comm_rank == 0
             else to.zeros((1), dtype=PRECISION, device=DEVICE)
         )
+        pies_init = to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs)
+
+        if args.model_params_file is not None:
+            theta = load_group_as_dict(args.model_params_file, "theta")
+            W_init = to.Tensor(theta["W"])
+            sigma2_init = to.Tensor(theta["sigma2"])
+            pies_init = to.Tensor(theta["pies"])
+
         barrier()
         broadcast(W_init)
         broadcast(sigma2_init)
@@ -112,7 +152,7 @@ def gaussian_denoising_example():  # noqa: C901
             D=D,
             W_init=W_init,
             sigma2_init=sigma2_init,
-            pies_init=to.full((args.H,), 2.0 / args.H, **dtype_device_kwargs),
+            pies_init=pies_init,
             precision=PRECISION,
         )
     elif args.model == "tvae":
@@ -138,14 +178,14 @@ def gaussian_denoising_example():  # noqa: C901
         parent_selection=args.selection,
         crossover=args.crossover,
         #K_init_file="./out/24-05-08-16-12-40/training.h5",
-        n_amortized_samples=64,
+        n_amortized_samples=args.n_amortized_samples,
     )
 
     # setup the experiment
     merge_every = args.merge_every if args.merge_every is not None else args.viz_every
     reco_epochs = get_epochs_from_every(every=merge_every, total=args.no_epochs)
     exp_config = ExpConfig(
-        batch_size=32,
+        batch_size=args.batch_size,
         output=training_file,
         reco_epochs=reco_epochs,
         log_blacklist=[],
@@ -162,9 +202,13 @@ def gaussian_denoising_example():  # noqa: C901
 
     # Amortized posterior sampler
     variationalparams = AmortizedResNetLowRankVariationalParams(N=0, D=D, H=args.H)
-    posterior_sampler = AmortizedBernoulli(variationalparams=variationalparams).to(DEVICE)
+    posterior_sampler = AmortizedBernoulli(variationalparams=variationalparams)
+    if args.amortizer_params_file is not None:
+        posterior_sampler.load_state_dict(
+            to.load(args.amortizer_params_file, weights_only=True))
     posterior_sampler.sampler_type = SamplerType.MEAN_ONLY
-    trainer.posterior_sampler = posterior_sampler 
+    posterior_sampler.to(DEVICE)
+    trainer.posterior_sampler = posterior_sampler
 
     # initialize visualizer
     pprint("Initializing visualizer")

@@ -154,6 +154,42 @@ viz_parser.add_argument(
     default=None,
 )
 
+amortization_parser = argparse.ArgumentParser(add_help=False)
+amortization_parser.add_argument(
+    "--n_vert_stripes",
+    type=int,
+    help="Number of vertical stripes to cut the image onto. Every second stripe is discarded from training.",
+    default=1,
+)
+
+amortization_parser.add_argument(
+    "--n_amortized_samples",
+    type=int,
+    help="Number of samples to draw from the amortized sampler every iteration.",
+    default=64,
+)
+
+amortization_parser.add_argument(
+    "--amortizer_params_file",
+    type=str,
+    help="Amortized sampler parameters file (.sampler).",
+    default=None,
+)
+
+amortization_parser.add_argument(
+    "--model_params_file",
+    type=str,
+    help="Model parameters (theta) file (.h5).",
+    default=None,
+)
+
+amortization_parser.add_argument(
+    "--batch_size",
+    type=int,
+    help="Batch size.",
+    default=32,
+)
+
 
 def get_args():
     parser = argparse.ArgumentParser(prog="Gaussian Denoising")
@@ -165,6 +201,7 @@ def get_args():
         experiment_parser,
         output_parser,
         viz_parser,
+        amortization_parser,
     ]
 
     algo_parsers.add_parser(
