@@ -149,7 +149,8 @@ class LTLinearTransform(FlowTransform):
     def inverse(self, fx):
         if self.mean is not None:
             fx -= self.mean
-        return torch.matmul(torch.inverse(self.LT), fx.unsqueeze(-1)).squeeze(-1)
+        # return torch.matmul(torch.inverse(self.LT), fx.unsqueeze(-1)).squeeze(-1)
+        return torch.linalg.solve_triangular(self.LT, fx.unsqueeze(-1), upper=False).squeeze(-1)
         
 
 class CopulaTransform(FlowTransform):

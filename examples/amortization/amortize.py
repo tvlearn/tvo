@@ -52,6 +52,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--precision", type=FloatPrecision, help="Compute precision", default=FloatPrecision.float32)
     arg_parser.add_argument("--save_every", type=int, help="Save every i-th epoch", default=10)
     arg_parser.add_argument("--outdir", type=str, help="Output directory", default=os.path.join("./out", datetime.now().strftime('%y.%m.%d-%H.%M.%S')+"-amortize"))
+    arg_parser.add_argument("-h", "--help", help="This help message.", action='help')
 
     cmd_args = arg_parser.parse_args()
     log_path = cmd_args.outdir
@@ -109,6 +110,7 @@ if __name__ == "__main__":
             torch.save(model, os.path.join(log_path, "trained_sampler_mean_epoch_{}.pt".format(epoch+1)))
 
     torch.save(model, os.path.join(log_path, "trained_sampler_mean.pt"))
+    torch.save(model.state_dict(), os.path.join(log_path, "trained_sampler_mean.state"))
     
     # Optimize full model (mean and covariance parameters)
     temperature = np.concatenate([np.linspace(cmd_args.t_start, cmd_args.t_end, cmd_args.epochs_full)])

@@ -118,7 +118,7 @@ class SamplerModule(Module):
 
 
 Objective = Enum("Objective", ["CROSSENTROPY", "KLDIVERGENCE", "MEANKLDIVERGENCE"])
-SamplerType = Enum("Sampler", ["MEAN_ONLY", "MEAN_COVAR"])
+SamplerType = Enum("SamplerType", ["MEAN_ONLY", "MEAN_COVAR"])
 
 
 class MeanCovarianceSamplerModule(SamplerModule):
