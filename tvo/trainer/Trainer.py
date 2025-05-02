@@ -9,7 +9,7 @@ from tvo.utils.data import TVODataLoader
 from tvo.utils.parallel import all_reduce, pprint
 from typing import Dict, Any, Sequence, Union, Callable
 import torch as to
-
+from tqdm import tqdm
 
 class Trainer:
     def __init__(
@@ -235,7 +235,7 @@ class Trainer:
         if isinstance(model, Optimized):
             model.init_epoch()
 
-        for idx, batch in train_data:
+        for batch_id, (idx, batch) in tqdm(enumerate(train_data)):
             batch = self.data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()

@@ -69,7 +69,7 @@ def get_image(image_file: str, rescale: float) -> to.Tensor:
             np.asarray(
                 [
                     np.asarray(
-                        Image.fromarray(img[:, :, ch]).resize(target_shape, resample=Image.NEAREST),
+                        Image.fromarray(img[:, :, ch]).resize(target_shape, resample=Image.LANCZOS),
                         dtype=np.float64,
                     )
                     for ch in range(3)
@@ -77,7 +77,7 @@ def get_image(image_file: str, rescale: float) -> to.Tensor:
             ).transpose(1, 2, 0)
             if isrgb
             else np.asarray(
-                Image.fromarray(img).resize(target_shape, resample=Image.NEAREST), dtype=np.float64
+                Image.fromarray(img).resize(target_shape, resample=Image.LANCZOS), dtype=np.float64
             )
         )
         print("Resized input image from {}->{}".format(orig_shape, np.asarray(img).shape))

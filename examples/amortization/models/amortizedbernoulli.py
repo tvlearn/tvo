@@ -415,3 +415,123 @@ class AmortizedBernoulli(MeanCovarianceSamplerModule):
 
         return binarize(q_samples)
     
+
+EPS = np.finfo("float32").eps  # The difference between 1.0 and the next smallest representable float larger than 1.0
+
+def stable_logist(x):
+    # This is much more numerically stable than simple
+    # return 1 / (1 + torch.exp(-x))
+    return torch.clamp(torch.sigmoid(x), min=EPS, max=1-EPS)
+
+
+class SequenceBernoulli(SamplerModule):
+    """ Multivariate Bernoulli based on full chain conditional factorization
+    """
+
+    def __init__(self, variationalparams=None) -> None:
+        super().__init__()
+        self.variationalparams = variationalparams
+
+
+    def forward(self, X, Kset, log_f, marginal_p=None, indexes=None):
+        """ Returns relaxed cross-entropy H(p_K | q(X))
+            :param X            : [N, D]    N data points
+            :param Kset         : [N, K, H] truncated binary posterior sets
+            :param log_f        : [N, K]    log-joint of (X, Kset) 
+            :param marginal_p   : [N, H]    marginal probability of bits
+            :param indexes      : [N]       data points indexes
+        """
+        N, K, H = Kset.shape
+        device = X.device
+
+        # Mean params M_params is [N, H]
+        # Conditional params C_params is [N, (H*H-H)/2]
+        M_params, C_params = self.variationalparams(X, indexes)
+
+        C = torch.zeros(size=(N, H, H), device=device)
+        tril_ind = torch.tril_indices(H, H, -1, device=device)
+        C[:, tril_ind[0], tril_ind[1]] = C_params
+
+        #print(Kset.shape, C.shape)
+        cond_params = (Kset.unsqueeze(-2) * C.unsqueeze(-3)).sum(-1)  # [N, K, H]
+        #print(M_params.shape, cond_params.shape)
+        S_prob_params = M_params.unsqueeze(-2) + cond_params  # [N, K, H]
+        
+        q_s = stable_logist(S_prob_params)  # [N, K, H]
+        p_s = compute_probabilities(log_f)  # [N, K]
+        crossH_pq = - (
+            p_s.unsqueeze(-1) * (
+                    Kset * torch.log(q_s) + 
+                    (1-Kset) * torch.log(1-q_s)
+                )
+            ).sum(dim=(-1, -2))
+        
+        H_p = stable_entropy(log_f)
+        KL_pq = crossH_pq - H_p
+
+        res = {}
+        res["objective"] = KL_pq.mean()  # average number of mismatched bits per sample
+        return res
+
+
+    def sample_q(self, X, indexes=None, nsamples=1000):
+        """ Sample from the fitted density
+            :param X            : [N, D]    N data points
+            :param indexes      : [N]       data points indexes
+            :param nsamples     : int       number of samples
+            :returns samples    : [nsamples, N, H]
+        """
+        self.eval()
+
+        with torch.no_grad():
+            M_params, C_params = self.variationalparams(X, indexes)
+            N, H = M_params.shape
+            device = X.device
+
+            C = torch.zeros(size=(N, H, H), device=device)
+            tril_ind = torch.tril_indices(H, H, -1, device=device)
+            C[:, tril_ind[0], tril_ind[1]] = C_params
+
+            res = []
+            L = torch.zeros(size=(N, H, H), device=device)  # intermediate sampling steps memory 
+            for i in range(H + nsamples):
+                cond_params = (L*C).sum(-1) 
+                S_prob_params = M_params + cond_params
+                S_new = torch.bernoulli(stable_logist(S_prob_params))
+                L = L.diagonal_scatter(S_new, dim1=-1, dim2=-2)
+                res.append(L[:, -1, :].clone().detach())
+                L[:, 1:, :] = L.clone()[:, :-1, :]
+
+            return torch.stack(res[H:], dim=0)
+
+    def _train_epoch(self, dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None):
+        self.train()
+        model_device = next(self.parameters()).device
+        losses = []
+        for batch_idx, (indexes, X) in enumerate(tqdm(dataloader)):
+            X = datatransformer(X)
+            optimizer.zero_grad()
+            res = self(X, Kset[indexes], log_f[indexes], indexes=indexes)
+            loss = res["objective"]
+            losses.append(loss.item())
+            loss.backward()
+            optimizer.step()
+            #print("Batch {:4d} | loss: {:9.4f}".format(batch_idx, loss))
+        
+        if on_finish is not None:
+            on_finish(X, Kset, log_f, np.array(losses).mean(), res)
+
+        return losses
+
+
+    def train_dataset(self, dataloader, datatransformer, Kset, log_f):
+        self.train()
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        epoch_loss = []
+        
+        for epoch in range(10):
+            losses = self._train_epoch(dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None)
+            epoch_loss.append(np.array(losses).mean())
+            print("Optimizing SequenceBernoulli | Epoch: {:4d} | <loss>: {:9.4f}".format(epoch+1, epoch_loss[-1]))
+            if epoch > 1 and epoch_loss[-1] > epoch_loss[-2]:
+                break
