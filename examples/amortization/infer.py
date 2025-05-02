@@ -8,6 +8,7 @@
 
 import os
 import sys
+import math
 from datetime import datetime
 import numpy as np
 import torch
@@ -22,7 +23,7 @@ from utils.common import FloatPrecision
 from utils.viz import Visualizer
 from utils.utils import eval_fn
 from utils.utils import stdout_logger
-from models.amortizedbernoulli import SamplerModule
+from models.amortizedbernoulli import SamplerModule, MeanCovarianceSamplerModule, SamplerType
 
 
 
@@ -52,7 +53,9 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(add_help=False)
     arg_parser.add_argument("--model", type=str, help="BSC model parameters file, *.HDF5", default=None)
     arg_parser.add_argument("--sampler", type=str, help="Posterior sampler file, *.pt", default=None)
+    arg_parser.add_argument("--mean_only", action="store_true")
     arg_parser.add_argument("--Xfile", type=str, help="X dataset file, HDF5", default=None)
+    arg_parser.add_argument("--images", type=str, help="Original and noisy images file, *.HDF5", default=None)
     arg_parser.add_argument("--epochs", type=int, help="Number of epochs to run the sampler", default=10)
     arg_parser.add_argument("--batch", type=int, help="Batch size", default=128)
     arg_parser.add_argument("--N_samples", type=int, help="Number of samples to draw", default=100)
@@ -87,13 +90,17 @@ if __name__ == "__main__":
     sampler = torch.load(cmd_args.sampler, map_location=device)
     assert isinstance(sampler, SamplerModule)
     sampler.eval()
+    if isinstance(sampler, MeanCovarianceSamplerModule):
+        sampler.sampler_type = SamplerType.MEAN_ONLY if cmd_args.mean_only else SamplerType.MEAN_COVAR
+
 
     # Load noisy image and extract image patches
-    clean = load_var(cmd_args.model, "clean_image")
-    noisy = load_var(cmd_args.model, "noisy_image")
+    images_filename = cmd_args.images if cmd_args.images is not None else cmd_args.model
+    clean = load_var(images_filename, "clean_image")
+    noisy = load_var(images_filename, "noisy_image")
 
-    patch_width = 5
-    patch_height = 5
+    patch_width = int(math.sqrt(model_config_dict["D"]))
+    patch_height = int(math.sqrt(model_config_dict["D"]))
     isrgb = clean.dim() == 3 and clean.shape[2] == 3
     OVP = MultiDimOverlappingPatches if isrgb else OverlappingPatches
     ovp = OVP(noisy, patch_height, patch_width, patch_shift=1)
