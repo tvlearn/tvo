@@ -453,7 +453,7 @@ class SimpleTrainableSampler(SamplerModule):
         for epoch in range(10):
             losses = self._train_epoch(dataloader, datatransformer, Kset, log_f, optimizer, on_finish=None)
             epoch_loss.append(np.array(losses).mean())
-            print("Optimizing SequenceBernoulli | Epoch: {:4d} | <loss>: {:9.4f}".format(epoch+1, epoch_loss[-1]))
+            print("Optimizing {} | Epoch: {:4d} | <loss>: {:9.4f}".format(self.__class__.__name__, epoch+1, epoch_loss[-1]))
             if epoch > 1 and epoch_loss[-1] > epoch_loss[-2]:
                 break
 
