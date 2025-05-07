@@ -10,6 +10,7 @@ from tvo.utils.parallel import all_reduce, pprint
 from typing import Dict, Any, Sequence, Union, Callable
 import torch as to
 from tqdm import tqdm
+import math
 
 class Trainer:
     def __init__(
@@ -235,7 +236,8 @@ class Trainer:
         if isinstance(model, Optimized):
             model.init_epoch()
 
-        for batch_id, (idx, batch) in tqdm(enumerate(train_data)):
+        niters = int(math.ceil(train_data.dataset.tensors[0].shape[0] / train_data.batch_size))
+        for batch_id, (idx, batch) in tqdm(enumerate(train_data), total=niters, desc="E-step"):
             batch = self.data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
