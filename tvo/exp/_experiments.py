@@ -94,7 +94,6 @@ class _TrainingAndOrValidation(Experiment):
     def _make_dataloader(self, dataset: to.Tensor, conf: ExpConfig) -> TVODataLoader:
         if dataset.dtype is not to.uint8:
             dataset = dataset.to(dtype=self._precision)
-        dataset = dataset.to(device=tvo.get_device())
         return TVODataLoader(
             dataset, batch_size=conf.batch_size, shuffle=conf.shuffle, drop_last=conf.drop_last
         )
@@ -141,6 +140,7 @@ class _TrainingAndOrValidation(Experiment):
 
         # EM steps
         for e in range(epochs):
+            pprint("-"*60)
             start_t = time.time()
             compute_reconstruction = (
                 self._conf.reco_epochs is not None and e in self._conf.reco_epochs

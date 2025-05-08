@@ -106,6 +106,7 @@ class Trainer:
         if isinstance(model, Optimized):
             model.init_epoch()
         for idx, batch in data:
+            idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
             batch = data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
@@ -290,7 +291,7 @@ class Trainer:
                                                  log_f=train_states.lpj)
 
         # Full data-wise params update (M-step)
-        self._update_parameters_with_rollback()
+        F = self._update_parameters_with_rollback()
         return F, subs, train_reconstruction
 
     def eval_free_energies(self) -> Dict[str, Any]:
@@ -311,6 +312,7 @@ class Trainer:
             if isinstance(m, Optimized):
                 m.init_epoch()
             for idx, batch in train_data:
+                idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
                 batch = self.data_transform(batch)
                 if isinstance(m, Optimized):
                     m.init_batch()
@@ -326,6 +328,7 @@ class Trainer:
             if isinstance(m, Optimized):
                 m.init_epoch()
             for idx, batch in test_data:
+                idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
                 batch = self.data_transform(batch)
                 if isinstance(m, Optimized):
                     m.init_batch()
@@ -337,30 +340,57 @@ class Trainer:
 
         return ret
 
+    def _compute_train_F(self):
+        F = to.tensor(0.0)
+        for idx, batch in self.train_data:
+            idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
+            batch = self.data_transform(batch)
+            states = self.train_states
+            F += self.model.free_energy(idx, batch, states)
+        return F
+    
+    def _compute_train_lpj(self):
+        m = self.model
+        lpj_fn = m.log_pseudo_joint if isinstance(m, Optimized) else m.log_joint
+        
+        lpj = []
+        for idx, batch in self.train_data:
+            batch = self.data_transform(batch)
+            lpj.append(lpj_fn(batch, self.train_states.K[idx]))
+
+        lpj = to.cat(lpj)
+        return lpj
+
+
     def _update_parameters_with_rollback(self) -> None:
         """Update model parameters calling `update_param_epoch`, roll back if F decreases."""
 
         if len(self._to_rollback) == 0:
             # nothing to rollback, fall back to simple parameter update
             self.model.update_param_epoch()
-            return
+            return self._compute_train_F()
 
         m = self.model
-        lpj_fn = m.log_pseudo_joint if isinstance(m, Optimized) else m.log_joint
-
+        
         assert self.train_data is not None and self.train_states is not None  # to make mypy happy
-        all_data = self.train_data.dataset.tensors[1]
         states = self.train_states
 
         old_params = {p: m.theta[p].clone() for p in self._to_rollback}
-        old_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        old_F = self._compute_train_F()
         all_reduce(old_F)
         old_lpj = states.lpj.clone()
         m.update_param_epoch()
-        states.lpj[:] = lpj_fn(all_data, states.K)
-        new_F = m.free_energy(idx=to.arange(all_data.shape[0]), batch=all_data, states=states)
+        states.lpj[:] = self._compute_train_lpj()
+        new_F = self._compute_train_F()
         all_reduce(new_F)
+        #print("M-step old F: ", old_F.item() / self.N_train)
+        #print("M-step new F: ", new_F.item() / self.N_train)
         if new_F < old_F:
+            print("Rejecting M-step update")
             for p in self._to_rollback:
                 m.theta[p][:] = old_params[p]
             states.lpj[:] = old_lpj
+            return old_F
+        else:
+            print("Accepting M-step update")
+            return new_F
