@@ -520,27 +520,3 @@ class AmortizedAudioResNetLowRankVariationalParams(AmortizedVariationalParams):
         L = cholesky_jitter(Sigma)
         return mu, L, Sigma
 
-"""
-c = ComputeContext()
-
-
-c.map(  (c.x1, c.x2, c.x3),
-	    Multivar1(),
-	(c.y1, c.y2, c.y3)
-     )
-	  
-	  
-c.map(  (c.y1),
-	Serial(Conv1d(), ReLU(), Linear())
-	(c.z1)
-     )	  
-	  
-c.apply(x1=x1, x2=x2, x3=x3)
-	
-resblock = DAG(
-		((c.y), block, (c.x)),
-	        ((c.z), Add(), (c.x, c.y)),
-	      )
-			
-		
-"""
