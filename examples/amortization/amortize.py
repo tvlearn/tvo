@@ -17,7 +17,8 @@ from models.variationalparams import (
     FullCovarGaussianVariationalParams, 
     AmortizedGaussianVariationalParams,
     AmortizedResNetVariationalParams, 
-    AmortizedResNetLowRankVariationalParams)
+    AmortizedResNetLowRankVariationalParams,
+    AmortizedAudioResNetLowRankVariationalParams)
 from utils.common import FloatPrecision
 from utils.training import train
 from utils.plotting import plot_epoch_log
@@ -86,6 +87,7 @@ if __name__ == "__main__":
     model = AmortizedBernoulli(nsamples=cmd_args.N_IS, 
                                #variationalparams=FullCovarGaussianVariationalParams(N, D, H)
                                variationalparams=AmortizedResNetLowRankVariationalParams(N, D, H)
+                               #variationalparams=AmortizedAudioResNetLowRankVariationalParams(N, D, H)
                                ).to(device)
     model.train()
    
