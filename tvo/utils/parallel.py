@@ -300,7 +300,7 @@ def get_h5_dataset_to_processes(fname: str, possible_keys: Tuple[str, ...]) -> t
     else:  # pragma: no cover
         raise ValueError(f'File "{fname}" does not contain any of keys {possible_keys}')
     if rank == 0:
-        data = torch.tensor(f[dataset][...], device=tvo.get_device())
+        data = torch.tensor(f[dataset][...])
     else:
         data = None
     return scatter_to_processes(data)

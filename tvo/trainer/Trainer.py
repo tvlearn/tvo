@@ -239,6 +239,8 @@ class Trainer:
 
         niters = int(math.ceil(train_data.dataset.tensors[0].shape[0] / train_data.batch_size))
         for batch_id, (idx, batch) in tqdm(enumerate(train_data), total=niters, desc="E-step"):
+            idx_cpu = idx
+            idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
             batch = self.data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
@@ -262,15 +264,15 @@ class Trainer:
             with to.no_grad():
                 if train_reconstruction is not None:
                     assert isinstance(model, Reconstructor)
-                    train_reconstruction[idx] = model.data_estimator(
+                    train_reconstruction[idx_cpu] = model.data_estimator(
                         idx, batch, train_states
-                    )  # full data estimation
+                    ).to(train_reconstruction.device)  # full data estimation
             
             # Inpainting
             if to.isnan(batch).any():
                 missing_data_mask = to.isnan(batch)
                 batch[missing_data_mask] = train_reconstruction[idx][missing_data_mask]
-                train_reconstruction[idx] = batch
+                train_reconstruction[idx_cpu] = batch.to(train_reconstruction.device)
 
             # Batch-wise params update (partial M-step), compute free energy
             batch_F = model.update_param_batch(idx, batch, train_states)
