@@ -357,6 +357,7 @@ class Trainer:
         
         lpj = []
         for idx, batch in self.train_data:
+            idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
             batch = self.data_transform(batch)
             lpj.append(lpj_fn(batch, self.train_states.K[idx]))
 
