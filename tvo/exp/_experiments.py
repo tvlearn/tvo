@@ -130,7 +130,8 @@ class _TrainingAndOrValidation(Experiment):
                 self._conf.warmup_reco_epochs is not None and e in self._conf.warmup_reco_epochs
             )
             d = trainer.e_step(compute_reconstruction)
-            self._log_epoch(logger, d)
+            if compute_reconstruction:
+                self._log_epoch(logger, d)
 
         # log initial free energies (after warm-up E-steps if any)
         if self._conf.warmup_Esteps == 0:
@@ -147,7 +148,8 @@ class _TrainingAndOrValidation(Experiment):
             )
             d = trainer.em_step(compute_reconstruction)
             epoch_runtime = time.time() - start_t
-            self._log_epoch(logger, d)
+            if compute_reconstruction:
+                self._log_epoch(logger, d)
             yield EpochLog(e + 1, d, epoch_runtime)
 
         # remove leftover ".old" logfiles produced by the logger
