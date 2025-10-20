@@ -106,6 +106,7 @@ class Trainer:
         if isinstance(model, Optimized):
             model.init_epoch()
         for idx, batch in data:
+            idx_cpu = idx
             idx, batch = idx.to(device=tvo.get_device()), batch.to(device=tvo.get_device())
             batch = data_transform(batch)
             if isinstance(model, Optimized):
@@ -114,7 +115,7 @@ class Trainer:
             F += model.free_energy(idx, batch, states)
             if reconstruction is not None:
                 # full data estimation
-                reconstruction[idx] = model.data_estimator(idx, batch, states)  # type: ignore
+                reconstruction[idx_cpu] = model.data_estimator(idx, batch, states).to(reconstruction.device)  # type: ignore
         all_reduce(F)
         all_reduce(subs)
         return F.item() / N, subs.item() / N, reconstruction
