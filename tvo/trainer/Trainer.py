@@ -119,7 +119,7 @@ class Trainer:
             if posterior_sampler is not None:
                 samples = posterior_sampler.sample_q(X=batch, nsamples=nsamples)
                 samples = samples.permute(1, 0, 2).to(states.K.dtype)
-                states.update_from_samples(idx, batch, model, samples)
+                subs += states.update_from_samples(idx, batch, model, samples)
 
             F += model.free_energy(idx, batch, states)
             if reconstruction is not None:
