@@ -96,6 +96,8 @@ class Trainer:
         N: int,
         data_transform,
         reconstruction: to.Tensor = None,
+        posterior_sampler = None,
+        nsamples = 1,
     ):
         if reconstruction is not None and not isinstance(model, Reconstructor):
             raise NotImplementedError(
@@ -112,6 +114,13 @@ class Trainer:
             if isinstance(model, Optimized):
                 model.init_batch()
             subs += states.update(idx, batch, model)
+
+            # Amortized sampling
+            if posterior_sampler is not None:
+                samples = posterior_sampler.sample_q(X=batch, nsamples=nsamples)
+                samples = samples.permute(1, 0, 2).to(states.K.dtype)
+                states.update_from_samples(idx, batch, model, samples)
+
             F += model.free_energy(idx, batch, states)
             if reconstruction is not None:
                 # full data estimation
@@ -213,7 +222,9 @@ class Trainer:
 
             assert test_data is not None and test_states is not None  # to make mypy happy
             res = self._do_e_step(
-                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction,
+                self.posterior_sampler,
+                self.train_states.config["n_amortized_samples"],
             )
             ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
             if test_reconstruction is not None:
