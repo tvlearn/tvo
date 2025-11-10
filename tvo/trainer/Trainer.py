@@ -221,10 +221,12 @@ class Trainer:
             model = self.model
 
             assert test_data is not None and test_states is not None  # to make mypy happy
+            n_amortized_samples = self.train_states.config["n_amortized_samples"] if self.train_states is not None else \
+                self.test_states.config["n_amortized_samples"]
             res = self._do_e_step(
                 test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction,
                 self.posterior_sampler,
-                self.train_states.config["n_amortized_samples"],
+                n_amortized_samples,
             )
             ret_dict["test_F"], ret_dict["test_subs"], test_rec = res
             if test_reconstruction is not None:
