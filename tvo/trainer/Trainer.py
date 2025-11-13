@@ -384,8 +384,9 @@ class Trainer:
 
         if len(self._to_rollback) == 0:
             # nothing to rollback, fall back to simple parameter update
+            F = self._compute_train_F()
             self.model.update_param_epoch()
-            return self._compute_train_F()
+            return F
 
         m = self.model
         
