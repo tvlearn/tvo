@@ -9,87 +9,54 @@ from typing import Dict
 from tvo.variational._set_redundant_lpj_to_low_CPU import set_redundant_lpj_to_low_CPU
 
 
+def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+    """Find redundant states in new_states w.r.t. old_states and set
+       corresponding lpg to low.
+       # Author: Dmytro Velychko
+
+    :param new_states: set of new variational states (batch_size, newS, H)
+    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
+    :param old_states: (batch_size, S, H)
+    """
+    def similar_reference(a, b):
+        # Reference implementation.
+        # Works fine on CPU and CUDA.
+        return to.all(a.unsqueeze(-2) == b.unsqueeze(-3), dim=-1).to(to.int)
+
+    def similar_bmm(a, b):
+        # Runs fast by exploiting matrix multiplications.
+        # This code uses float32 because:
+        #   1) it can precisely represent integers,
+        #   2) runs fast on both CPU and CUDA.
+        a = a.to(to.float32)
+        bt = b.permute([0, 2, 1]).to(to.float32)
+        abt = to.bmm(a, bt)
+        a_bits = a.sum(dim=-1, keepdims=True)
+        b_bits = bt.sum(dim=-2, keepdims=True)
+        return to.logical_and(abt == a_bits, abt == b_bits).to(dtype=to.int)
+
+    new_old_sim = similar_bmm(new_states, old_states)
+    new_new_sim = similar_bmm(new_states, new_states)
+    #assert to.all(new_old_sim == similar_reference(new_states, old_states))
+    #assert to.all(new_new_sim == similar_reference(new_states, new_states))
+    redundant = to.tril(new_new_sim).sum(dim=-1) + new_old_sim.sum(dim=-1)  > 1
+    new_lpj[redundant] = -1e20
+
+
 def _unique_ind(x: to.Tensor) -> to.Tensor:
     """Find indices of unique rows in tensor. Prioritizes the first instance.
 
     :param x: torch tensor
     :returns: indices of unique rows in tensor.
     """
-    # Get unique rows and inverse indices
-    unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
-
-    # get unique inverse indices
-    uii = inverse_ind.unique()
-
-    # find where unique index in inverse index (uii x ii matrix)
-    where_unique = to.eq(uii.unsqueeze(1), inverse_ind.repeat(len(uii), 1))
-
-    # get index of first instance
-    unique_indices = where_unique.to(to.float).argmax(1)
-
-    return unique_indices
-
-    # The code below is a bit faster, but is 1. unstable and 2.non-deterministic as of July 2023 and
-    # pytorch=2.0.0. When the pytorch version increases, check if the docs for
-    # Tensor.scatter_reduce_ still have the respective warnings & notes about the function.
-    # Until then, the deterministic function above should be used instead. (If you checked,
-    # please increment the pytorch version in this comment and push).
-
-    # Authored by Sebastian Salwig:
-    # n = x.shape[0]
-    # unique_rows, inverse_ind = to.unique(x, sorted=False, return_inverse=True, dim=0)
-    # n_unique = unique_rows.shape[0]
-    # uniq_ind = to.zeros(n_unique, dtype=to.int, device=unique_rows.device)
-    # perm = to.arange(n, device=inverse_ind.device)
-    # uniq_ind = inverse_ind.new_empty(
-    #   n_unique
-    #   ).scatter_reduce_(0, inverse_ind, perm,"amin",include_self=False)
-    # return uniq_ind
-
-    # The slow CPU code below can be used to verify:
-    # CPU code
-    # for i in range(n_unique):
-    #     for j, n in enumerate(inverse_ind):
-    #         if n == i:
-    #             uniq_ind[i] = int(j)
-    #             uniq_ind.long()
-    #             break
-
-
-def _set_redundant_lpj_to_low_GPU(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
-    """Find redundant states in new_states w.r.t. old_states and set
-       corresponding lpg to low.
-
-    :param new_states: set of new variational states (batch_size, newS, H)
-    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
-    :param old_states: (batch_size, S, H)
-    """
-
-    N, S, H = old_states.shape
-    newS = new_states.shape[1]
-
-    # old_states must come first for np.unique to discard redundant new_states
-    old_and_new = to.cat((old_states, new_states), dim=1)
-    for n in range(N):
-        uniq_idx = _unique_ind(old_and_new[n])
-        # indexes of states in new_states[n] that are not in old_states[n]
-        new_uniq_idx = uniq_idx[uniq_idx >= S] - S
-        # BoolTensor in pytorch>=1.2, ByteTensor otherwise
-        bool_or_byte = (to.empty(0) < 0).dtype
-        mask = to.ones(newS, dtype=bool_or_byte, device=new_lpj.device)
-        # indexes of all non-unique states in new_states (complementary of new_uniq_idx)
-        mask[new_uniq_idx.to(device=new_lpj.device)] = 0
-        # set lpj of redundant states to an arbitrary low value
-        new_lpj[n][mask] = -1e20
-
-
-# set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
-# function that runs on numpy arrays, when running on GPU, we stick to torch tensors
-def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
-    if tvo.get_device().type == "cpu":
-        set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
-    else:
-        _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
+    # A simple but quite fast implementation.
+    # Runs ~3 times faster than torch.unique(), 
+    # at least for relatively small x.
+    # Author: Dmytro Velychko
+    x_sim =  to.all(x.unsqueeze(-3) == x.unsqueeze(-2), dim=-1)
+    unique = to.tril(x_sim.to(to.int)).sum(dim=-1) == 1
+    uniqueindexes = unique.nonzero(as_tuple=True)[0]
+    return uniqueindexes
 
 
 def generate_unique_states(
