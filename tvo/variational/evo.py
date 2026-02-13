@@ -98,8 +98,8 @@ class EVOVariationalStates(TVOVariationalStates):
             return lpj_fn(batch, states)
 
         new_states, new_lpj = evolve_states(
-            lpj=lpj[idx].to(device="cpu"),
-            states=K[idx].to(device="cpu"),
+            lpj=lpj[idx],
+            states=K[idx],
             lpj_fn=lpj_fn_,
             n_parents=n_parents,
             n_children=n_children,
@@ -201,10 +201,7 @@ def evolve_states(
         new_states[:, gen_idx] = mutate(parents, n_children, sparsity, p_bf)
 
         # children fitness evaluation
-        # new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
-        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx].to(device=tvo.get_device())).to(
-            device="cpu"
-        )
+        new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx])
 
     set_redundant_lpj_to_low(new_states, new_lpj, states)
 
