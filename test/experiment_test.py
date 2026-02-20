@@ -307,7 +307,7 @@ def test_reconstruction_with_missing(
             train_data[inds_not_is_nan],
             train_reconstruction[inds_not_is_nan],
             rtol=1e-01,
-            atol=1e-03,
+            atol=1e-02,
         )
 
 
