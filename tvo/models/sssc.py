@@ -9,7 +9,7 @@ from tvo import get_device
 from tvo.utils.model_protocols import Sampler, Optimized, Reconstructor
 from tvo.utils.parallel import broadcast, all_reduce, pprint
 from tvo.variational.TVOVariationalStates import TVOVariationalStates
-from tvo.variational._utils import mean_posterior
+from tvo.utils.mean_posterior import mean_posterior
 
 
 def _get_hash(x: to.Tensor) -> int:

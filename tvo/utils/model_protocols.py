@@ -7,9 +7,10 @@ from typing import Tuple, Dict, Any, Optional, Union, TYPE_CHECKING
 import torch as to
 from tvo.utils.parallel import mpi_average_grads
 from abc import abstractmethod
-
+from tvo.utils.mean_posterior import mean_posterior
 if TYPE_CHECKING:
     from tvo.variational.TVOVariationalStates import TVOVariationalStates
+
 
 
 @runtime_checkable
@@ -50,20 +51,21 @@ class Trainable(Protocol):
         Trainers will skip a direct per-batch call to the free_energy method.
         """
         # by default, perform gradient-based parameter updates
+        
         if self._optimizer is None:
             for t in self._theta.values():
                 t.requires_grad_(True)
             self._optimizer = to.optim.Adam(self._theta.values())
         assert self._optimizer is not None  # to make mypy happy
         log_joints = self.log_joint(batch, states.K[idx])
-        F = to.logsumexp(log_joints, dim=1).sum(dim=0)
-        loss = -F / batch.shape[0]
+        objective = mean_posterior(log_joints,log_joints.detach()).sum(dim=0) # the mean posterior function should also work with the log joints
+        loss = -objective / batch.shape[0]
         loss.backward()
         mpi_average_grads(self.theta)
         self._optimizer.step()
         self._optimizer.zero_grad()
 
-        return F.item()
+        return None
 
     def update_param_epoch(self) -> None:
         """Execute epoch-wise M-step or epoch-wise section of an M-step computation.

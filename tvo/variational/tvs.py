@@ -4,7 +4,7 @@
 
 import torch as to
 from tvo.variational.TVOVariationalStates import TVOVariationalStates
-from tvo.variational._utils import mean_posterior
+from tvo.utils.mean_posterior import mean_posterior
 from tvo.utils.model_protocols import Trainable, Optimized
 from ._utils import update_states_for_batch, set_redundant_lpj_to_low
 

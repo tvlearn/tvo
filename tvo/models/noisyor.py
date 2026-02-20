@@ -5,7 +5,7 @@
 
 from tvo.utils.model_protocols import Optimized, Sampler
 from tvo.variational import TVOVariationalStates  # type: ignore
-from tvo.variational._utils import mean_posterior
+from tvo.utils.mean_posterior import mean_posterior
 from tvo.utils.parallel import all_reduce, broadcast
 from torch import Tensor
 import torch as to

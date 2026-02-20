@@ -11,7 +11,7 @@ from typing import Union, Tuple
 import tvo
 from tvo.utils.parallel import pprint, all_reduce, broadcast
 from tvo.variational.TVOVariationalStates import TVOVariationalStates
-from tvo.variational._utils import mean_posterior, lpj2pjc
+from tvo.utils.mean_posterior import mean_posterior, lpj2pjc
 from tvo.utils.model_protocols import Optimized, Sampler, Reconstructor
 from tvo.utils.sanity import fix_theta
 from tvo.utils._utils import get_lstsq

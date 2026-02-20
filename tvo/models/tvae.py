@@ -4,7 +4,7 @@
 
 from tvo.utils.model_protocols import Trainable, Sampler, Reconstructor
 from tvo.variational.TVOVariationalStates import TVOVariationalStates
-from tvo.variational._utils import mean_posterior
+from tvo.utils.mean_posterior import mean_posterior
 from tvo.utils.parallel import all_reduce, broadcast, mpi_average_grads
 from tvo.utils import get, CyclicLR
 import torch.optim as opt
@@ -120,10 +120,10 @@ class _TVAE(Trainable, Sampler, Reconstructor):
     ) -> float:
         if to.isnan(batch).any():
             raise RuntimeError("There are NaNs in this batch")
-        F, mlp_out = self._optimize_nn_params(idx, batch, states)
+        mlp_out = self._optimize_nn_params(idx, batch, states)
         with to.no_grad():
             self._accumulate_param_updates(idx, batch, states, mlp_out)
-        return F
+        return
 
     @property
     def shape(self) -> Tuple[int, ...]:
@@ -150,8 +150,8 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         assert self._optimizer is not None  # to make mypy happy
 
         lpj, mlp_out = self._lpj_and_mlpout(data, states.K[idx])
-        F = self._free_energy_from_logjoints(self.log_joint(data, states.K[idx], lpj))
-        loss = -F / data.shape[0]
+        objective = mean_posterior(self.log_joint(data,states.K[idx],lpj=lpj),lpj.detach()).sum(dim=0)
+        loss = -objective / data.shape[0]
         loss.backward()
 
         mpi_average_grads(self.theta)
@@ -159,7 +159,7 @@ class _TVAE(Trainable, Sampler, Reconstructor):
         self._scheduler.step()
         self._optimizer.zero_grad()
 
-        return F.item(), mlp_out
+        return mlp_out
 
     def _accumulate_param_updates(
         self, idx: to.Tensor, data: to.Tensor, states: TVOVariationalStates, mlp_out: to.Tensor
@@ -410,7 +410,7 @@ class GaussianTVAE(_TVAE):
     def _optimize_nn_params(
         self, idx: to.Tensor, data: to.Tensor, states: TVOVariationalStates
     ) -> Tuple[float, to.Tensor]:
-        F, mlp_out = super()._optimize_nn_params(idx, data, states)
+        mlp_out = super()._optimize_nn_params(idx, data, states)
 
         with to.no_grad():
             sigma2 = self.theta["sigma2"]
@@ -420,7 +420,7 @@ class GaussianTVAE(_TVAE):
             if pi.requires_grad:
                 to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
 
-        return F, mlp_out
+        return mlp_out
 
     def _accumulate_param_updates(
         self, idx: to.Tensor, data: to.Tensor, states: TVOVariationalStates, mlp_out: to.Tensor
@@ -657,14 +657,14 @@ class BernoulliTVAE(_TVAE):
     def _optimize_nn_params(
         self, idx: to.Tensor, data: to.Tensor, states: TVOVariationalStates
     ) -> Tuple[float, to.Tensor]:
-        F, mlp_out = super()._optimize_nn_params(idx, data, states)
+        mlp_out = super()._optimize_nn_params(idx, data, states)
 
         with to.no_grad():
             pi = self.theta["pies"]
             if pi.requires_grad:
                 to.clamp(pi, 1e-5, 1 - 1e-5, out=pi)
 
-        return F, mlp_out
+        return mlp_out
 
     def _accumulate_param_updates(
         self, idx: to.Tensor, data: to.Tensor, states: TVOVariationalStates, mlp_out: to.Tensor
