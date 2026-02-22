@@ -405,8 +405,8 @@ class Trainer:
         if new_F < old_F:
             print("Rejecting M-step update")
             for p in self._to_rollback:
-                m.theta[p][:] = old_params[p]
-            states.lpj[:] = old_lpj
+                m.theta[p][:].data = old_params[p]
+            states.lpj[:].data = old_lpj
             return old_F
         else:
             print("Accepting M-step update")
