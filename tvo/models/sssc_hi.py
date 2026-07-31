@@ -16,7 +16,7 @@ def _get_hash(x: to.Tensor) -> int:
     return hash(x.detach().cpu().numpy().tobytes())
 
 
-class SSSC(Sampler, Optimized, Reconstructor):
+class SSSC_HI(Sampler, Optimized, Reconstructor):
     def __init__(
         self,
         H: int,
@@ -31,15 +31,15 @@ class SSSC(Sampler, Optimized, Reconstructor):
         reformulated_psi_update: bool = False,
         precision: to.dtype = to.float32,
     ):
-        """Spike-And-Slab Sparse Coding (SSSC) model.
+        """Spike-And-Slab Sparse Coding (SSSC_Hi) model.
 
         :param H: Number of hidden units.
         :param D: Number of observables.
-        :param W_init: Tensor with shape (H, D), initializes SSSC weights.
-        :param sigma2_init: Tensor initializing SSSC observable variance.
-        :param mus_init: Tensor with shape (H,), initializes SSSC latent means.
-        :param Psi_init: Tensor with shape (H, H), initializes SSSC latent variance.
-        :param pies_init: Tensor with shape (H,), initializes SSSC priors.
+        :param W_init: Tensor with shape (H, D), initializes SSSC_HI weights.
+        :param sigma2_init: Tensor initializing SSSC_HI observable variance.
+        :param mus_init: Tensor with shape (H,), initializes SSSC_HI latent means.
+        :param Psi_init: Tensor with shape (H, H), initializes SSSC_HI latent variance.
+        :param pies_init: Tensor with shape (H,), initializes SSSC_HI priors.
         :param reformulated_lpj: Use looped instead of batchified E-step and mathematically
                                  reformulated form of the log-pseudo-joint formula (exploiting
                                  matrix determinant lemma and Woodbury matrix identity). Yields
@@ -95,33 +95,42 @@ class SSSC(Sampler, Optimized, Reconstructor):
 
     def _init_W(self, init: Optional[to.Tensor]):
         D, H = self.shape
-        if init is not None:
+        H2 = H // 2
+        W = to.zeros([H2,H2,H], dtype=self.precision)
+        for d in range(H2):
+            W[d,:,d] = 1.0              # horizontal bars
+            W[:,d,d+H2] = 1.0            # vertical bars
+        
+        return W.reshape(D, H)
+    
+        '''if init is not None:
             assert init.shape == (D, H)
             return init.to(dtype=self.precision, device=get_device())
         else:
             W_init = to.rand((D, H), dtype=self.precision, device=get_device())
             broadcast(W_init)
-            return W_init
+            return W_init'''
 
     def _init_sigma2(self, init: Optional[to.Tensor]):
-        if init is not None:
+        return to.tensor([0.1], dtype=self.precision, device=get_device())
+        '''if init is not None:
             assert init.shape == (1,)
             return init.to(dtype=self.precision, device=get_device())
         else:
-            return to.tensor([1.0], dtype=self.precision, device=get_device())
+            return to.tensor([1.0], dtype=self.precision, device=get_device())'''
 
     def _init_mus(self, init: Optional[to.Tensor]):
         H = self.shape[1]
         if init is not None:
             assert init.shape == (H,)
-            return init.to(dtype=self.precision, device=get_device())
+            return 0.0 * init.to(dtype=self.precision, device=get_device())
         else:
             mus_init = to.normal(
                 mean=to.zeros(H, dtype=self.precision, device=get_device()),
                 std=to.ones(H, dtype=self.precision, device=get_device()),
             )
             broadcast(mus_init)
-            return mus_init
+            return 0.0 * mus_init
 
     def _init_Psi(self, init: Optional[to.Tensor]):
         H = self.shape[1]
@@ -133,11 +142,12 @@ class SSSC(Sampler, Optimized, Reconstructor):
 
     def _init_pies(self, init: Optional[to.Tensor]):
         H = self.shape[1]
-        if init is not None:
+        return 0.25 * to.ones([H], dtype=self.precision)
+        '''if init is not None:
             assert init.shape == (H,)
             return init.to(dtype=self.precision, device=get_device())
         else:
-            return 0.1 + 0.5 * to.rand(H, dtype=self.precision, device=get_device())
+            return 0.1 + 0.5 * to.rand(H, dtype=self.precision, device=get_device())'''
 
     def generate_data(
         self, N: int = None, hidden_state: to.Tensor = None
@@ -174,7 +184,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
 
     def _lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """
-        Straightforward batchified implementation of log-pseudo joint for SSSC
+        Straightforward batchified implementation of log-pseudo joint for SSSC_HI
         """
         precision = self.precision
         W, sigma2, _pies, mus, Psi = (
@@ -265,7 +275,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
 
     def _reformulated_lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """
-        Batchified implementation of log-pseudo joint for SSSC using matrix determinant lemma and
+        Batchified implementation of log-pseudo joint for SSSC_HI using matrix determinant lemma and
         Woodbury matrix identity to compute determinant and inverse of matrix C_s
         """
         precision = self.precision
@@ -337,7 +347,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         return lpj
 
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
-        """Evaluate log-pseudo-joints for SSSC."""
+        """Evaluate log-pseudo-joints for SSSC_HI."""
         lpj_fn = self._reformulated_lpj_fn if self._reformulated_lpj else self._lpj_fn
         lpj = lpj_fn(data, states)
         min_ = to.finfo(self.precision).min
@@ -346,7 +356,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
         return lpj
 
     def log_joint(self, data: to.Tensor, states: to.Tensor, lpj=None) -> to.Tensor:
-        """Evaluate log-joints for SSSC."""
+        """Evaluate log-joints for SSSC_HI."""
         assert states.dtype == to.uint8
         notnan = to.logical_not(to.isnan(data))
         if lpj is None:
@@ -436,7 +446,7 @@ class SSSC(Sampler, Optimized, Reconstructor):
             else None
         )
         # is (batch_size, H, H)
-
+        
         self._my_sum_xpt_s.add_(to.sum(batch_xpt_s, dim=0))  # (H,)
         self._my_sum_xpt_ssT.add_(to.sum(batch_xpt_ssT, dim=0))  # (H, H)
         self._my_sum_xpt_sz.add_(to.sum(batch_xpt_sz, dim=0))  # (H,)
@@ -509,23 +519,23 @@ class SSSC(Sampler, Optimized, Reconstructor):
 
         pies[:] = self._my_sum_xpt_s / N
         mus[:] = self._my_sum_xpt_sz / (self._my_sum_xpt_s + dtype_eps)
-        if self._reformulated_psi_update:
-            assert self._my_sum_xpt_ssz is not None
-            all_reduce(self._my_sum_xpt_ssz)  # (H, H)
-            _Psi = (
-                to.outer(mus, mus) * self._my_sum_xpt_ssT
-                + self._my_sum_xpt_szszT
-                - 2.0 * mus.unsqueeze(1) * self._my_sum_xpt_ssz
-            )
-            Psi[:] = _Psi * Inv_my_sum_xpt_ssT + eps_eyeH
-            self._my_sum_xpt_ssz[:] = 0.0
-        else:
-            Psi[:] = (
-                self._my_sum_xpt_szszT - self._my_sum_xpt_ssT * to.outer(mus, mus)
-            ) * Inv_my_sum_xpt_ssT + eps_eyeH
-        sigma2[:] = (
-            self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_xpt_sz_xpt_szT @ (W.t() @ W))
-        ) / N / D + eps
+        # if self._reformulated_psi_update:
+        #     assert self._my_sum_xpt_ssz is not None
+        #     all_reduce(self._my_sum_xpt_ssz)  # (H, H)
+        #     _Psi = (
+        #         to.outer(mus, mus) * self._my_sum_xpt_ssT
+        #         + self._my_sum_xpt_szszT
+        #         - 2.0 * mus.unsqueeze(1) * self._my_sum_xpt_ssz
+        #     )
+        #     Psi[:] = _Psi * Inv_my_sum_xpt_ssT# + eps_eyeH
+        #     self._my_sum_xpt_ssz[:] = 0.0
+        # else:
+        #     Psi[:] = (
+        #         self._my_sum_xpt_szszT - self._my_sum_xpt_ssT * to.outer(mus, mus)
+        #     ) * Inv_my_sum_xpt_ssT# + eps_eyeH
+        #sigma2[:] = (
+        #    self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_xpt_sz_xpt_szT @ (W.t() @ W))
+        #) / N / D# + eps
 
         self._my_sum_y_szT[:] = 0.0
         self._my_sum_xpt_szszT[:] = 0.0
