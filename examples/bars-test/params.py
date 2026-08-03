@@ -205,16 +205,6 @@ def get_args():
     )
 
     algo_parsers.add_parser(
-        "sssc_old",
-        help="Run experiment with SSSC_OLD",
-        parents=comm_parents
-        + [
-            sssc_parser,
-        ],
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    
-    algo_parsers.add_parser(
         "sssc_hi",
         help="Run experiment with SSSC_HI",
         parents=comm_parents

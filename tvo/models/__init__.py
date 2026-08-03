@@ -1,6 +1,5 @@
 from .noisyor import NoisyOR
 from .bsc import BSC
-from .sssc_old import SSSC_OLD
 from .sssc_hi import SSSC_HI
 from .sssc_in import SSSC_IN
 from .tvae import GaussianTVAE, BernoulliTVAE

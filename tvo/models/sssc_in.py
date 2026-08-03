@@ -593,7 +593,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         print("diff:               ", elbo - entropy_sum)
         
         if self._elbo_old  > elbo and not to.isclose(self._elbo_old, elbo):
-            print("WARNING: ELBO ist böse!")
+            print("WARNING: M-step ELBO decreases")
             breakpoint()
         
         self._elbo_old = elbo.clone()

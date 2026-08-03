@@ -16,7 +16,7 @@ def _get_hash(x: to.Tensor) -> int:
     return hash(x.detach().cpu().numpy().tobytes())
 
 
-class SSSC_OLD(Sampler, Optimized, Reconstructor):
+class SSSC_HI(Sampler, Optimized, Reconstructor):
     def __init__(
         self,
         H: int,
@@ -95,29 +95,20 @@ class SSSC_OLD(Sampler, Optimized, Reconstructor):
 
     def _init_W(self, init: Optional[to.Tensor]):
         D, H = self.shape
-        H2 = H // 2
-        W = to.zeros([H2,H2,H], dtype=self.precision)
-        for d in range(H2):
-            W[d,:,d] = 1.0              # horizontal bars
-            W[:,d,d+H2] = 1.0            # vertical bars
-        
-        return W.reshape(D, H)
-    
-        '''if init is not None:
+        if init is not None:
             assert init.shape == (D, H)
             return init.to(dtype=self.precision, device=get_device())
         else:
             W_init = to.rand((D, H), dtype=self.precision, device=get_device())
             broadcast(W_init)
-            return W_init'''
+            return W_init
 
     def _init_sigma2(self, init: Optional[to.Tensor]):
-        return to.tensor([0.1], dtype=self.precision, device=get_device())
-        '''if init is not None:
+        if init is not None:
             assert init.shape == (1,)
             return init.to(dtype=self.precision, device=get_device())
         else:
-            return to.tensor([1.0], dtype=self.precision, device=get_device())'''
+            return to.tensor([1.0], dtype=self.precision, device=get_device())
 
     def _init_mus(self, init: Optional[to.Tensor]):
         H = self.shape[1]
@@ -518,24 +509,24 @@ class SSSC_OLD(Sampler, Optimized, Reconstructor):
                 pprint("W update: Failed to compute W^(new). Pertubed current W with AWGN.")
 
         pies[:] = self._my_sum_xpt_s / N
-        #mus[:] = self._my_sum_xpt_sz / (self._my_sum_xpt_s + dtype_eps)
-        # if self._reformulated_psi_update:
-        #     assert self._my_sum_xpt_ssz is not None
-        #     all_reduce(self._my_sum_xpt_ssz)  # (H, H)
-        #     _Psi = (
-        #         to.outer(mus, mus) * self._my_sum_xpt_ssT
-        #         + self._my_sum_xpt_szszT
-        #         - 2.0 * mus.unsqueeze(1) * self._my_sum_xpt_ssz
-        #     )
-        #     Psi[:] = _Psi * Inv_my_sum_xpt_ssT# + eps_eyeH
-        #     self._my_sum_xpt_ssz[:] = 0.0
-        # else:
-        #     Psi[:] = (
-        #         self._my_sum_xpt_szszT - self._my_sum_xpt_ssT * to.outer(mus, mus)
-        #     ) * Inv_my_sum_xpt_ssT# + eps_eyeH
-        #sigma2[:] = (
-        #    self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_xpt_sz_xpt_szT @ (W.t() @ W))
-        #) / N / D# + eps
+        mus[:] = self._my_sum_xpt_sz / (self._my_sum_xpt_s + dtype_eps)
+        if self._reformulated_psi_update:
+            assert self._my_sum_xpt_ssz is not None
+            all_reduce(self._my_sum_xpt_ssz)  # (H, H)
+            _Psi = (
+                to.outer(mus, mus) * self._my_sum_xpt_ssT
+                + self._my_sum_xpt_szszT
+                - 2.0 * mus.unsqueeze(1) * self._my_sum_xpt_ssz
+            )
+            Psi[:] = _Psi * Inv_my_sum_xpt_ssT# + eps_eyeH
+            self._my_sum_xpt_ssz[:] = 0.0
+        else:
+            Psi[:] = (
+                 self._my_sum_xpt_szszT - self._my_sum_xpt_ssT * to.outer(mus, mus)
+             ) * Inv_my_sum_xpt_ssT# + eps_eyeH
+        sigma2[:] = (
+            self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_xpt_sz_xpt_szT @ (W.t() @ W))
+        ) / N / D# + eps
 
         self._my_sum_y_szT[:] = 0.0
         self._my_sum_xpt_szszT[:] = 0.0
