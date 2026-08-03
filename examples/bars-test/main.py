@@ -26,10 +26,10 @@ DEVICE = tvo.get_device()
 PRECISION = to.float64
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
-#seed = 105
-#random.seed(seed)
-#np.random.seed(seed)
-#to.manual_seed(seed)
+seed = 105
+random.seed(seed)
+np.random.seed(seed)
+to.manual_seed(seed)
 
 def bars_test():
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
@@ -193,7 +193,6 @@ def bars_test():
     for epoch, summary in enumerate(exp.run(args.no_epochs)):
         summary.print()
         
-        exp.trainer.train_states.K = K_set.clone()
         K = exp.trainer.train_states.K
         all_unique = all(
             to.unique(k, dim=0).shape[0] == K.shape[1]
@@ -203,7 +202,7 @@ def bars_test():
             raise RuntimeError("Duplicates in Kn sets!")
         
         if F_old  > summary._results["train_F"] and not np.isclose(F_old, summary._results["train_F"]):
-            print("WARNING: F decreases")
+            raise RuntimeError("WARNING: F decreases")
         
         F_old = summary._results["train_F"]
     
