@@ -8,10 +8,11 @@ import time
 import datetime
 import torch as to
 import numpy as np
+import random
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
-from tvo.models import NoisyOR, BSC, SSSC_HI, SSSC_IN
+from tvo.models import NoisyOR, BSC, SSSC_OLD, SSSC_HI, SSSC_IN
 from tvo.utils.parallel import pprint, broadcast, barrier
 from tvo.utils.param_init import init_W_data_mean, init_sigma2_default
 from tvo.utils.model_protocols import Sampler
@@ -25,6 +26,10 @@ DEVICE = tvo.get_device()
 PRECISION = to.float64
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
+#seed = 105
+#random.seed(seed)
+#np.random.seed(seed)
+#to.manual_seed(seed)
 
 def bars_test():
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
@@ -71,6 +76,17 @@ def bars_test():
                 W_init=gfs,
                 sigma2_init=to.tensor([args.sigma2_gen], **dtype_device_kwargs),
                 pies_init=to.full((args.H_gen,), pi_gen, **dtype_device_kwargs),
+                precision=PRECISION,
+            )
+        elif args.model == "sssc_old":
+            gen_model = SSSC_OLD(
+                H=args.H_gen,
+                D=D,
+                W_init=gfs,
+                sigma2_init=to.tensor([args.sigma2_gen], **dtype_device_kwargs),
+                pies_init=to.full((args.H_gen,), pi_gen, **dtype_device_kwargs),
+                mus_init=to.full((args.H_gen,), args.mu_gen, **dtype_device_kwargs),
+                Psi_init=to.eye(args.H_gen, **dtype_device_kwargs) * args.Psi_gen,
                 precision=PRECISION,
             )
         elif args.model == "sssc_hi":
@@ -130,6 +146,7 @@ def bars_test():
     model = {
         "nor": NoisyOR(pi_init=pies_init, **model_kwargs),
         "bsc": BSC(sigma2_init=sigma2_init, pies_init=pies_init, **model_kwargs),
+        "sssc_old": SSSC_OLD(sigma2_init=sigma2_init, pies_init=pies_init, **model_kwargs),
         "sssc_hi": SSSC_HI(sigma2_init=sigma2_init, pies_init=pies_init, **model_kwargs),
         "sssc_in": SSSC_IN(sigma2_init=sigma2_init, pies_init=pies_init, **model_kwargs),
     }[args.model]
@@ -152,7 +169,7 @@ def bars_test():
     # initialize visualizer
     pprint("Initializing visualizer")
     Visualizer = (
-        {"nor": _Visualizer, "bsc": BSCVisualizer, "sssc_hi": SSSCVisualizer, "sssc_in": SSSCVisualizer}[args.model]
+        {"nor": _Visualizer, "bsc": BSCVisualizer, "sssc_old": SSSCVisualizer, "sssc_hi": SSSCVisualizer, "sssc_in": SSSCVisualizer}[args.model]
         if comm_rank == 0
         else None
     )

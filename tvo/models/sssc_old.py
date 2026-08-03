@@ -16,7 +16,7 @@ def _get_hash(x: to.Tensor) -> int:
     return hash(x.detach().cpu().numpy().tobytes())
 
 
-class SSSC_HI(Sampler, Optimized, Reconstructor):
+class SSSC_OLD(Sampler, Optimized, Reconstructor):
     def __init__(
         self,
         H: int,
@@ -194,7 +194,7 @@ class SSSC_HI(Sampler, Optimized, Reconstructor):
             self.theta["mus"],
             self.theta["Psi"],
         )
-        pies = _pies.clamp(1e-2, 1.0 - 1e-2)
+        pies = _pies#.clamp(1e-2, 1.0 - 1e-2)
         Kfloat = states.type_as(pies)
         N, D, S, H = data.shape + states.shape[1:]
         eyeD = to.eye(D, dtype=precision, device=get_device())
@@ -283,7 +283,7 @@ class SSSC_HI(Sampler, Optimized, Reconstructor):
             self.theta["sigma2"],
             self.theta["pies"],
         )
-        pies = _pies.clamp(1e-2, 1.0 - 1e-2)
+        pies = _pies#.clamp(1e-5, 1.0 - 1e-2)
         Kbool = states.to(dtype=to.bool)
         Kfloat = states.to(dtype=precision)
         batch_size, S = data.shape[0], Kbool.shape[1]
@@ -362,7 +362,7 @@ class SSSC_HI(Sampler, Optimized, Reconstructor):
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
         # TODO: could pre-evaluate the constant factor once per epoch
-        pies = self.theta["pies"].clamp(1e-2, 1.0 - 1e-2)
+        pies = self.theta["pies"]#.clamp(1e-2, 1.0 - 1e-2)
         D = to.sum(notnan, dim=1)  # (N,)
         logjoints = (
             lpj
@@ -518,7 +518,7 @@ class SSSC_HI(Sampler, Optimized, Reconstructor):
                 pprint("W update: Failed to compute W^(new). Pertubed current W with AWGN.")
 
         pies[:] = self._my_sum_xpt_s / N
-        mus[:] = self._my_sum_xpt_sz / (self._my_sum_xpt_s + dtype_eps)
+        #mus[:] = self._my_sum_xpt_sz / (self._my_sum_xpt_s + dtype_eps)
         # if self._reformulated_psi_update:
         #     assert self._my_sum_xpt_ssz is not None
         #     all_reduce(self._my_sum_xpt_ssz)  # (H, H)

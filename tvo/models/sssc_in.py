@@ -51,10 +51,8 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         device = get_device()
         self._precision = precision
         self._shape = (D, H)
-        #self._reformulated_lpj = reformulated_lpj
         self._use_storage = False#use_storage
-        #self._reformulated_psi_update = reformulated_psi_update
-
+        
         self._theta: Dict[str, to.Tensor] = {}
         self._theta["W"] = self._init_W(W_init)
         self._theta["sigma2"] = self._init_sigma2(sigma2_init)
@@ -77,10 +75,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_log_det_Lambda_s = to.zeros((1,), dtype=precision, device=device)
         self._my_sum_xpt_lpj = to.zeros((1,), dtype=precision, device=device)
         self._my_sum_log_sum_exp = to.zeros((1,), dtype=precision, device=device)
-        
-        self._my_sum_xpt_logjoints = to.zeros((1,), dtype=precision, device=device)
-        self._my_sum_log_marg = to.zeros((1,), dtype=precision, device=device)
-        
         self._eyeD = to.eye(D, dtype=precision, device=device)
         self._eyeH = to.eye(H, dtype=precision, device=device)
         self._eps_eyeH = to.eye(H, dtype=precision, device=device) * 1e-6
@@ -95,28 +89,28 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
     def _init_W(self, init: Optional[to.Tensor]):
         D, H = self.shape
-        H2 = H // 2
+        '''H2 = H // 2
         W = to.zeros([H2,H2,H], dtype=self.precision)
         for d in range(H2):
             W[d,:,d] = 1.0              # horizontal bars
             W[:,d,d+H2] = 1.0            # vertical bars
 
-        return W.reshape(D, H)
-        '''if init is not None:
+        return W.reshape(D, H)'''
+        if init is not None:
             assert init.shape == (D, H)
             return init.to(dtype=self.precision, device=get_device())
         else:
             W_init = to.rand((D, H), dtype=self.precision, device=get_device())
             broadcast(W_init)
-            return W_init'''
+            return W_init
 
     def _init_sigma2(self, init: Optional[to.Tensor]):
-        return to.tensor([0.01], dtype=self.precision, device=get_device())
-        '''if init is not None:
+        #return to.tensor([0.01], dtype=self.precision, device=get_device())
+        if init is not None:
             assert init.shape == (1,)
             return init.to(dtype=self.precision, device=get_device())
         else:
-            return to.tensor([1.0], dtype=self.precision, device=get_device())'''
+            return to.tensor([1.0], dtype=self.precision, device=get_device())
 
     def _init_mus(self, init: Optional[to.Tensor]):
         H = self.shape[1]
@@ -141,12 +135,12 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
     def _init_pies(self, init: Optional[to.Tensor]):
         H = self.shape[1]
-        return 0.25 * to.ones([H], dtype=self.precision)
-        '''if init is not None:
+        #return 0.25 * to.ones([H], dtype=self.precision)
+        if init is not None:
             assert init.shape == (H,)
             return init.to(dtype=self.precision, device=get_device())
         else:
-            return 0.1 + 0.5 * to.rand(H, dtype=self.precision, device=get_device())'''
+            return 0.1 + 0.5 * to.rand(H, dtype=self.precision, device=get_device())
 
     def generate_data(
         self, N: int = None, hidden_state: to.Tensor = None
@@ -219,10 +213,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             raise ValueError("WARNING: Inverse von Lambda_s nicht korrekt berechnet")
 
         Lambda_s_W_s_sigma2inv = Lambda_s @ W_s.t() / sigma2
-        
-        #Lambda_s = self._eyeH.clone()
-        #Inv_Lambda_s = self._eyeH.clone()
-        #Lambda_s_W_s_sigma2inv = W_s.t().clone() / sigma2
 
         return (
             W_s,
@@ -332,7 +322,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
         # TODO: could pre-evaluate the constant factor once per epoch
-        pies = self.theta["pies"].clamp(1e-2, 1.0 - 1e-2)
+        pies = self.theta["pies"]#.clamp(1e-2, 1.0 - 1e-2)
         D = data.shape[1]
         logjoints = (
             lpj
@@ -360,20 +350,14 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
         use_storage = self._use_storage and self._storage is not None and len(self._storage) > 0
 
-        # TODO: Add option to neglect reconstructed values
-        notnan = to.ones_like(batch, dtype=to.bool, device=batch.device)
-
         batch_kappas = to.zeros((batch_size, S, H), dtype=precision, device=get_device())
         batch_Lambdas_plus_kappas_kappasT = to.zeros(
             (batch_size, S, H, H), dtype=precision, device=get_device()
         )
         log_det_Lambda_s = to.zeros((batch_size, S), dtype=precision, device=get_device())
-        logjoints = self.log_joint(data=batch, states=Kfloat.to(dtype=to.uint8))
         for n in range(batch_size):
             for s in range(S):
                 state = Kbool[n, s]
-                if state.sum() == 0:
-                    continue
                 hsh = _get_hash(state)
 
                 datapoint = batch[n]
@@ -407,11 +391,24 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
                 batch_kappas[n, s] = (
                     mus + Lambda_s_W_s_sigma2inv @ datapoint_norm
                 )  # is (H,)
-                #batch_kappas[n,s] = to.zeros([H,], dtype=self.precision, device=get_device())
                 
                 batch_Lambdas_plus_kappas_kappasT[n, s] = (
                     Lambda_s + to.outer(batch_kappas[n, s], batch_kappas[n, s])
                 )  # (H, H)
+                if (n == batch_size - 1) and (s == S - 1):
+                    state_used = state
+        (
+            _,
+            _,
+            _,
+            _,
+            Lambda_s_new,
+            _,
+        ) = self._common_e_m_step_terms(state)
+        
+        if not to.allclose(Lambda_s_new, Lambda_s, rtol=1e-5, atol=1e-8):
+            diff = to.sum((Lambda_s_new - Lambda_s)**2)
+            breakpoint()
 
         batch_xpt_s = mean_posterior(Kfloat, lpj)  # (batch_size,H)
         batch_xpt_sz = mean_posterior(Kfloat * batch_kappas, lpj)  # (batch_size, H)
@@ -428,9 +425,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         batch_log_sum_exp = to.log(to.sum(to.exp(lpj - max_lpj[:,None]), dim=-1))
         batch_log_sum_exp += max_lpj
         
-        batch_xpt_logjoints = mean_posterior(logjoints, lpj)  # (batch_size,)
-        batch_log_marg = to.log(to.sum(to.exp(logjoints), dim=-1))  # (batch_size)
-        
         self._my_sum_xpt_s.add_(to.sum(batch_xpt_s, dim=0))  # (H,)
         self._my_sum_xpt_sz.add_(to.sum(batch_xpt_sz, dim=0))  # (H,)
         self._my_sum_xpt_szszT.add_(to.sum(batch_xpt_szszT, dim=0))  # (H, H)
@@ -442,9 +436,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_log_det_Lambda_s.add_(to.sum(batch_xpt_log_det_Lambda_s, dim=0))  # (1,)
         self._my_sum_xpt_lpj.add_(to.sum(batch_xpt_lpj, dim=0))  # (1,)
         self._my_sum_log_sum_exp.add_(to.sum(batch_log_sum_exp, dim=0))  # (1,)
-        
-        self._my_sum_xpt_logjoints.add_(to.sum(batch_xpt_logjoints, dim=0))  # (1,)
-        self._my_sum_log_marg.add_(to.sum(batch_log_marg, dim=0))  # (1,)
         
         return None
 
@@ -463,9 +454,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         xpt_log_det_Lambda_s = self._my_sum_xpt_log_det_Lambda_s / N
         xpt_log_sum_exp = self._my_sum_log_sum_exp / N
         
-        xpt_logjoints = self._my_sum_xpt_logjoints / N
-        xpt_log_marg = self._my_sum_log_marg / N
-        
         # entropy of spike variable (already checked)
         entropy_spike = - to.dot(pies, to.logit(pies)) - to.sum(to.log(1.0 - pies))
         
@@ -481,11 +469,10 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         # entropy approximate posterior
         entropy_post_slab = H * (self._log2pi + 1.0) + xpt_log_det_Lambda_s
         entropy_post_slab *= 0.5
-        #entropy_post_spike = - xpt_lpj + xpt_log_sum_exp
-        entropy_post_spike = -xpt_logjoints + xpt_log_marg
+        entropy_post_spike = - xpt_lpj + xpt_log_sum_exp
         entropy_post = entropy_post_slab + entropy_post_spike
         
-        return - entropy_spike - entropy_slab - entropy_observable
+        return entropy_post - entropy_spike - entropy_slab - entropy_observable
 
     def _compute_elbo(self, theta: Dict[str, to.Tensor]):
         # model parameters
@@ -504,7 +491,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         xpt_y_szT = self._my_sum_y_szT / N
         xpt_szszT = self._my_sum_xpt_szszT / N
         xpt_diag_yyT = self._my_sum_diag_yyT / N
-        
         xpt_lpj = self._my_sum_xpt_lpj / N
         xpt_log_det_Lambda_s = self._my_sum_xpt_log_det_Lambda_s / N
         xpt_log_sum_exp = self._my_sum_log_sum_exp / N
@@ -544,7 +530,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         elbo_post_slab = H * (self._log2pi + 1.0) + xpt_log_det_Lambda_s
         elbo_post_slab *= 0.5
         elbo_post_spike = - xpt_lpj + xpt_log_sum_exp
-        #entropy_post_spike = -xpt_logjoints + xpt_log_marg
         elbo_post = elbo_post_slab + elbo_post_spike
         
         return elbo_post + elbo_observable + elbo_spike + elbo_slab
@@ -593,8 +578,8 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
                 pprint("W update: Failed to compute W^(new). Perturbed current W with AWGN.")
 
         pies[:] = self._my_sum_xpt_s / N
-        #mus[:] = self._my_sum_xpt_z / N
-        Psi[:] = self._my_sum_xpt_zzT / N# - to.outer(mus, mus)# + self._eps_eyeH
+        mus[:] = self._my_sum_xpt_z / N
+        Psi[:] = self._my_sum_xpt_zzT / N - to.outer(mus, mus)# + self._eps_eyeH
         sigma2[:] = (
             self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_y_szT @ W.t())
         ) / N / D# + eps
@@ -603,9 +588,9 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         
         elbo = self._compute_elbo(theta=theta)
         
-        #print("Entropy sum:       ", entropy_sum)
+        print("Entropy sum:       ", entropy_sum)
         print("ELBO:             ", elbo)
-        #print("diff:               ", elbo - entropy_sum)
+        print("diff:               ", elbo - entropy_sum)
         
         if self._elbo_old  > elbo and not to.isclose(self._elbo_old, elbo):
             print("WARNING: ELBO ist böse!")
@@ -624,9 +609,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_log_det_Lambda_s[:] = 0.0
         self._my_sum_xpt_lpj[:] = 0.0
         self._my_sum_log_sum_exp[:] = 0.0
-        
-        self._my_sum_xpt_logjoints[:] = 0.0  # (1,)
-        self._my_sum_log_marg[:] = 0.0  # (1,)
         
         if self._use_storage:
             assert self._storage is not None
@@ -685,9 +667,8 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
                 datapoint_norm = datapoint_notnan - W_s @ mus_s  # (D,)
 
-                #batch_kappas[n, s][state] = (
-                #    mus_s + Lambda_s_W_s_sigma2inv @ datapoint_norm
-                #)  # is (H,)
-                batch_kappas[n,s] = to.zeros([H,], dtype=self.precision, device=get_device())
+                batch_kappas[n, s][state] = (
+                    mus_s + Lambda_s_W_s_sigma2inv @ datapoint_norm
+                )  # is (H,)
 
         return to.sum(W.unsqueeze(0) * mean_posterior(batch_kappas, lpj).unsqueeze(1), dim=2)
