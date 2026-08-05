@@ -133,12 +133,11 @@ class SSSC_HI(Sampler, Optimized, Reconstructor):
 
     def _init_pies(self, init: Optional[to.Tensor]):
         H = self.shape[1]
-        return 0.25 * to.ones([H], dtype=self.precision)
-        '''if init is not None:
+        if init is not None:
             assert init.shape == (H,)
             return init.to(dtype=self.precision, device=get_device())
         else:
-            return 0.1 + 0.5 * to.rand(H, dtype=self.precision, device=get_device())'''
+            return 0.1 + 0.5 * to.rand(H, dtype=self.precision, device=get_device())
 
     def generate_data(
         self, N: int = None, hidden_state: to.Tensor = None

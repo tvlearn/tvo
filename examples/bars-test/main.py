@@ -26,7 +26,7 @@ DEVICE = tvo.get_device()
 PRECISION = to.float64
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
-seed = 105
+seed = 100
 random.seed(seed)
 np.random.seed(seed)
 to.manual_seed(seed)

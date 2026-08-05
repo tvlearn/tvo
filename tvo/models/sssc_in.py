@@ -26,9 +26,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         mus_init: to.Tensor = None,
         Psi_init: to.Tensor = None,
         pies_init: to.Tensor = None,
-        #reformulated_lpj: bool = True,
         use_storage: bool = True,
-        #reformulated_psi_update: bool = False,
         precision: to.dtype = to.float32,
     ):
         """Spike-And-Slab Sparse Coding (SSSC_IN) model.
@@ -51,7 +49,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         device = get_device()
         self._precision = precision
         self._shape = (D, H)
-        self._use_storage = False#use_storage
+        self._use_storage = use_storage
         
         self._theta: Dict[str, to.Tensor] = {}
         self._theta["W"] = self._init_W(W_init)
@@ -79,6 +77,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         self._eyeH = to.eye(H, dtype=precision, device=device)
         self._eps_eyeH = to.eye(H, dtype=precision, device=device) * 1e-6
         self._storage: Optional[Dict[int, to.Tensor]] = {} if use_storage else None
+        self._counter_sigma = to.zeros((1,), dtype=precision, device=device)
 
         self._config = dict(
             shape=self._shape,
@@ -89,13 +88,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
     def _init_W(self, init: Optional[to.Tensor]):
         D, H = self.shape
-        '''H2 = H // 2
-        W = to.zeros([H2,H2,H], dtype=self.precision)
-        for d in range(H2):
-            W[d,:,d] = 1.0              # horizontal bars
-            W[:,d,d+H2] = 1.0            # vertical bars
-
-        return W.reshape(D, H)'''
         if init is not None:
             assert init.shape == (D, H)
             return init.to(dtype=self.precision, device=get_device())
@@ -105,7 +97,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             return W_init
 
     def _init_sigma2(self, init: Optional[to.Tensor]):
-        #return to.tensor([0.01], dtype=self.precision, device=get_device())
         if init is not None:
             assert init.shape == (1,)
             return init.to(dtype=self.precision, device=get_device())
@@ -135,7 +126,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
     def _init_pies(self, init: Optional[to.Tensor]):
         H = self.shape[1]
-        #return 0.25 * to.ones([H], dtype=self.precision)
         if init is not None:
             assert init.shape == (H,)
             return init.to(dtype=self.precision, device=get_device())
@@ -164,7 +154,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             loc=self.theta["mus"],
             covariance_matrix=self.theta["Psi"],
         )
-
         Wbar = to.einsum("dh,nh->nd", (self.theta["W"], hidden_state * Z.sample((N,))))
 
         Y = to.distributions.multivariate_normal.MultivariateNormal(
@@ -192,12 +181,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             Inv_Psi = to.linalg.inv(Psi)
         except Exception:
             Inv_Psi = to.linalg.pinv(Psi)
-            
-        if not to.allclose(Psi @ Inv_Psi, self._eyeH, rtol=1e-5, atol=1e-8):
-            raise ValueError("WARNING: Inverse von Psi nicht korrekt berechnet")
-        
-        if not to.allclose(Inv_Psi @ Psi, self._eyeH, rtol=1e-5, atol=1e-8):
-            raise ValueError("WARNING: Inverse von Psi nicht korrekt berechnet")
 
         Inv_Lambda_s = (W_s.t() @ W_s @ Psi + sigma2 * self._eyeH) @ Inv_Psi / sigma2
         
@@ -206,12 +189,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         except Exception:
             Lambda_s = to.linalg.pinv(Inv_Lambda_s)
         
-        if not to.allclose(Lambda_s @ Inv_Lambda_s, self._eyeH, rtol=1e-5, atol=1e-8):
-            raise ValueError("WARNING: Inverse von Lambda_s nicht korrekt berechnet")
-        
-        if not to.allclose(Inv_Lambda_s @ Lambda_s, self._eyeH, rtol=1e-5, atol=1e-8):
-            raise ValueError("WARNING: Inverse von Lambda_s nicht korrekt berechnet")
-
         Lambda_s_W_s_sigma2inv = Lambda_s @ W_s.t() / sigma2
 
         return (
@@ -219,6 +196,46 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             mus,
             Psi,
             Inv_Lambda_s,
+            Lambda_s,
+            Lambda_s_W_s_sigma2inv,
+        )
+
+    def _common_e_m_step_terms_notnan(
+        self, states: to.Tensor
+    ) -> Tuple[to.Tensor, to.Tensor, to.Tensor, to.Tensor, to.Tensor, to.Tensor]:
+        Kfloat = states.to(dtype=self.precision)
+        
+        W, mus, Psi, sigma2 = (
+            self.theta["W"].clone(),
+            self.theta["mus"].clone(),
+            self.theta["Psi"].clone(),
+            self.theta["sigma2"].clone(),
+        )
+        
+        W_s = W[None, None] * Kfloat[:, :, None]  # (batch_size, S, D, H)
+        
+        try:
+            Inv_Psi = to.linalg.inv(Psi)  # (H, H)
+        except Exception:
+            Inv_Psi = to.linalg.pinv(Psi)  # (H, H)
+        
+        Inv_Lambda_s_Psi_sigma2 = W_s.transpose(-1, -2) @ W_s @ Psi[None, None]  # (batch_size, S, H, H)
+        Inv_Lambda_s_Psi_sigma2 += sigma2 * self._eyeH[None, None]
+        
+        try:
+            Lambda_s = Psi[None, None] @ to.linalg.inv(Inv_Lambda_s_Psi_sigma2)  # (batch_size, S, H, H)
+        except Exception:
+            Lambda_s = Psi[None, None] @ to.linalg.pinv(Inv_Lambda_s_Psi_sigma2)
+        
+        Lambda_s_W_s_sigma2inv = Lambda_s @ W_s.transpose(-1, -2)
+        
+        Lambda_s *= sigma2
+        
+        return (
+            W_s,
+            mus,
+            Psi,
+            Inv_Lambda_s_Psi_sigma2,
             Lambda_s,
             Lambda_s_W_s_sigma2inv,
         )
@@ -239,7 +256,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             pprint("Disabled storage (inaccurate for incomplete data and batch_size > 1)")
             self._use_storage = use_storage
 
-    def _lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
+    def _lpj_fn_nan(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         precision = self.precision
         sigma2, _pies = (
             self.theta["sigma2"].clone(),
@@ -251,7 +268,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         batch_size, S = data.shape[0], Kfloat.shape[1]
 
         self._check_if_storage_reliable(incomplete=to.isnan(data).any(), batch_size=batch_size)
-        use_storage = self._use_storage
+        use_storage = False#self._use_storage
 
         lpj = Kfloat @ to.log(pies / (1.0 - pies))  # initial allocation, (N, S)
         for n in range(batch_size):
@@ -305,8 +322,58 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
                         + (datapoint_norm * (Inv_C_s @ datapoint_norm)).sum()
                     ).item()
                 )
-                
+
         return lpj
+
+    def _lpj_fn_notnan(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
+        precision = self.precision
+
+        sigma2, _pies = (
+            self.theta["sigma2"].clone(),
+            self.theta["pies"].clone(),
+        )
+        pies = _pies.clamp(1e-2, 1.0 - 1e-2)
+        Kfloat = states.to(dtype=precision)
+        H = self.shape[1]
+
+        #self._check_if_storage_reliable(incomplete=to.isnan(data).any(), batch_size=batch_size)
+        use_storage = False#self._use_storage
+
+        (
+            W_s,
+            mus,
+            _,
+            Inv_Lambda_s_Psi_sigma2,
+            _,
+            Lambda_s_W_s_sigma2inv,
+        ) = self._common_e_m_step_terms_notnan(states=states)
+        
+        lpj = Kfloat @ to.log(pies / (1.0 - pies))  # initial allocation, (N, S)
+        
+        datapoint_norm = data[:, None] - to.einsum("nsdh,h->nsd", W_s, mus)  # (batch_size, S, D)
+        
+        log_det_C_s_wo_last_term = to.linalg.slogdet(Inv_Lambda_s_Psi_sigma2)[1]  # (batch_size, S)
+        
+        Inv_C_s_sigma2 = self._eyeD[None, None] - W_s @ Lambda_s_W_s_sigma2inv  # (batch_size, S, D, D)
+        
+        lpj -= 0.5 * (
+            log_det_C_s_wo_last_term
+            + to.einsum("nsd,nsde,nse->ns", datapoint_norm, Inv_C_s_sigma2, datapoint_norm) / sigma2
+        )
+        
+        return lpj
+    
+    def _lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
+        """
+        Straightforward batchified implementation of log-pseudo joint for SSSC_HI
+        """
+        notnan = to.logical_not(to.isnan(data))
+        
+        if notnan.all():
+            return self._lpj_fn_notnan(data=data, states=states)
+        else:
+            return self._lpj_fn_nan(data=data, states=states)
+        
 
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """Evaluate log-pseudo-joints for SSSC_IN."""
@@ -319,36 +386,39 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
     def log_joint(self, data: to.Tensor, states: to.Tensor, lpj=None) -> to.Tensor:
         """Evaluate log-joints for SSSC_IN."""
         assert states.dtype == to.uint8
+        
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
-        # TODO: could pre-evaluate the constant factor once per epoch
+
         pies = self.theta["pies"]#.clamp(1e-2, 1.0 - 1e-2)
-        D = data.shape[1]
-        logjoints = (
-            lpj
-            + (to.log(1.0 - pies).sum()
-            - D / 2.0 * (self._log2pi + to.log(self.theta["sigma2"]))).item()
-            #- 0.5 * to.linalg.slogdet(self.theta["Psi"])[1]
-        )
+        D, H = self.shape
+        
+        notnan = to.logical_not(to.isnan(data))
+        
+        if notnan.all():
+            logjoints = lpj + to.log(1.0 - pies).sum() - D / 2.0 * self._log2pi
+            logjoints -= (D - H ) * 0.5 *  to.log(self.theta["sigma2"])
+        else:
+            logjoints = lpj + to.log(1.0 - pies).sum() - D / 2.0 * self._log2pi
+            logjoints -= D / 2.0 *  to.log(self.theta["sigma2"])
+
         assert logjoints.shape == lpj.shape
         assert not to.isnan(logjoints).any() and not to.isinf(logjoints).any()
         
         return logjoints
 
-    def update_param_batch(
+    def update_param_batch_nan(
         self,
         idx: to.Tensor,
         batch: to.Tensor,
         states: TVOVariationalStates,
         **kwargs: Dict[str, Any],
-    ) -> None:
+    ):
         precision = self.precision
-        lpj = states.lpj[idx]
         Kbool = states.K[idx].to(dtype=to.bool)
-        Kfloat = states.K[idx].to(dtype=lpj.dtype)
         batch_size, S, H = Kbool.shape
 
-        use_storage = self._use_storage and self._storage is not None and len(self._storage) > 0
+        use_storage = False #self._use_storage and self._storage is not None and len(self._storage) > 0
 
         batch_kappas = to.zeros((batch_size, S, H), dtype=precision, device=get_device())
         batch_Lambdas_plus_kappas_kappasT = to.zeros(
@@ -395,21 +465,83 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
                 batch_Lambdas_plus_kappas_kappasT[n, s] = (
                     Lambda_s + to.outer(batch_kappas[n, s], batch_kappas[n, s])
                 )  # (H, H)
-                if (n == batch_size - 1) and (s == S - 1):
-                    state_used = state
-        (
-            _,
-            _,
-            _,
-            _,
-            Lambda_s_new,
-            _,
-        ) = self._common_e_m_step_terms(state)
         
-        if not to.allclose(Lambda_s_new, Lambda_s, rtol=1e-5, atol=1e-8):
-            diff = to.sum((Lambda_s_new - Lambda_s)**2)
-            breakpoint()
+        return (
+            log_det_Lambda_s,
+            batch_kappas,
+            batch_Lambdas_plus_kappas_kappasT,
+        )
+    
+    def update_param_batch_notnan(
+        self,
+        idx: to.Tensor,
+        batch: to.Tensor,
+        states: TVOVariationalStates,
+        **kwargs: Dict[str, Any],
+    ):
+        lpj = states.lpj[idx]
+        Kfloat = states.K[idx].to(dtype=lpj.dtype)
 
+        use_storage = False #self._use_storage and self._storage is not None and len(self._storage) > 0
+
+        (
+            W_s,
+            mus,
+            _,
+            _,
+            Lambda_s,
+            Lambda_s_W_s_sigma2inv,
+        ) = self._common_e_m_step_terms_notnan(states=Kfloat)
+        
+        log_det_Lambda_s = to.linalg.slogdet(Lambda_s)[1]  # (batch_size, S)
+        datapoint_norm = batch[:, None] - to.einsum("nsdh,h->nsd", W_s, mus)  # (batch_size, S, D)
+        
+        batch_kappas = mus[None, None] + to.einsum("nshd,nsd->nsh", Lambda_s_W_s_sigma2inv, datapoint_norm)  # (batch_size, S, H)
+        
+        batch_Lambdas_plus_kappas_kappasT = Lambda_s + batch_kappas[:, :, :, None] @ batch_kappas[:, :, None]  # (batch_size, S, H, H)
+
+        return (
+            log_det_Lambda_s,
+            batch_kappas,
+            batch_Lambdas_plus_kappas_kappasT,
+        )
+        
+    def update_param_batch(
+        self,
+        idx: to.Tensor,
+        batch: to.Tensor,
+        states: TVOVariationalStates,
+        **kwargs: Dict[str, Any],
+    ) -> None:
+        lpj = states.lpj[idx]
+        Kfloat = states.K[idx].to(dtype=lpj.dtype)
+        batch_size = Kfloat.shape[0]
+        
+        notnan = to.logical_not(to.isnan(batch))
+        
+        if notnan.all():
+            (
+                log_det_Lambda_s,
+                batch_kappas,
+                batch_Lambdas_plus_kappas_kappasT,
+            ) =  self.update_param_batch_notnan(
+                idx=idx,
+                batch=batch,
+                states=states,
+                **kwargs
+            )
+        else:
+            (
+                log_det_Lambda_s,
+                batch_kappas,
+                batch_Lambdas_plus_kappas_kappasT,
+            ) = self.update_param_batch_nan(
+                idx=idx,
+                batch=batch,
+                states=states,
+                **kwargs
+            )
+        
         batch_xpt_s = mean_posterior(Kfloat, lpj)  # (batch_size,H)
         batch_xpt_sz = mean_posterior(Kfloat * batch_kappas, lpj)  # (batch_size, H)
         ssT = Kfloat.unsqueeze(-1) @ Kfloat.unsqueeze(-2)
@@ -436,8 +568,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         self._my_sum_xpt_log_det_Lambda_s.add_(to.sum(batch_xpt_log_det_Lambda_s, dim=0))  # (1,)
         self._my_sum_xpt_lpj.add_(to.sum(batch_xpt_lpj, dim=0))  # (1,)
         self._my_sum_log_sum_exp.add_(to.sum(batch_log_sum_exp, dim=0))  # (1,)
-        
-        return None
 
     def _compute_entropies(self, theta: Dict[str, to.Tensor]):
         # model parameters
@@ -580,9 +710,12 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         pies[:] = self._my_sum_xpt_s / N
         mus[:] = self._my_sum_xpt_z / N
         Psi[:] = self._my_sum_xpt_zzT / N - to.outer(mus, mus)# + self._eps_eyeH
-        sigma2[:] = (
-            self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_y_szT @ W.t())
-        ) / N / D# + eps
+        
+        if self._counter_sigma > 10:
+            sigma2[:] = (
+                self._my_sum_diag_yyT.sum() - to.trace(self._my_sum_y_szT @ W.t())
+            ) / N / D# + eps
+        self._counter_sigma += 1
         
         entropy_sum = self._compute_entropies(theta=theta)
         
