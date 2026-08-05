@@ -3,6 +3,7 @@
 # Licensed under the Academic Free License version 3.0
 
 import torch as to
+import h5py
 from typing import Dict, Optional, Tuple, Union, Any
 from math import pi as MATH_PI
 from tvo import get_device
@@ -670,6 +671,9 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         device = get_device()
         eps = 1e-6
         D, H = self.shape
+        
+        # for storing entropy sum after E-step
+        self._entropy_sum = self._compute_entropies(theta=theta)
 
         W, sigma2, pies, Psi, mus = (
             theta["W"],
@@ -717,14 +721,15 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             ) / N / D# + eps
         self._counter_sigma += 1
         
-        entropy_sum = self._compute_entropies(theta=theta)
-        
+        # compute elbo and entropy sum after M-step
         elbo = self._compute_elbo(theta=theta)
+        #entropy_sum = self._compute_entropies(theta=theta)
         
-        print("Entropy sum:       ", entropy_sum)
-        print("ELBO:             ", elbo)
-        print("diff:               ", elbo - entropy_sum)
+        #print("Entropy sum:       ", entropy_sum)
+        #print("ELBO:             ", elbo)
+        #print("diff:               ", elbo - entropy_sum)
         
+        # ensure that elbo is non-decreasing
         if self._elbo_old  > elbo and not to.isclose(self._elbo_old, elbo):
             print("WARNING: M-step ELBO decreases")
             breakpoint()

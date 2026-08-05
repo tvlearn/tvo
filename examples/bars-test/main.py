@@ -9,6 +9,7 @@ import datetime
 import torch as to
 import numpy as np
 import random
+import h5py
 
 import tvo
 from tvo.exp import EVOConfig, ExpConfig, Training
@@ -53,7 +54,7 @@ def bars_test():
         sys.stdout = stdout_logger(txt_file)  # type: ignore
     pprint("Will write training output to {}.".format(training_file))
     pprint("Will write terminal output to {}".format(txt_file))
-
+    
     # generate data set
     D = int((args.H_gen / 2) ** 2)
     if comm_rank == 0:
@@ -151,6 +152,7 @@ def bars_test():
 
     # define general hyperparameters of the experiment
     exp_config = ExpConfig(batch_size=32, output=training_file)
+    
     pprint("Initializing experiment")
     exp = Training(conf=exp_config, estep_conf=estep_conf, model=model, train_data_file=data_file)
 
@@ -175,6 +177,7 @@ def bars_test():
     )
     barrier()
     
+    entropy_sum_list = []
     F_old = -to.inf
     K_set = exp.trainer.train_states.K.clone()
     # run epochs
@@ -194,7 +197,6 @@ def bars_test():
         
         F_old = summary._results["train_F"]
     
-
         # visualize epoch
         if comm_rank == 0:
             assert isinstance(visualizer, _Visualizer)  # to make mypy happy
@@ -203,6 +205,13 @@ def bars_test():
                 F=summary._results["train_F"],
                 theta={k: v.detach().cpu() for k, v in exp.trainer.model.theta.items()},
             )
+            
+        # store entropies
+        if hasattr(exp.trainer.model, "_entropy_sum"):
+            entropy_sum_list.append(exp.trainer.model._entropy_sum.item())
+        
+    with h5py.File(training_file, "a") as f:
+        f["train_entropy_sum"] = entropy_sum_list
 
     barrier()
 
