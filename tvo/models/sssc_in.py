@@ -4,6 +4,7 @@
 
 import torch as to
 import h5py
+import time
 from typing import Dict, Optional, Tuple, Union, Any
 from math import pi as MATH_PI
 from tvo import get_device
@@ -16,6 +17,34 @@ from tvo.variational._utils import mean_posterior
 def _get_hash(x: to.Tensor) -> int:
     return hash(x.detach().cpu().numpy().tobytes())
 
+class Timer(object):
+    """
+    A context manager for measuring the execution time of a code block and storing the result in a dictionary.
+
+    Parameters
+    ----------
+    dictionary : dict
+        A dictionary where the elapsed time will be stored.
+    name : str
+        The key to use in the dictionary for storing the elapsed time.
+    """
+
+    def __init__(self, dictionary, name=""):
+        self.dictionary = dictionary
+        self.name = name
+
+    def __enter__(self):
+        """
+        Starts the timer.
+        """
+        self.start = time.monotonic()
+
+    def __exit__(self, type, value, traceback):
+        """
+        Stops the timer and stores the elapsed time in the dictionary.
+        """
+        elapsed = time.monotonic() - self.start
+        self.dictionary[self.name] = self.dictionary.get(self.name, 0) + elapsed
 
 class SSSC_IN(Sampler, Optimized, Reconstructor):
     def __init__(
@@ -79,6 +108,8 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         self._eps_eyeH = to.eye(H, dtype=precision, device=device) * 1e-6
         self._storage: Optional[Dict[int, to.Tensor]] = {} if use_storage else None
         self._counter_sigma = to.zeros((1,), dtype=precision, device=device)
+        
+        self.timer = {}
 
         self._config = dict(
             shape=self._shape,
@@ -213,24 +244,28 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             self.theta["sigma2"].clone(),
         )
         
-        W_s = W[None, None] * Kfloat[:, :, None]  # (batch_size, S, D, H)
+        with Timer(self.timer, "em: compute W_s"):
+            W_s = W[None, None] * Kfloat[:, :, None]  # (batch_size, S, D, H)
         
-        try:
-            Inv_Psi = to.linalg.inv(Psi)  # (H, H)
-        except Exception:
-            Inv_Psi = to.linalg.pinv(Psi)  # (H, H)
+        with Timer(self.timer, "em: invert Psi"):
+            try:
+                Inv_Psi = to.linalg.inv(Psi)  # (H, H)
+            except Exception:
+                Inv_Psi = to.linalg.pinv(Psi)  # (H, H)
         
-        Inv_Lambda_s_Psi_sigma2 = W_s.transpose(-1, -2) @ W_s @ Psi[None, None]  # (batch_size, S, H, H)
-        Inv_Lambda_s_Psi_sigma2 += sigma2 * self._eyeH[None, None]
+        with Timer(self.timer, "em: minor computations 1"):
+            Inv_Lambda_s_Psi_sigma2 = W_s.transpose(-1, -2) @ W_s @ Psi[None, None]  # (batch_size, S, H, H)
+            Inv_Lambda_s_Psi_sigma2 += sigma2 * self._eyeH[None, None]
         
-        try:
-            Lambda_s = Psi[None, None] @ to.linalg.inv(Inv_Lambda_s_Psi_sigma2)  # (batch_size, S, H, H)
-        except Exception:
-            Lambda_s = Psi[None, None] @ to.linalg.pinv(Inv_Lambda_s_Psi_sigma2)
-        
-        Lambda_s_W_s_sigma2inv = Lambda_s @ W_s.transpose(-1, -2)
-        
-        Lambda_s *= sigma2
+        with Timer(self.timer, "em: compute Lambda_s"):
+            try:
+                Lambda_s = Psi[None, None] @ to.linalg.inv(Inv_Lambda_s_Psi_sigma2)  # (batch_size, S, H, H)
+            except Exception:
+                Lambda_s = Psi[None, None] @ to.linalg.pinv(Inv_Lambda_s_Psi_sigma2)
+                
+        with Timer(self.timer, "em: minor computations 2"):
+            Lambda_s_W_s_sigma2inv = Lambda_s @ W_s.transpose(-1, -2)
+            Lambda_s *= sigma2
         
         return (
             W_s,
@@ -345,23 +380,53 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
             mus,
             _,
             Inv_Lambda_s_Psi_sigma2,
-            _,
+            Lambda_s,
             Lambda_s_W_s_sigma2inv,
         ) = self._common_e_m_step_terms_notnan(states=states)
         
         lpj = Kfloat @ to.log(pies / (1.0 - pies))  # initial allocation, (N, S)
         
-        datapoint_norm = data[:, None] - to.einsum("nsdh,h->nsd", W_s, mus)  # (batch_size, S, D)
+        #with Timer(self.timer, "compute datapoint_norm"):
+        #    datapoint_norm = data[:, None] - to.einsum("nsdh,h->nsd", W_s, mus)  # (batch_size, S, D)
         
-        log_det_C_s_wo_last_term = to.linalg.slogdet(Inv_Lambda_s_Psi_sigma2)[1]  # (batch_size, S)
+        with Timer(self.timer, "compute determinant"):
+            log_det_C_s_wo_last_term = to.linalg.slogdet(Inv_Lambda_s_Psi_sigma2)[1]  # (batch_size, S)
+
+        #with Timer(self.timer, "compute Inv_C"):
+        #    Inv_C_s_sigma2 = self._eyeD[None, None] - W_s @ Lambda_s_W_s_sigma2inv  # (batch_size, S, D, D)
         
-        Inv_C_s_sigma2 = self._eyeD[None, None] - W_s @ Lambda_s_W_s_sigma2inv  # (batch_size, S, D, D)
+        with Timer(self.timer, "mahalanobis new"):
+            datapoint_norm_new = to.sum(data**2, dim=1)
+            W_s_T_x_new = W_s.transpose(-1, -2) @ data[:, None, :, None]
+            Lambda_s_W_s_T_x_new = Lambda_s @ W_s_T_x_new
+            W_s_T_W_s_new = W_s.transpose(-1, -2) @ W_s
+            W_s_T_W_s_mus_new = to.sum(W_s_T_W_s_new * mus, dim=-1)
+            
+            mahalanobis_alpha_new = - to.sum(W_s_T_x_new * Lambda_s_W_s_T_x_new, dim=-2).squeeze(-1) / sigma2
+            mahalanobis_alpha_new += datapoint_norm_new[:, None]
+            mahalanobis_alpha_new /= sigma2
+            
+            mahalanobis_beta_new = - to.sum(W_s_T_W_s_mus_new * Lambda_s_W_s_T_x_new.squeeze(-1), dim=-1) / sigma2
+            mahalanobis_beta_new += to.sum(W_s_T_x_new.squeeze() * mus, dim=-1)
+            mahalanobis_beta_new /= sigma2
+            
+            mahalanobis_gamma_new = - to.sum(W_s_T_W_s_mus_new * (Lambda_s @ W_s_T_W_s_mus_new[..., None]).squeeze(-1), dim=-1) / sigma2
+            mahalanobis_gamma_new += to.sum(W_s_T_W_s_mus_new * mus, dim=-1)
+            mahalanobis_gamma_new /= sigma2
+            
+            mahalanobis_new = mahalanobis_alpha_new - 2.0 *  mahalanobis_beta_new + mahalanobis_gamma_new
         
+        #with Timer(self.timer, "mahalanobis distance"):
+        #    mahalanobis = to.einsum("nsd,nsde,nse->ns", datapoint_norm, Inv_C_s_sigma2, datapoint_norm) / sigma2
+            
+        #if not to.allclose(mahalanobis, mahalanobis_new):
+        #    raise ValueError("WARNING: Mahalanobis distances differ")
+            
         lpj -= 0.5 * (
             log_det_C_s_wo_last_term
-            + to.einsum("nsd,nsde,nse->ns", datapoint_norm, Inv_C_s_sigma2, datapoint_norm) / sigma2
+            + mahalanobis_new
         )
-        
+
         return lpj
     
     def _lpj_fn(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
@@ -379,15 +444,16 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
     def log_pseudo_joint(self, data: to.Tensor, states: to.Tensor) -> to.Tensor:
         """Evaluate log-pseudo-joints for SSSC_IN."""
         lpj = self._lpj_fn(data, states)
+        start = time.monotonic()
         min_ = to.finfo(self.precision).min
         lpj[to.isnan(lpj)] = min_
         lpj[to.isinf(lpj)] = min_
+        
         return lpj
 
     def log_joint(self, data: to.Tensor, states: to.Tensor, lpj=None) -> to.Tensor:
         """Evaluate log-joints for SSSC_IN."""
         assert states.dtype == to.uint8
-        
         if lpj is None:
             lpj = self.log_pseudo_joint(data, states)
 
@@ -405,7 +471,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
 
         assert logjoints.shape == lpj.shape
         assert not to.isnan(logjoints).any() and not to.isinf(logjoints).any()
-        
+
         return logjoints
 
     def update_param_batch_nan(
@@ -466,7 +532,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
                 batch_Lambdas_plus_kappas_kappasT[n, s] = (
                     Lambda_s + to.outer(batch_kappas[n, s], batch_kappas[n, s])
                 )  # (H, H)
-        
+
         return (
             log_det_Lambda_s,
             batch_kappas,
@@ -480,27 +546,28 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         states: TVOVariationalStates,
         **kwargs: Dict[str, Any],
     ):
-        lpj = states.lpj[idx]
-        Kfloat = states.K[idx].to(dtype=lpj.dtype)
+        with Timer(self.timer, "update_param_batch_notnan"):
+            lpj = states.lpj[idx]
+            Kfloat = states.K[idx].to(dtype=lpj.dtype)
 
-        use_storage = False #self._use_storage and self._storage is not None and len(self._storage) > 0
+            use_storage = False #self._use_storage and self._storage is not None and len(self._storage) > 0
 
-        (
-            W_s,
-            mus,
-            _,
-            _,
-            Lambda_s,
-            Lambda_s_W_s_sigma2inv,
-        ) = self._common_e_m_step_terms_notnan(states=Kfloat)
+            (
+                W_s,
+                mus,
+                _,
+                _,
+                Lambda_s,
+                Lambda_s_W_s_sigma2inv,
+            ) = self._common_e_m_step_terms_notnan(states=Kfloat)
         
-        log_det_Lambda_s = to.linalg.slogdet(Lambda_s)[1]  # (batch_size, S)
-        datapoint_norm = batch[:, None] - to.einsum("nsdh,h->nsd", W_s, mus)  # (batch_size, S, D)
+            log_det_Lambda_s = to.linalg.slogdet(Lambda_s)[1]  # (batch_size, S)
+            datapoint_norm = batch[:, None] - to.einsum("nsdh,h->nsd", W_s, mus)  # (batch_size, S, D)
         
-        batch_kappas = mus[None, None] + to.einsum("nshd,nsd->nsh", Lambda_s_W_s_sigma2inv, datapoint_norm)  # (batch_size, S, H)
+            batch_kappas = mus[None, None] + to.einsum("nshd,nsd->nsh", Lambda_s_W_s_sigma2inv, datapoint_norm)  # (batch_size, S, H)
         
-        batch_Lambdas_plus_kappas_kappasT = Lambda_s + batch_kappas[:, :, :, None] @ batch_kappas[:, :, None]  # (batch_size, S, H, H)
-
+            batch_Lambdas_plus_kappas_kappasT = Lambda_s + batch_kappas[:, :, :, None] @ batch_kappas[:, :, None]  # (batch_size, S, H, H)
+        
         return (
             log_det_Lambda_s,
             batch_kappas,
@@ -542,37 +609,37 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
                 states=states,
                 **kwargs
             )
-        
-        batch_xpt_s = mean_posterior(Kfloat, lpj)  # (batch_size,H)
-        batch_xpt_sz = mean_posterior(Kfloat * batch_kappas, lpj)  # (batch_size, H)
-        ssT = Kfloat.unsqueeze(-1) @ Kfloat.unsqueeze(-2)
-        batch_xpt_szszT = mean_posterior(
-            ssT * batch_Lambdas_plus_kappas_kappasT, lpj
-        )  # (batch_size, H, H)
-        batch_xpt_z = mean_posterior(batch_kappas, lpj)  # (batch_size, H)
-        batch_xpt_zzT = mean_posterior(batch_Lambdas_plus_kappas_kappasT, lpj)  # (batch_size, H, H)
-        batch_xpt_log_det_Lambda_s = mean_posterior(log_det_Lambda_s, lpj)  # (batch_size,)
-        batch_xpt_lpj = mean_posterior(lpj, lpj)  # (1,)
-        # stable version of log sum exp
-        max_lpj = to.max(lpj, dim=-1)[0] - 10.0
-        batch_log_sum_exp = to.log(to.sum(to.exp(lpj - max_lpj[:,None]), dim=-1))
-        batch_log_sum_exp += max_lpj
-        
-        self._my_sum_xpt_s.add_(to.sum(batch_xpt_s, dim=0))  # (H,)
-        self._my_sum_xpt_sz.add_(to.sum(batch_xpt_sz, dim=0))  # (H,)
-        self._my_sum_xpt_szszT.add_(to.sum(batch_xpt_szszT, dim=0))  # (H, H)
-        self._my_sum_xpt_z.add_(to.sum(batch_xpt_z, dim=0))  # (H,)
-        self._my_sum_xpt_zzT.add_(to.sum(batch_xpt_zzT, dim=0))  # (H,H)
-        self._my_sum_diag_yyT.add_(to.sum(batch**2, dim=0))  # (D,)
-        self._my_sum_y_szT.add_(batch.t() @ batch_xpt_sz)  # (D, H)
-        self._my_N.add_(batch_size)  # (1,)
-        self._my_sum_xpt_log_det_Lambda_s.add_(to.sum(batch_xpt_log_det_Lambda_s, dim=0))  # (1,)
-        self._my_sum_xpt_lpj.add_(to.sum(batch_xpt_lpj, dim=0))  # (1,)
-        self._my_sum_log_sum_exp.add_(to.sum(batch_log_sum_exp, dim=0))  # (1,)
+        with Timer(self.timer, "update_param_batch"):
+            batch_xpt_s = mean_posterior(Kfloat, lpj)  # (batch_size,H)
+            batch_xpt_sz = mean_posterior(Kfloat * batch_kappas, lpj)  # (batch_size, H)
+            ssT = Kfloat.unsqueeze(-1) @ Kfloat.unsqueeze(-2)
+            batch_xpt_szszT = mean_posterior(
+                ssT * batch_Lambdas_plus_kappas_kappasT, lpj
+            )  # (batch_size, H, H)
+            batch_xpt_z = mean_posterior(batch_kappas, lpj)  # (batch_size, H)
+            batch_xpt_zzT = mean_posterior(batch_Lambdas_plus_kappas_kappasT, lpj)  # (batch_size, H, H)
+            batch_xpt_log_det_Lambda_s = mean_posterior(log_det_Lambda_s, lpj)  # (batch_size,)
+            batch_xpt_lpj = mean_posterior(lpj, lpj)  # (1,)
+            # stable version of log sum exp
+            max_lpj = to.max(lpj, dim=-1)[0] - 10.0
+            batch_log_sum_exp = to.log(to.sum(to.exp(lpj - max_lpj[:,None]), dim=-1))
+            batch_log_sum_exp += max_lpj
+            
+            self._my_sum_xpt_s.add_(to.sum(batch_xpt_s, dim=0))  # (H,)
+            self._my_sum_xpt_sz.add_(to.sum(batch_xpt_sz, dim=0))  # (H,)
+            self._my_sum_xpt_szszT.add_(to.sum(batch_xpt_szszT, dim=0))  # (H, H)
+            self._my_sum_xpt_z.add_(to.sum(batch_xpt_z, dim=0))  # (H,)
+            self._my_sum_xpt_zzT.add_(to.sum(batch_xpt_zzT, dim=0))  # (H,H)
+            self._my_sum_diag_yyT.add_(to.sum(batch**2, dim=0))  # (D,)
+            self._my_sum_y_szT.add_(batch.t() @ batch_xpt_sz)  # (D, H)
+            self._my_N.add_(batch_size)  # (1,)
+            self._my_sum_xpt_log_det_Lambda_s.add_(to.sum(batch_xpt_log_det_Lambda_s, dim=0))  # (1,)
+            self._my_sum_xpt_lpj.add_(to.sum(batch_xpt_lpj, dim=0))  # (1,)
+            self._my_sum_log_sum_exp.add_(to.sum(batch_log_sum_exp, dim=0))  # (1,)
 
     def _compute_entropies(self, theta: Dict[str, to.Tensor]):
         # model parameters
-        W, sigma2, pies, Psi, mus = (
+        W, sigma2, pies, Psi, _ = (
             theta["W"].clone(),
             theta["sigma2"].clone(),
             to.clamp(theta["pies"].clone(), min=1e-7, max=1.0 - 1e-7),
@@ -602,7 +669,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         entropy_post_slab *= 0.5
         entropy_post_spike = - xpt_lpj + xpt_log_sum_exp
         entropy_post = entropy_post_slab + entropy_post_spike
-        
+
         return entropy_post - entropy_spike - entropy_slab - entropy_observable
 
     def _compute_elbo(self, theta: Dict[str, to.Tensor]):
@@ -647,7 +714,6 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         elbo_slab -= 0.5 * to.trace(Inv_Psi @ xpt_zzT)
         elbo_slab += to.dot(xpt_z, Inv_Psi @ mus)
         elbo_slab -= 0.5 * to.dot(mus, Inv_Psi @ mus)
-        diff = to.trace(Inv_Psi @ xpt_zzT) - to.dot(mus, Inv_Psi @ mus) - H
         
         # elbo of observable variable
         D = W.shape[-2]
@@ -662,7 +728,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         elbo_post_slab *= 0.5
         elbo_post_spike = - xpt_lpj + xpt_log_sum_exp
         elbo_post = elbo_post_slab + elbo_post_spike
-        
+
         return elbo_post + elbo_observable + elbo_spike + elbo_slab
 
     def update_param_epoch(self) -> None:
@@ -736,6 +802,9 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         
         self._elbo_old = elbo.clone()
         
+        print(self.timer)
+        self.timer = {}
+        
         self._my_sum_y_szT[:] = 0.0
         self._my_sum_xpt_szszT[:] = 0.0
         self._my_sum_xpt_s[:] = 0.0
@@ -751,6 +820,7 @@ class SSSC_IN(Sampler, Optimized, Reconstructor):
         if self._use_storage:
             assert self._storage is not None
             self._storage.clear()
+            
 
     def data_estimator(
         self,
