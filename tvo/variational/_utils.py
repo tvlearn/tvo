@@ -85,11 +85,50 @@ def _set_redundant_lpj_to_low_GPU(new_states: to.Tensor, new_lpj: to.Tensor, old
 
 # set_redundant_lpj_to_low is a performance hotspot. when running on CPU, we use a cython
 # function that runs on numpy arrays, when running on GPU, we stick to torch tensors
-def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
-    if tvo.get_device().type == "cpu":
-        set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
-    else:
-        _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
+# def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+#     if tvo.get_device().type == "cpu":
+#         set_redundant_lpj_to_low_CPU(new_states.numpy(), new_lpj.numpy(), old_states.numpy())
+#     else:
+#         _set_redundant_lpj_to_low_GPU(new_states, new_lpj, old_states)
+
+def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor, only_new: bool = False):
+    """Find redundant states in new_states w.r.t. old_states and set
+       corresponding lpg to low.
+       # Author: Dmytro Velychko
+
+    :param new_states: set of new variational states (batch_size, newS, H)
+    :param new_lpj: corresponding log-pseudo-joints (batch_size, newS)
+    :param old_states: (batch_size, S, H)
+    """
+    def similar_reference(a, b):
+        # Reference implementation.
+        # Works fine on CPU and CUDA.
+        return to.all(a.unsqueeze(-2) == b.unsqueeze(-3), dim=-1).to(to.int)
+
+    def similar_bmm(a, b):
+        # Runs fast by exploiting matrix multiplications.
+        # This code uses float32 because:
+        #   1) it can precisely represent integers,
+        #   2) runs fast on both CPU and CUDA.
+        a = a.to(to.float32)
+        bt = b.permute([0, 2, 1]).to(to.float32)
+        abt = to.bmm(a, bt)
+        a_bits = a.sum(dim=-1, keepdims=True)
+        b_bits = bt.sum(dim=-2, keepdims=True)
+        return to.logical_and(abt == a_bits, abt == b_bits).to(dtype=to.int)
+
+    if not only_new:
+        new_old_sim = similar_bmm(new_states, old_states)
+        new_new_sim = similar_bmm(new_states, new_states)
+        #assert to.all(new_old_sim == similar_reference(new_states, old_states))
+        #assert to.all(new_new_sim == similar_reference(new_states, new_states))
+        redundant = to.tril(new_new_sim).sum(dim=-1) + new_old_sim.sum(dim=-1)  > 1
+    elif only_new:
+        new_new_sim = similar_bmm(new_states, new_states)
+        redundant = to.tril(new_new_sim).sum(dim=-1) > 1
+
+    new_lpj[redundant] = -1e20
+    return new_lpj
 
 
 def generate_unique_states(

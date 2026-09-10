@@ -73,4 +73,5 @@ def _make_EVO_var_states(conf: EVOConfig, N: int, H: int, precision: to.dtype):
         crossover=conf.crossover,
         bitflip_frequency=conf.bitflip_frequency,
         K_init_file=conf.K_init_file,
+        shufflekeep=conf.shufflekeep,
     )

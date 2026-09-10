@@ -32,6 +32,7 @@ class EVOVariationalStates(TVOVariationalStates):
         crossover: bool = False,
         bitflip_frequency: float = None,
         K_init_file: str = None,
+        shufflekeep: bool = False,
     ):
         """Evolutionary Variational Optimization class.
 
@@ -77,7 +78,7 @@ class EVOVariationalStates(TVOVariationalStates):
         )
         super().__init__(conf)
 
-    def update(self, idx: Tensor, batch: Tensor, model: Trainable) -> int:
+    def update(self, idx: Tensor, batch: Tensor, model: Trainable, shufflekeep: bool) -> int:
         if isinstance(model, Optimized):
             lpj_fn = model.log_pseudo_joint
             sort_by_lpj = model.sorted_by_lpj
@@ -108,6 +109,7 @@ class EVOVariationalStates(TVOVariationalStates):
             mutation=mutation,
             sparsity=model.theta["pies"].mean() if "sparseflip" in mutation else None,
             p_bf=self.config.get("p_bf"),
+            shufflekeep=shufflekeep,
         )
 
         return update_states_for_batch(
@@ -126,6 +128,7 @@ def evolve_states(
     mutation: str = "cross_randflip",
     sparsity: Optional[float] = None,
     p_bf: Optional[float] = None,
+    shufflekeep:bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """
     Take old variational states states (N,K,H) with lpj values (N,K) and
@@ -177,7 +180,7 @@ def evolve_states(
     N, K, H = states.shape
     max_new_states = get_n_new_states(mutation, n_parents, n_children, n_generations)
     new_states_per_gen = max_new_states // n_generations
-
+    # breakpoint()
     # Pre-allocations
     # It'states probable that not all new_states will be filled with a
     # new unique state. Unfilled new_states will remain uninitialized and
@@ -205,10 +208,30 @@ def evolve_states(
         new_lpj[:, gen_idx] = lpj_fn(new_states[:, gen_idx].to(device=tvo.get_device())).to(
             device="cpu"
         )
+    if shufflekeep == True:
+        # print('shuffling new states before select states ... ...', flush=True)
+        # decoy = new_states 
+        N, S, H = new_states.shape
+        random_keys = to.rand(1, H, S, device=new_states.device)
+        perm_1_H_S = to.argsort(random_keys, dim=2) # generate permutation for each latent unit h
+        single_perm = perm_1_H_S.transpose(1, 2) 
+        perm = single_perm.expand(N, S, H) # same permutation for all N
+        new_states_ = new_states.gather(1, perm)
+        # compute lpj for shuffuled states
+        # new_lpj_ = model.log_pseudo_joint(batch, new_states_)
+        new_lpj_ = lpj_fn(new_states_)
+    
+        new_states__ = to.cat((new_states, new_states_), dim=1)
+        new_lpj__ = to.cat((new_lpj, new_lpj_), dim=1)
+    else:
+        new_states__ = new_states
+        new_lpj__ = new_lpj
 
-    set_redundant_lpj_to_low(new_states, new_lpj, states)
+    new_lpj__ = set_redundant_lpj_to_low(new_states__, new_lpj__, states)
+    # set_redundant_lpj_to_low(new_states, new_lpj, states)
 
-    return new_states, new_lpj
+    # return new_states, new_lpj
+    return new_states__, new_lpj__
 
 
 def get_n_new_states(mutation: str, n_parents: int, n_children: int, n_gen: int) -> int:

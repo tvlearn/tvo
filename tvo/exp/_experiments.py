@@ -88,6 +88,7 @@ class _TrainingAndOrValidation(Experiment):
             will_reconstruct=will_reconstruct,
             eval_F_at_epoch_end=self._conf.eval_F_at_epoch_end,
             data_transform=self._conf.data_transform,
+            shufflekeep=estep_conf.shufflekeep
         )
         self.logger = H5Logger(self._conf.output, blacklist=self._conf.log_blacklist)
 
