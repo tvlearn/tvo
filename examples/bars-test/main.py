@@ -24,8 +24,8 @@ DEVICE = tvo.get_device()
 PRECISION = to.float32
 dtype_device_kwargs = {"dtype": PRECISION, "device": DEVICE}
 
-
-def bars_test():
+print(tvo.__file__)
+def bars_test(shuffleforget=False, shufflekeep=False, sparseflip=False):
     # initialize MPI (if executed with env TVO_MPI=...), otherwise pass
     comm_rank = init_processes()[0]
 
@@ -122,15 +122,26 @@ def bars_test():
     }[args.model]
 
     # define hyperparameters of the variational optimization
-    estep_conf = EVOConfig(
-        n_states=args.Ksize,
-        n_parents=args.no_parents,
-        n_children=args.no_children,
-        n_generations=args.no_generations,
-        parent_selection=args.selection,
-        crossover=args.crossover,
-    )
-
+    if not sparseflip:
+        estep_conf = EVOConfig(
+            n_states=args.Ksize,
+            n_parents=args.no_parents,
+            n_children=args.no_children,
+            n_generations=args.no_generations,
+            parent_selection=args.selection,
+            crossover=args.crossover,
+        )
+    elif sparseflip:
+            estep_conf = EVOConfig(
+            n_states=args.Ksize,
+            n_parents=args.no_parents,
+            n_children=args.no_children,
+            n_generations=args.no_generations,
+            parent_selection=args.selection,
+            crossover=args.crossover,
+            mutation='sparsity',
+            bitflip_frequency=1/args.H,
+        )
     # define general hyperparameters of the experiment
     exp_config = ExpConfig(batch_size=32, output=training_file)
     pprint("Initializing experiment")
@@ -159,6 +170,16 @@ def bars_test():
 
     # run epochs
     for epoch, summary in enumerate(exp.run(args.no_epochs)):
+        
+        exp.trainer.shufflekeep = shufflekeep
+        exp.trainer.shuffleforget = shuffleforget
+        exp.trainer.freeze_theta = False
+
+
+        print('Shuffle keep:', exp.trainer.shufflekeep, flush = True)
+        print('Shuffle forget:', exp.trainer.shuffleforget, flush = True)
+        print('Freeze theta:', exp.trainer.freeze_theta, flush = True)
+
         summary.print()
 
         # visualize epoch
@@ -182,4 +203,6 @@ def bars_test():
 
 
 if __name__ == "__main__":
-    bars_test()
+    for i in range(30):
+        print(f"------------------------Run {i + 1}----------------------------")
+        bars_test(sparseflip=True, shufflekeep=False) 

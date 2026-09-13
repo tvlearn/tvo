@@ -31,6 +31,7 @@ class EVOConfig(EStepConfig):
         mutation: str = "uniform",
         bitflip_frequency: float = None,
         K_init_file: str = None,
+        shufflekeep: bool = False,
     ):
         """Configuration object for EVO E-step.
 
@@ -77,6 +78,7 @@ class EVOConfig(EStepConfig):
         self.mutation = mutation
         self.bitflip_frequency = bitflip_frequency
         self.K_init_file = K_init_file
+        self.shufflekeep = shufflekeep
 
         super().__init__(n_states)
 

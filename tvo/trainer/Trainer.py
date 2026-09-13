@@ -8,6 +8,7 @@ from tvo.variational import TVOVariationalStates
 from tvo.utils.data import TVODataLoader
 from tvo.utils.parallel import all_reduce, pprint
 from typing import Dict, Any, Sequence, Union, Callable
+from tvo.variational._utils import set_redundant_lpj_to_low
 import torch as to
 from tqdm import tqdm
 import math
@@ -25,6 +26,7 @@ class Trainer:
         eval_F_at_epoch_end: bool = False,
         data_transform: Callable[[to.Tensor], to.Tensor] = None,
         posterior_sampler = None,
+        shufflekeep: bool = False,
     ):
         """Train and/or test a given model.
 
@@ -72,6 +74,9 @@ class Trainer:
         self.test_states = test_states
         self.will_reconstruct = will_reconstruct
         self.eval_F_at_epoch_end = eval_F_at_epoch_end
+        self.shuffleforget = False
+        self.freeze_theta = False
+        self.shufflekeep = shufflekeep
         if train_data is not None:
             self.N_train = to.tensor(len(train_data.dataset))
             all_reduce(self.N_train)
@@ -98,6 +103,8 @@ class Trainer:
         reconstruction: to.Tensor = None,
         posterior_sampler = None,
         nsamples = 1,
+        shufflekeep: bool = False,
+        shuffleforget: bool = False,
     ):
         if reconstruction is not None and not isinstance(model, Reconstructor):
             raise NotImplementedError(
@@ -113,7 +120,25 @@ class Trainer:
             batch = data_transform(batch)
             if isinstance(model, Optimized):
                 model.init_batch()
-            subs += states.update(idx, batch, model)
+            # subs += states.update(idx, batch, model)
+            subs += states.update(idx, batch, model, shufflekeep=shufflekeep)
+
+            if shuffleforget == True:
+                
+                # print('Shuffling test states ... ...', flush=True)
+                array = states.K[idx] 
+                n, S, H = array.shape
+                random_keys = to.rand(1, H, S, device=array.device)
+                perm_1_H_S = to.argsort(random_keys, dim=2) 
+                single_perm = perm_1_H_S.transpose(1, 2) 
+                perm = single_perm.expand(n, S, H)
+                new_states_ = array.gather(1, perm)
+                # compute lpj for shuffuled states
+                new_lpj = model.log_pseudo_joint(batch, new_states_)
+                states.K[idx] = new_states_
+                set_redundant_lpj_to_low(new_states_, new_lpj, states.K[idx], only_new=True)
+                states.lpj[idx] = new_lpj
+
 
             # Amortized sampling
             if posterior_sampler is not None:
@@ -162,6 +187,8 @@ class Trainer:
                 self.N_train,
                 self.data_transform,
                 train_reconstruction,
+                self.shufflekeep,
+                self.shuffleforget,
             )
             if train_rec is not None:
                 ret["train_rec"] = train_rec
@@ -170,7 +197,14 @@ class Trainer:
         if self.can_test:
             assert test_data is not None and test_states is not None  # to make mypy happy
             ret["test_F"], ret["test_subs"], test_rec = self._do_e_step(
-                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction
+                test_data, 
+                test_states, 
+                model, 
+                self.N_test, 
+                self.data_transform, 
+                test_reconstruction,
+                self.shufflekeep, 
+                self.shuffleforget,
             )
             if test_rec is not None:
                 ret["test_rec"] = test_rec
@@ -224,7 +258,13 @@ class Trainer:
             n_amortized_samples = self.train_states.config["n_amortized_samples"] if self.train_states is not None else \
                 self.test_states.config["n_amortized_samples"]
             res = self._do_e_step(
-                test_data, test_states, model, self.N_test, self.data_transform, test_reconstruction,
+                test_data, 
+                test_states, 
+                model, 
+                self.N_test, 
+                self.data_transform, 
+                test_reconstruction,
+                self.shufflekeep, self.shuffleforget,
                 self.posterior_sampler,
                 n_amortized_samples,
             )
@@ -261,7 +301,27 @@ class Trainer:
 
             # Evolutionary K-set update (E-step)
             with to.no_grad():
-                subs += train_states.update(idx, batch, model)
+                old_states = self.train_states.K[idx].clone()
+                subs += train_states.update(idx, batch, model, self.shufflekeep)
+                # subs += train_states.update(idx, batch, model)
+                if self.shuffleforget == True:
+                    shuffled_all = []
+                    times_shuffle = 1
+                    # print('Shuffling train states ... ...', flush=True)
+                    for i in range(times_shuffle):
+                        array = train_states.K[idx] 
+                        evolved_states = array.clone()
+                        N, S, H = array.shape
+                        random_keys = to.rand(1, H, S, device=array.device)
+                        perm_1_H_S = to.argsort(random_keys, dim=2) 
+                        single_perm = perm_1_H_S.transpose(1, 2) 
+                        perm = single_perm.expand(N, S, H)
+                        new_states_ = array.gather(1, perm)
+                    train_states.K[idx] = new_states_
+                    new_lpj = model.log_pseudo_joint(batch, train_states.K[idx])
+                    set_redundant_lpj_to_low(new_states_, new_lpj, old_states, only_new=True)
+                    train_states.lpj[idx] = new_lpj
+
 
             # Amortized sampling
             if self.posterior_sampler is not None:
