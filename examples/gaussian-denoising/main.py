@@ -123,15 +123,27 @@ def gaussian_denoising_example():  # noqa: C901
     pprint("Initializing experiment")
 
     # define hyperparameters of the variational optimization
-    estep_conf = EVOConfig(
-        n_states=args.Ksize,
-        n_parents=args.no_parents,
-        n_children=args.no_children,
-        n_generations=args.no_generations,
-        parent_selection=args.selection,
-        crossover=args.crossover,
-        #K_init_file="./out/24-05-08-16-12-40/training.h5",
-    )
+    if args.sparse_flip:
+        estep_conf = EVOConfig(
+                n_states=args.Ksize,
+                n_parents=args.no_parents,
+                n_children=args.no_children,
+                n_generations=args.no_generations,
+                parent_selection=args.selection,
+                crossover=args.crossover,
+                mutation='sparsity',
+                bitflip_frequency=1/args.H,
+            )
+    else:
+        estep_conf = EVOConfig(
+                n_states=args.Ksize,
+                n_parents=args.no_parents,
+                n_children=args.no_children,
+                n_generations=args.no_generations,
+                parent_selection=args.selection,
+                crossover=args.crossover,
+            )
+        
 
     # setup the experiment
     merge_every = args.merge_every if args.merge_every is not None else args.viz_every
@@ -172,6 +184,10 @@ def gaussian_denoising_example():  # noqa: C901
 
     # run epochs
     for epoch, summary in enumerate(exp.run(args.no_epochs)):
+        exp.trainer.shufflekeep = args.shuffle_keep
+        exp.trainer.shuffleforget = args.shuffle_forget
+        exp.trainer.freeze_theta = args.freeze_theta
+        
         summary.print()
 
         # merge reconstructed image patches and generate reconstructed image

@@ -9,7 +9,7 @@ from typing import Dict
 
 
 
-def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor):
+def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_states: to.Tensor, only_new: bool = False):
     """Find redundant states in new_states w.r.t. old_states and set
        corresponding lpg to low.
        # Author: Dmytro Velychko
@@ -35,12 +35,18 @@ def set_redundant_lpj_to_low(new_states: to.Tensor, new_lpj: to.Tensor, old_stat
         b_bits = bt.sum(dim=-2, keepdims=True)
         return to.logical_and(abt == a_bits, abt == b_bits).to(dtype=to.int)
 
-    new_old_sim = similar_bmm(new_states, old_states)
-    new_new_sim = similar_bmm(new_states, new_states)
-    #assert to.all(new_old_sim == similar_reference(new_states, old_states))
-    #assert to.all(new_new_sim == similar_reference(new_states, new_states))
-    redundant = to.tril(new_new_sim).sum(dim=-1) + new_old_sim.sum(dim=-1)  > 1
+    if not only_new:
+        new_old_sim = similar_bmm(new_states, old_states)
+        new_new_sim = similar_bmm(new_states, new_states)
+        #assert to.all(new_old_sim == similar_reference(new_states, old_states))
+        #assert to.all(new_new_sim == similar_reference(new_states, new_states))
+        redundant = to.tril(new_new_sim).sum(dim=-1) + new_old_sim.sum(dim=-1)  > 1
+    elif only_new:
+        new_new_sim = similar_bmm(new_states, new_states)
+        redundant = to.tril(new_new_sim).sum(dim=-1) > 1
+
     new_lpj[redundant] = -1e20
+    return new_lpj
 
 
 def _unique_ind_fast(x: to.Tensor) -> to.Tensor:

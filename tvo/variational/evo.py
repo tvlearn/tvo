@@ -255,7 +255,7 @@ def evolve_states(
         new_states__ = new_states
         new_lpj__ = new_lpj
 
-    set_redundant_lpj_to_low(new_states__, new_lpj__, states)
+    new_lpj__ = set_redundant_lpj_to_low(new_states__, new_lpj__, states)
     # set_redundant_lpj_to_low(new_states, new_lpj, states)
 
     # return new_states, new_lpj

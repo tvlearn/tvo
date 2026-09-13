@@ -89,6 +89,33 @@ variational_parser.add_argument(
     default=1,
 )
 
+variational_parser.add_argument(
+    "--sparse_flip",
+    action="store_true",
+    help="Sparse-flip mode",
+    default=False,
+)
+
+variational_parser.add_argument(
+    "--shuffle_keep",
+    action="store_true",
+    help="Shuffle-keep mode",
+    default=False,
+)
+
+variational_parser.add_argument(
+    "--shuffle_forget",
+    action="store_true",
+    help="Shuffle-forget mode",
+    default=False,
+)
+
+variational_parser.add_argument(
+    "--freeze_theta",
+    action="store_true",
+    help="Freeze-theta-parameters mode",
+    default=False,
+)
 
 bsc_parser = argparse.ArgumentParser(add_help=False)
 bsc_parser.add_argument(
