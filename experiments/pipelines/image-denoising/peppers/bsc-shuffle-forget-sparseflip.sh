@@ -19,6 +19,6 @@ env HDF5_USE_FILE_LOCKING='FALSE' python main.py bsc \
 --no_generations 4 \
 --noise_level 25 \
 --shuffle_forget \
---sparseflip
+--sparse_flip
 
 # End of commands to execute
