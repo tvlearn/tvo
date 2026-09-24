@@ -400,34 +400,41 @@ def _fill_crossed_idxs_for_batch(
             crossed_idxs[n, o3:o4] = parent1
 
 
-def batch_cross(parents: Tensor) -> Tensor:
-    """For each datapoint, each pair of parents is crossed generating two children.
+from itertools import combinations
+from functools import lru_cache
 
-    :param parents: Tensor with shape (N, n_parents, H)
-    :returns: Tensor with shape (N, n_parents*(n_parents - 1), H)
 
-    The crossover is performed by selecting a "cut point" and switching the
-    """
-    N, n_parents, H = parents.shape
-    parent_pairs = np.array(list(combinations(range(n_parents), 2)), dtype=np.int64)
-    n_pairs = parent_pairs.shape[0]
-    cutting_points = np.random.randint(low=1, high=H, size=(N, n_pairs))
-    n_children = n_pairs * 2  # will produce 2 children per pair
-
-    # The next lines build (N, n_children, H) indexes that swap
-    # parent elements to produce the desired crossover.
-    crossed_idxs = np.empty((N, n_children * H), dtype=np.int64)
-    parent_pair_idxs = np.arange(n_pairs)
-    parent1_starts = np.tile(parent_pair_idxs * (2 * H), (N, 1))  # (N, n_children * H)
-    cutting_points_1 = parent1_starts + cutting_points
-    cutting_points_2 = cutting_points_1 + H
-    parent2_ends = parent1_starts + 2 * H
-    _fill_crossed_idxs_for_batch(
-        parent_pairs, crossed_idxs, parent1_starts, cutting_points_1, cutting_points_2, parent2_ends
+@lru_cache(maxsize=None)
+def get_parent_pairs(n_parents):
+    return to.tensor(
+        list(combinations(range(n_parents), 2)),
+        dtype=to.long,
     )
-    crossed_idxs = crossed_idxs.reshape(N, n_children, H)
 
-    children = parents[np.arange(N)[:, None, None], crossed_idxs, np.arange(H)[None, None, :]]
+
+def batch_cross(parents):
+    """
+    parents: Tensor of shape (N, n_parents, H)
+    returns:
+    Tensor of shape (N, n_parents*(n_parents-1), H)
+    """
+
+    N, n_parents, H = parents.shape
+    device = parents.device
+
+    parent_pairs = get_parent_pairs(n_parents).to(device)
+    n_pairs = parent_pairs.shape[0]
+    cuts = to.randint(1, H, (N, n_pairs), device=device)
+    pair1 = parent_pairs[:, 0]
+    pair2 = parent_pairs[:, 1]
+    p1 = parents[:, pair1, :]
+    p2 = parents[:, pair2, :]
+    mask = to.arange(H, device=device).view(1, 1, H) < cuts.unsqueeze(-1)
+    child1 = to.where(mask, p1, p2)
+    child2 = to.where(mask, p2, p1)
+    children = to.empty((N, 2 * n_pairs, H), dtype=parents.dtype, device=device)
+    children[:, 0::2] = child1
+    children[:, 1::2] = child2
     return children
 
 
