@@ -15,7 +15,6 @@ env HDF5_USE_FILE_LOCKING='FALSE' python main.py bsc \
 --patch_height 8 \
 -H 256 \
 --no_parents 10 \
---no_children None \
 --no_generations 4 \
 --noise_level 25 \
 --crossover

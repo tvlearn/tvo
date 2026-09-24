@@ -79,7 +79,7 @@ variational_parser.add_argument(
     "--no_children",
     type=int,
     help="Number of children to evolve per generation",
-    default=2,
+    default=None,
 )
 
 variational_parser.add_argument(
